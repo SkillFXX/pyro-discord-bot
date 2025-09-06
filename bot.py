@@ -8,7 +8,7 @@ TOKEN = Config.TOKEN
 
 class MyBot(commands.Bot):
     async def setup_hook(self):
-        for extension in ['listener']:
+        for extension in ['listener', 'config']:
             await self.load_extension(f'cogs.{extension}')
 
     async def on_ready(self):
