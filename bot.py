@@ -12,6 +12,8 @@ class MyBot(commands.Bot):
             await self.load_extension(f'cogs.{extension}')
 
     async def on_ready(self):
+        synced = await bot.tree.sync()
+        print(f"{len(synced)} globally synchronized commands")
         print(f"Logged as {self.user} (ID : {self.user.id})")
 
 intents = discord.Intents.all()

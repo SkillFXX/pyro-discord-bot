@@ -29,7 +29,7 @@ class ListenerCog(commands.Cog):
             self.check_rules(guild_id, channel_id, full_content)
 
         except Exception as e:
-            print(f"Error [on_thread_create | listener.py ] : {e}")
+            print(f"Error [on_thread_create | cogs/listener.py ] : {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
