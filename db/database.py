@@ -17,7 +17,8 @@ def init_db():
         channel_id INTEGER,
         rule TEXT,
         description TEXT,
-        consequence TEXT,
+        message_consequence TEXT,
+        user_consequence TEXT
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -38,3 +39,13 @@ def get_listener_rules(guild_id: int, channel_id: int):
     
     # retourne une liste de dictionnaires
     return [dict(row) for row in rows]
+
+def create_rule(guild_id:int, channel_id:int, rule_type:str, rule_value:str, message_consequence:str, user_consequence:str, description:str):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO listener_rules (guild_id, channel_id, rule, description, message_consequence, user_consequence)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (guild_id, channel_id, f"{rule_type}:{rule_value}", description, message_consequence, user_consequence))
+    conn.commit()
+    conn.close()
