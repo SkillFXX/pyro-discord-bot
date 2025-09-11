@@ -49,3 +49,21 @@ def create_rule(guild_id:int, channel_id:int, rule_type:str, rule_value:str, mes
     """, (guild_id, channel_id, f"{rule_type}:{rule_value}", description, message_consequence, user_consequence))
     conn.commit()
     conn.close()
+
+def delete_rule(guild_id: int, rule_id: int) -> bool:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM listener_rules WHERE id = ? AND guild_id = ?", (rule_id, guild_id))
+    conn.commit()
+    deleted = c.rowcount > 0
+    conn.close()
+    return deleted
+
+def list_rules(guild_id: int):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, channel_id, rule, description, message_consequence, user_consequence FROM listener_rules WHERE guild_id = ?", (guild_id,))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
