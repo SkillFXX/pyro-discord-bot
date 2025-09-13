@@ -8,15 +8,16 @@ class ListenerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def check_rules(self, guild_id, channel_id, content):
-        content_lower = content.lower()
+    def check_rules(self, guild_id, channel_id, message):
+        content_lower = message.content.lower()
+        media_count = len(message.attachments)  # Comptage des médias
         violated_rule = None
 
         rules = database.get_listener_rules(guild_id, channel_id)
 
         for rule in rules:
             rule_value = rule['rule']
-            
+
             if rule_value.startswith("min_char"):
                 min_len = int(rule_value.split(":")[1])
                 if len(content_lower.strip()) < min_len:
@@ -41,7 +42,20 @@ class ListenerCog(commands.Cog):
                     violated_rule = rule
                     break
 
+            elif rule_value.startswith("min_media"):
+                min_media = int(rule_value.split(":")[1])
+                if media_count < min_media:
+                    violated_rule = rule
+                    break
+
+            elif rule_value.startswith("max_media"):
+                max_media = int(rule_value.split(":")[1])
+                if media_count > max_media:
+                    violated_rule = rule
+                    break
+
         return violated_rule
+
 
     async def apply_consequences(self, message_or_thread, rule, user=None):
         if isinstance(message_or_thread, (discord.Message, discord.Thread)):
@@ -95,9 +109,15 @@ class ListenerCog(commands.Cog):
     async def on_message(self, message):
         if message.author.bot:
             return
-        violated_rule = self.check_rules(message.guild.id, message.channel.id, message.content)
+
+        violated_rule = self.check_rules(
+            message.guild.id, 
+            message.channel.id, 
+            message  
+        )
         if violated_rule:
             await self.apply_consequences(message, violated_rule)
+
 
     @commands.Cog.listener()
     async def on_thread_create(self, thread):
@@ -105,11 +125,16 @@ class ListenerCog(commands.Cog):
         async for message in thread.history(limit=1, oldest_first=True):
             if message.author.bot:
                 return
-            full_content = f"{thread.name} {message.content}"
-            violated_rule = self.check_rules(thread.guild.id, thread.parent.id, full_content)
+
+            violated_rule = self.check_rules(
+                thread.guild.id, 
+                thread.parent.id, 
+                message
+            )
+
             if violated_rule:
-                # On passe le premier message comme "user" pour appliquer la sanction
                 await self.apply_consequences(thread, violated_rule, user=message.author)
+
 
 
         
