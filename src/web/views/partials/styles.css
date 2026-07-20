@@ -1,0 +1,307 @@
+/* Pyro Bot Dashboard - Shared Styles */
+:root {
+  --primary: #ff6b35;
+  --primary-hover: #e0531f;
+  --primary-focus: rgba(255, 107, 53, 0.25);
+  --background: #0f0f12;
+  --surface: #15151a;
+  --surface-hover: #1a1a24;
+  --text: #e2e8f0;
+  --text-muted: rgba(226, 232, 240, 0.7);
+  --border: rgba(255, 255, 255, 0.1);
+  --success: #2ecc71;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --info: #3498db;
+}
+
+[data-theme="light"],
+:root:not([data-theme="dark"]) {
+  --primary: #ff6b35;
+  --primary-hover: #e0531f;
+  --primary-focus: rgba(255, 107, 53, 0.125);
+  --primary-inverse: #FFF;
+}
+
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --primary: #ff6b35;
+    --primary-hover: #ff9800;
+    --primary-focus: rgba(255, 107, 53, 0.25);
+    --primary-inverse: #FFF;
+  }
+}
+
+[data-theme="dark"] {
+  --primary: #ff6b35;
+  --primary-hover: #ff9800;
+  --primary-focus: rgba(255, 107, 53, 0.25);
+  --primary-inverse: #FFF;
+}
+
+:root {
+  --form-element-active-border-color: var(--primary);
+  --form-element-focus-color: var(--primary-focus);
+  --switch-color: var(--primary-inverse);
+  --switch-checked-background-color: var(--primary);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Header */
+.header-bar {
+  border-bottom: 1px solid rgba(255, 107, 53, 0.2);
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+  background-color: var(--surface);
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-title h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: var(--primary);
+}
+
+.header-title p {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+}
+
+/* Buttons */
+.logout-btn {
+  --background-color: var(--danger);
+  --border-color: var(--danger);
+}
+
+.logout-btn:hover {
+  --background-color: #c0392b;
+  --border-color: #c0392b;
+}
+
+.primary-btn {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.primary-btn:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+/* Sidebar */
+.sidebar {
+  padding: 1rem;
+  background-color: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-menu li a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar-menu li a svg {
+  flex-shrink: 0;
+}
+
+.sidebar-menu li a:hover,
+.sidebar-menu li a.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+/* Content Area */
+.content-area {
+  background-color: var(--surface);
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  min-height: 500px;
+}
+
+/* Tabs */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Form Elements */
+input,
+select,
+textarea {
+  background-color: var(--surface-hover);
+  border: 1px solid var(--border);
+  color: white;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-focus);
+}
+
+/* Grid */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.badge-success {
+  background-color: rgba(46, 204, 113, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(46, 204, 113, 0.2);
+}
+
+.badge-danger {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: var(--danger);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.badge-info {
+  background-color: rgba(52, 152, 219, 0.2);
+  color: var(--info);
+  border: 1px solid rgba(52, 152, 219, 0.2);
+}
+
+/* Notification Toast */
+#notification-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: var(--success);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  display: none;
+}
+
+#notification-toast.show {
+  display: block;
+  opacity: 1;
+}
+
+/* Automod Actions Checkboxes */
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.action-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-hover);
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: border-color 0.2s;
+}
+
+.action-checkbox-label:has(input:checked) {
+  border-color: var(--primary);
+  background-color: rgba(255, 107, 53, 0.1);
+}
+
+/* Login Page Specific */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(circle at center, #1e1e24 0%, #0f0f12 100%);
+}
+
+.login-article {
+  width: 100%;
+  max-width: 450px;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 107, 53, 0.2);
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.brand h1 {
+  color: var(--primary);
+  font-size: 2.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.error-msg {
+  color: var(--danger);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.login-page button {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.login-page button:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}

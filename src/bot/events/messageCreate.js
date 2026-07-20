@@ -208,9 +208,12 @@ async function handleAutomod(message, client) {
   const isForumThread = message.channel.isThread() && message.channel.parent?.type === 15; // 15 = GuildForum
   const isThreadStart = isForumThread && message.id === message.channel.id;
 
-  // Build a fingerprint for the message: text content + attachment URLs
-  // This allows detecting duplicate images (same URL = same file re-uploaded)
-  const attachmentFingerprint = [...message.attachments.values()].map(a => a.url.split('?')[0]).sort().join('|');
+  // Build a fingerprint for the message: text content + attachment properties
+  // Using name, size, and contentType instead of URL since Discord generates different URLs each time
+  const attachmentFingerprint = [...message.attachments.values()]
+    .map(a => `${a.name}:${a.size}:${a.contentType || 'unknown'}`)
+    .sort()
+    .join('|');
   const messageFingerprint = content.trim() + (attachmentFingerprint ? '::' + attachmentFingerprint : '');
 
   // Track user message log for anti-spam/duplicate

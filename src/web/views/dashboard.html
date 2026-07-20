@@ -3,195 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔥 Pyro Bot Dashboard</title>
+  <title>Pyro Bot Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/public/logo.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/partials/styles.css">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
-    [data-theme="light"],
-    :root:not([data-theme="dark"]) {
-      --primary: #fb8c00;
-      --primary-hover: #f57c00;
-      --primary-focus: rgba(251, 140, 0, 0.125);
-      --primary-inverse: #FFF;
-    }
-    @media only screen and (prefers-color-scheme: dark) {
-      :root:not([data-theme]) {
-        --primary: #fb8c00;
-        --primary-hover: #ff9800;
-        --primary-focus: rgba(251, 140, 0, 0.25);
-        --primary-inverse: #FFF;
-      }
-    }
-    [data-theme="dark"] {
-      --primary: #fb8c00;
-      --primary-hover: #ff9800;
-      --primary-focus: rgba(251, 140, 0, 0.25);
-      --primary-inverse: #FFF;
-    }
-    :root {
-      --form-element-active-border-color: var(--primary);
-      --form-element-focus-color: var(--primary-focus);
-      --switch-color: var(--primary-inverse);
-      --switch-checked-background-color: var(--primary);
-    }
-    
-    :root {
-      --primary: #ff6b35;
-      --primary-hover: #e0531f;
-      --primary-focus: rgba(255, 107, 53, 0.25);
-    }
-    body {
-      background-color: #0f0f12;
-      color: #e2e8f0;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-    .header-bar {
-      border-bottom: 1px solid #ff6b3533;
-      padding: 1rem 0;
-      margin-bottom: 2rem;
-      background-color: #15151a;
-    }
-    .header-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .header-title h1 {
-      margin: 0;
-      font-size: 1.8rem;
-      color: var(--primary);
-    }
-    .header-title p {
-      margin: 0;
-      font-size: 0.8rem;
-      opacity: 0.7;
-    }
-    .logout-btn {
-      --background-color: #e74c3c;
-      --border-color: #e74c3c;
-    }
-    .logout-btn:hover {
-      --background-color: #c0392b;
-      --border-color: #c0392b;
-    }
-    .sidebar {
-      padding: 1rem;
-      background-color: #15151a;
-      border-radius: 8px;
-      border: 1px solid #ffffff0a;
-    }
-    .sidebar-menu {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .sidebar-menu li a {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      margin-bottom: 0.5rem;
-      color: #e2e8f0;
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-    .sidebar-menu li a svg {
-      flex-shrink: 0;
-    }
-    .sidebar-menu li a:hover, .sidebar-menu li a.active {
-      background-color: var(--primary);
-      color: white;
-    }
-    .content-area {
-      background-color: #15151a;
-      padding: 2rem;
-      border-radius: 8px;
-      border: 1px solid #ffffff0a;
-      min-height: 500px;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    input, select, textarea {
-      background-color: #1a1a24;
-      border: 1px solid #ffffff1a;
-      color: white;
-    }
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-focus);
-    }
-    button.primary-btn {
-      background-color: var(--primary);
-      border-color: var(--primary);
-    }
-    button.primary-btn:hover {
-      background-color: var(--primary-hover);
-      border-color: var(--primary-hover);
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-    .badge {
-      display: inline-block;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: bold;
-    }
-    .badge-success { background-color: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid #2ecc7133; }
-    .badge-danger { background-color: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid #e74c3c33; }
-    .badge-info { background-color: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid #3498db33; }
-    
-    #notification-toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background-color: #2ecc71;
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      display: none;
-    }
-    #notification-toast.show {
-      display: block;
-      opacity: 1;
-    }
-
-    /* Automod actions checkboxes */
-    .actions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 0.5rem;
-    }
-    .action-checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
-      border: 1px solid #ffffff1a;
-      background-color: #1a1a24;
-      cursor: pointer;
-      font-size: 0.88rem;
-      transition: border-color 0.2s;
-    }
-    .action-checkbox-label:has(input:checked) {
-      border-color: var(--primary);
-      background-color: rgba(255, 107, 53, 0.1);
-    }
+    /* Custom styles specific to dashboard - shared styles in styles.css */
   </style>
 </head>
 <body>
@@ -199,9 +19,12 @@
   <!-- Top Navigation Bar -->
   <header class="header-bar">
     <div class="container header-container">
-      <div class="header-title">
-        <h1>🔥 Pyro Dashboard</h1>
-        <p>Serveur connecté : <strong><%= serverName %></strong> (<%= guildId %>)</p>
+      <div class="logo-container">
+        <img src="/public/logo.png" alt="Pyro Logo" class="logo-icon">
+        <div class="header-title">
+          <h1>Pyro Dashboard</h1>
+          <p>Serveur connecté : <strong><%= serverName %></strong> (<%= guildId %>)</p>
+        </div>
       </div>
       <div>
         <a href="/logout" class="button logout-btn" role="button">
@@ -304,7 +127,7 @@
                 <select id="voice_creator_channel_id" name="voice_creator_channel_id">
                   <option value="">-- Désactivé --</option>
                   <% channels.voice.forEach(v => { %>
-                    <option value="<%= v.id %>" <%= config.voice_creator_channel_id === v.id ? 'selected' : '' %>>🔊 <%= v.name %></option>
+                    <option value="<%= v.id %>" <%= config.voice_creator_channel_id === v.id ? 'selected' : '' %>><%= v.name %></option>
                   <% }) %>
                 </select>
               </div>
@@ -538,7 +361,7 @@
                 <select id="automod_channel" name="channelId" required onchange="onAutomodChannelChange(this)">
                   <option value="global" data-forum="false">Global (Tous les salons)</option>
                   <% channels.text.forEach(c => { %>
-                    <option value="<%= c.id %>" data-forum="<%= c.forum ? 'true' : 'false' %>"><%= c.forum ? '📋' : '#' %> <%= c.name %></option>
+                    <option value="<%= c.id %>" data-forum="<%= c.forum ? 'true' : 'false' %>"><%= c.forum ? 'Forum' : '#' %> <%= c.name %></option>
                   <% }) %>
                 </select>
               </div>
@@ -557,16 +380,16 @@
               <div>
                 <label for="automod_scope">Portée de la règle</label>
                 <select id="automod_scope" name="scope">
-                  <option value="all_messages">📡 Tous les messages</option>
-                  <option value="new_threads" id="scope_new_threads" style="display:none;">📌 Nouveaux posts de forum uniquement</option>
+                  <option value="all_messages">Tous les messages</option>
+                  <option value="new_threads" id="scope_new_threads" style="display:none;">Nouveaux posts de forum uniquement</option>
                 </select>
               </div>
               <div>
                 <label for="automod_monitored">Types de contenus surveillés</label>
                 <select id="automod_monitored" name="monitoredTypes">
-                  <option value="all">🔀 Tout (texte + pièces jointes)</option>
-                  <option value="text">✏️ Texte uniquement</option>
-                  <option value="attachments">📎 Pièces jointes uniquement</option>
+                  <option value="all">Tout (texte + pièces jointes)</option>
+                  <option value="text">Texte uniquement</option>
+                  <option value="attachments">Pièces jointes uniquement</option>
                 </select>
               </div>
             </div>
@@ -577,19 +400,19 @@
               <div class="actions-grid" style="margin-top: 0.4rem;">
                 <label class="action-checkbox-label">
                   <input type="checkbox" name="actions" value="delete" checked>
-                  🗑️ Supprimer le message
+                  <i data-lucide="trash-2" style="width:16px;height:16px;"></i> Supprimer le message
                 </label>
                 <label class="action-checkbox-label">
                   <input type="checkbox" name="actions" value="warn">
-                  ⚠️ Avertir (Warn DM)
+                  <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i> Avertir (Warn DM)
                 </label>
                 <label class="action-checkbox-label">
                   <input type="checkbox" name="actions" value="mute">
-                  🔇 Mute temporaire
+                  <i data-lucide="volume-x" style="width:16px;height:16px;"></i> Mute temporaire
                 </label>
                 <label class="action-checkbox-label">
                   <input type="checkbox" name="actions" value="ban">
-                  🔨 Bannir
+                  <i data-lucide="ban" style="width:16px;height:16px;"></i> Bannir
                 </label>
               </div>
             </div>

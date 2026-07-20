@@ -67,6 +67,17 @@ module.exports = {
             AttachFiles: true,
           });
 
+          // Update topic to track added member
+          const membersMatch = channel.topic ? channel.topic.match(/Membres ajoutés: (.+)$/) : null;
+          const addedMembersStr = membersMatch ? membersMatch[1].trim() : '';
+          const addedMembers = addedMembersStr ? addedMembersStr.split(',').map(id => id.trim()).filter(id => id !== '') : [];
+          
+          if (!addedMembers.includes(target.id)) {
+            addedMembers.push(target.id);
+            const newTopic = channel.topic.replace(/Membres ajoutés: .+$/, `Membres ajoutés: ${addedMembers.join(',')}`);
+            await channel.setTopic(newTopic);
+          }
+
           await interaction.editReply({
             embeds: [embeds.success(`${target} a été ajouté au ticket.`)]
           });
@@ -92,6 +103,17 @@ module.exports = {
           await channel.permissionOverwrites.edit(target.id, {
             ViewChannel: false,
           });
+
+          // Update topic to remove tracked member
+          const membersMatch = channel.topic ? channel.topic.match(/Membres ajoutés: (.+)$/) : null;
+          const addedMembersStr = membersMatch ? membersMatch[1].trim() : '';
+          const addedMembers = addedMembersStr ? addedMembersStr.split(',').map(id => id.trim()).filter(id => id !== '') : [];
+          
+          if (addedMembers.includes(target.id)) {
+            const newMembers = addedMembers.filter(id => id !== target.id);
+            const newTopic = channel.topic.replace(/Membres ajoutés: .+$/, `Membres ajoutés: ${newMembers.join(',')}`);
+            await channel.setTopic(newTopic);
+          }
 
           await interaction.editReply({
             embeds: [embeds.success(`${target} a été retiré du ticket.`)]
@@ -182,7 +204,7 @@ module.exports = {
           name: channelName,
           type: ChannelType.GuildText,
           parent: categoryId,
-          topic: `Ticket de ${target.username} | Auteur ID: ${target.id} | Sujet: ${subject} (Modérateur: ${interaction.user.username})`,
+          topic: `Ticket de ${target.username} | Auteur ID: ${target.id} | Sujet: ${subject} (Modérateur: ${interaction.user.username}) | Membres ajoutés: `,
           permissionOverwrites,
         });
 

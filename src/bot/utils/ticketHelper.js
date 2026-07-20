@@ -102,7 +102,7 @@ async function handleTicketModalSubmit(interaction, client) {
       name: channelName,
       type: ChannelType.GuildText,
       parent: categoryId,
-      topic: `Ticket de ${user.username} | Auteur ID: ${user.id} | Sujet: ${subject}`,
+      topic: `Ticket de ${user.username} | Auteur ID: ${user.id} | Sujet: ${subject} | Membres ajoutés: `,
       permissionOverwrites,
     });
 
@@ -159,7 +159,7 @@ async function handleTicketModalSubmit(interaction, client) {
 }
 
 /**
- * Closes the ticket by removing the user's access
+ * Closes the ticket by removing the user's access and added members
  */
 async function closeTicket(interaction, client) {
   const channel = interaction.channel;
@@ -167,6 +167,11 @@ async function closeTicket(interaction, client) {
   // Extract Author ID from topic
   const match = channel.topic ? channel.topic.match(/Auteur ID: (\d+)/) : null;
   const authorId = match ? match[1] : null;
+
+  // Extract added members from topic
+  const membersMatch = channel.topic ? channel.topic.match(/Membres ajoutés: (.+)$/) : null;
+  const addedMembersStr = membersMatch ? membersMatch[1].trim() : '';
+  const addedMembers = addedMembersStr ? addedMembersStr.split(',').map(id => id.trim()).filter(id => id !== '') : [];
 
   if (!authorId) {
     return interaction.reply({
@@ -183,10 +188,19 @@ async function closeTicket(interaction, client) {
       ViewChannel: false
     });
 
+    // Remove view channel permission for all added members
+    for (const memberId of addedMembers) {
+      if (memberId !== authorId) {
+        await channel.permissionOverwrites.edit(memberId, {
+          ViewChannel: false
+        }).catch(() => {});
+      }
+    }
+
     const closeEmbed = embeds.custom(
       '🔒 Ticket Fermé',
       `Ce ticket a été fermé par **${interaction.user.username}**.\n` +
-      `L'auteur du ticket n'a plus accès à ce salon.`,
+      `L'auteur du ticket et les membres ajoutés n'ont plus accès à ce salon.`,
       embeds.COLORS.WARNING
     );
 
@@ -223,7 +237,7 @@ async function closeTicket(interaction, client) {
 }
 
 /**
- * Reopens the ticket by restoring the user's access
+ * Reopens the ticket by restoring the user's access and added members
  */
 async function reopenTicket(interaction, client) {
   const channel = interaction.channel;
@@ -231,6 +245,11 @@ async function reopenTicket(interaction, client) {
   // Extract Author ID from topic
   const match = channel.topic ? channel.topic.match(/Auteur ID: (\d+)/) : null;
   const authorId = match ? match[1] : null;
+
+  // Extract added members from topic
+  const membersMatch = channel.topic ? channel.topic.match(/Membres ajoutés: (.+)$/) : null;
+  const addedMembersStr = membersMatch ? membersMatch[1].trim() : '';
+  const addedMembers = addedMembersStr ? addedMembersStr.split(',').map(id => id.trim()).filter(id => id !== '') : [];
 
   if (!authorId) {
     return interaction.reply({
@@ -250,13 +269,25 @@ async function reopenTicket(interaction, client) {
       AttachFiles: true,
     });
 
+    // Restore view channel permission for all added members
+    for (const memberId of addedMembers) {
+      if (memberId !== authorId) {
+        await channel.permissionOverwrites.edit(memberId, {
+          ViewChannel: true,
+          SendMessages: true,
+          ReadMessageHistory: true,
+          AttachFiles: true,
+        }).catch(() => {});
+      }
+    }
+
     // Delete old reopening message components
     await interaction.message.delete().catch(() => {});
 
     const reopenEmbed = embeds.custom(
       '🔓 Ticket Réouvert',
       `Ce ticket a été réouvert par **${interaction.user.username}**.\n` +
-      `L'auteur a de nouveau accès au salon.`,
+      `L'auteur et les membres ajoutés ont de nouveau accès au salon.`,
       embeds.COLORS.SUCCESS
     );
 

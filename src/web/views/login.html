@@ -4,52 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion - Pyro Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/public/logo.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/partials/styles.css">
   <style>
     body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
       background: radial-gradient(circle at center, #1e1e24 0%, #0f0f12 100%);
-    }
-    article {
-      width: 100%;
-      max-width: 450px;
-      padding: 2.5rem;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      border: 1px solid #ff6b3533;
-    }
-    .brand {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-    .brand h1 {
-      color: #ff6b35;
-      font-size: 2.5rem;
-      margin-bottom: 0.2rem;
-    }
-    .error-msg {
-      color: #e74c3c;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-    button {
-      background-color: #ff6b35;
-      border-color: #ff6b35;
-    }
-    button:hover {
-      background-color: #e0531f;
-      border-color: #e0531f;
     }
   </style>
 </head>
-<body>
+<body class="login-page">
   <main class="container">
-    <article>
+    <article class="login-article">
       <div class="brand">
+        <img src="/public/logo.png" alt="Pyro Logo" style="width:48px;height:48px;">
         <h1>Pyro</h1>
         <p>Dashboard d'Administration du Bot</p>
       </div>
@@ -67,5 +35,8 @@
       </form>
     </article>
   </main>
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>
