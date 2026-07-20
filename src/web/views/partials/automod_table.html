@@ -1,0 +1,79 @@
+<table>
+  <thead>
+    <tr>
+      <th>Salon</th>
+      <th>Type de Règle</th>
+      <th>Paramètres</th>
+      <th>Actions & Portée</th>
+      <th style="text-align: right;">Suppr.</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (automodRules.length === 0) { %>
+      <tr>
+        <td colspan="5" style="text-align: center; opacity: 0.6;">Aucune règle d'automodération configurée.</td>
+      </tr>
+    <% } else { %>
+      <% automodRules.forEach(rule => { %>
+        <tr>
+          <td>
+            <% if (rule.channelId === 'global') { %>
+              <span class="badge badge-info">Global</span>
+            <% } else { %>
+              <strong>#<%= rule.channelName || 'Salon inconnu' %></strong>
+            <% } %>
+          </td>
+          <td>
+            <% if (rule.ruleType === 'spam') { %>
+              <span class="badge badge-danger">Anti-Spam</span>
+            <% } else if (rule.ruleType === 'duplicate') { %>
+              <span class="badge badge-info">Anti-Doublons</span>
+            <% } else if (rule.ruleType === 'words_blacklist') { %>
+              <span class="badge badge-danger">Blacklist</span>
+            <% } else if (rule.ruleType === 'words_whitelist') { %>
+              <span class="badge badge-success">Whitelist</span>
+            <% } %>
+          </td>
+          <td>
+            <% 
+              let params = {};
+              try { params = JSON.parse(rule.parameters || '{}'); } catch(e) {}
+            %>
+            <% if (rule.ruleType === 'spam') { %>
+              <strong><%= params.maxMessages %></strong> msgs / <strong><%= params.intervalSeconds %>s</strong>
+            <% } else if (rule.ruleType === 'duplicate') { %>
+              <strong><%= params.maxDuplicates %></strong> doublons / <strong><%= params.intervalSeconds %>s</strong>
+            <% } else if (rule.ruleType === 'words_blacklist' || rule.ruleType === 'words_whitelist') { %>
+              <code style="word-break: break-all; font-size: 0.8em;"><%= Array.isArray(params) ? params.slice(0,3).join(', ') + (params.length > 3 ? '...' : '') : '' %></code>
+            <% } %>
+          </td>
+          <td>
+            <%
+              let actionsArr = [];
+              try { actionsArr = JSON.parse(rule.actions || '[]'); } catch(e) {}
+              const actionBadge = { delete: 'badge-info', warn: 'badge-success', mute: 'badge-danger', ban: 'badge-danger' };
+              const actionLabel = { delete: 'Suppr.', warn: 'Warn', mute: 'Mute', ban: 'Ban' };
+            %>
+            <div style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 3px;">
+              <% actionsArr.forEach(a => { %>
+                <span class="badge <%= actionBadge[a] || 'badge-info' %>"><%= actionLabel[a] || a %></span>
+              <% }) %>
+            </div>
+            <small style="opacity:0.55; font-size:0.7em;">
+              <%= rule.scope === 'new_threads' ? '📌 Nouveaux threads' : '📡 Tous messages' %>
+              · <%= rule.monitoredTypes === 'text' ? '✏️ Texte' : rule.monitoredTypes === 'attachments' ? '📎 Pièces jointes' : '🔀 Tout' %>
+            </small>
+          </td>
+          <td style="text-align: right;">
+            <button class="badge badge-danger" 
+                    style="border: none; cursor: pointer;"
+                    hx-delete="/dashboard/automod/<%= rule.id %>" 
+                    hx-target="#automod-table-container">
+              ✕
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    <% } %>
+  </tbody>
+</table>

@@ -1,0 +1,52 @@
+<table>
+  <thead>
+    <tr>
+      <th>Nombre de Warns</th>
+      <th>Sanction Automatique</th>
+      <th>Durée</th>
+      <th style="text-align: right;">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (warnActions.length === 0) { %>
+      <tr>
+        <td colspan="4" style="text-align: center; opacity: 0.6;">Aucune sanction automatique configurée.</td>
+      </tr>
+    <% } else { %>
+      <% warnActions.forEach(action => { %>
+        <tr>
+          <td><strong><%= action.warnsCount %></strong> warn(s)</td>
+          <td>
+            <% if (action.action === 'mute') { %>
+              <span class="badge badge-info">Exclusion (Mute)</span>
+            <% } else { %>
+              <span class="badge badge-danger">Bannissement</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (action.action === 'mute') { %>
+              <% if (action.duration >= 86400) { %>
+                <%= action.duration / 86400 %> jour(s)
+              <% } else if (action.duration >= 3600) { %>
+                <%= action.duration / 3600 %> heure(s)
+              <% } else { %>
+                <%= action.duration / 60 %> minute(s)
+              <% } %>
+              (<%= action.duration %>s)
+            <% } else { %>
+              Définitif
+            <% } %>
+          </td>
+          <td style="text-align: right;">
+            <button class="badge badge-danger" 
+                    style="border: none; cursor: pointer;"
+                    hx-delete="/dashboard/warnaction/<%= action.warnsCount %>" 
+                    hx-target="#warnactions-table-container">
+              Supprimer
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    <% } %>
+  </tbody>
+</table>

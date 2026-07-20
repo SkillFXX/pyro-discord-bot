@@ -1,0 +1,33 @@
+<table>
+  <thead>
+    <tr>
+      <th>Salon</th>
+      <th>Multiplicateur</th>
+      <th style="text-align: right;">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (xpMultipliers.length === 0) { %>
+      <tr>
+        <td colspan="3" style="text-align: center; opacity: 0.6;">Aucun multiplicateur d'XP configuré.</td>
+      </tr>
+    <% } else { %>
+      <% xpMultipliers.forEach(m => { %>
+        <tr>
+          <td><strong># <%= m.channelName || 'Salon Inconnu' %></strong> (<code><%= m.channelId %></code>)</td>
+          <td>
+            <span class="badge badge-info">× <%= m.multiplier %></span>
+          </td>
+          <td style="text-align: right;">
+            <button class="badge badge-danger"
+                    style="border: none; cursor: pointer;"
+                    hx-delete="/dashboard/xpmultiplier/<%= m.channelId %>"
+                    hx-target="#xpmultipliers-table-container">
+              Retirer
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    <% } %>
+  </tbody>
+</table>

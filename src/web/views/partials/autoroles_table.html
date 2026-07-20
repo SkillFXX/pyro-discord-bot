@@ -1,0 +1,31 @@
+<table>
+  <thead>
+    <tr>
+      <th>Rôle</th>
+      <th>ID du Rôle</th>
+      <th style="text-align: right;">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (autoRoles.length === 0) { %>
+      <tr>
+        <td colspan="3" style="text-align: center; opacity: 0.6;">Aucun rôle automatique configuré.</td>
+      </tr>
+    <% } else { %>
+      <% autoRoles.forEach(r => { %>
+        <tr>
+          <td><strong>@<%= r.roleName || 'Rôle Inconnu' %></strong></td>
+          <td><code><%= r.roleId %></code></td>
+          <td style="text-align: right;">
+            <button class="badge badge-danger" 
+                    style="border: none; cursor: pointer;"
+                    hx-delete="/dashboard/autorole/<%= r.roleId %>" 
+                    hx-target="#autoroles-table-container">
+              Retirer
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    <% } %>
+  </tbody>
+</table>

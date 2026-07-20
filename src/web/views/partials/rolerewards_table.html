@@ -1,0 +1,39 @@
+<table>
+  <thead>
+    <tr>
+      <th>Niveau Requis</th>
+      <th>Rôle Attribué</th>
+      <th>Remplacement</th>
+      <th style="text-align: right;">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (roleRewards.length === 0) { %>
+      <tr>
+        <td colspan="4" style="text-align: center; opacity: 0.6;">Aucune récompense de rôle configurée.</td>
+      </tr>
+    <% } else { %>
+      <% roleRewards.forEach(reward => { %>
+        <tr>
+          <td><strong>Niveau <%= reward.level %></strong></td>
+          <td><strong>@<%= reward.roleName || 'Rôle Inconnu' %></strong> (<code><%= reward.roleId %></code>)</td>
+          <td>
+            <% if (reward.replacePreviousRole) { %>
+              <span class="badge badge-danger">Retire les niveaux inférieurs</span>
+            <% } else { %>
+              <span class="badge badge-success">Cumulable</span>
+            <% } %>
+          </td>
+          <td style="text-align: right;">
+            <button class="badge badge-danger" 
+                    style="border: none; cursor: pointer;"
+                    hx-delete="/dashboard/rolereward/<%= reward.level %>" 
+                    hx-target="#rolerewards-table-container">
+              Retirer
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    <% } %>
+  </tbody>
+</table>
