@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pyro Bot Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/public/logo.png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/partials/styles.css">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <!-- Lucide Icons -->
@@ -372,6 +371,9 @@
                   <option value="duplicate">Anti-Doublons (Messages répétitifs)</option>
                   <option value="words_blacklist">Mots interdits (Blacklist)</option>
                   <option value="words_whitelist">Mots requis (Whitelist / Format)</option>
+                  <option value="min_length">Longueur minimum</option>
+                  <option value="max_length">Longueur maximum</option>
+                  <option value="regex">Expression régulière (Regex)</option>
                 </select>
               </div>
             </div>
@@ -392,6 +394,11 @@
                   <option value="attachments">Pièces jointes uniquement</option>
                 </select>
               </div>
+            </div>
+
+            <div style="margin-top: 0.8rem;">
+                <label for="customReason">Motif personnalisé de la sanction (Optionnel)</label>
+                <input type="text" id="customReason" name="customReason" placeholder="Raison affichée aux modérateurs et à l'utilisateur (ex: Langage inapproprié interdit)">
             </div>
 
             <!-- Multi-action checkboxes -->
@@ -449,6 +456,22 @@
                 <label for="words_list">Liste de mots (séparés par des virgules)</label>
                 <input type="text" id="words_list" name="words_list" placeholder="Ex: discord.gg, hack, gratuit, bot">
                 <small>La détection est insensible à la casse.</small>
+              </div>
+
+              <div id="params-min_length" class="params-subfields" style="display:none;">
+                <label for="min_length">Longueur minimum requise (caractères)</label>
+                <input type="number" id="min_length" name="min_length" placeholder="Ex: 50" min="1">
+              </div>
+
+              <div id="params-max_length" class="params-subfields" style="display:none;">
+                <label for="max_length">Longueur maximum autorisée (caractères)</label>
+                <input type="number" id="max_length" name="max_length" placeholder="Ex: 500" min="1">
+              </div>
+
+              <div id="params-regex" class="params-subfields" style="display:none;">
+                <label for="regex_pattern">Motif Expression Régulière (Regex)</label>
+                <input type="text" id="regex_pattern" name="regex_pattern" placeholder="Ex: ^https?:\/\/">
+                <small>Testez vos Regex au préalable (la vérification est insensible à la casse: /i).</small>
               </div>
             </div>
 
@@ -522,6 +545,12 @@
         document.getElementById('params-duplicate').style.display = 'block';
       } else if (ruleType === 'words_blacklist' || ruleType === 'words_whitelist') {
         document.getElementById('params-words').style.display = 'block';
+      } else if (ruleType === 'min_length') {
+        document.getElementById('params-min_length').style.display = 'block';
+      } else if (ruleType === 'max_length') {
+        document.getElementById('params-max_length').style.display = 'block';
+      } else if (ruleType === 'regex') {
+        document.getElementById('params-regex').style.display = 'block';
       }
     }
 

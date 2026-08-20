@@ -288,16 +288,12 @@ async function handleAutomod(message, client) {
     } 
     else if (rule.ruleType === 'words_blacklist') {
       const blacklist = parameters;
-      // Also check thread title if this is the first post of a forum thread
       const threadTitle = isThreadStart ? (message.channel.name || '') : '';
       const contentToCheck = content + ' ' + threadTitle;
       for (const word of blacklist) {
         if (contentToCheck.toLowerCase().includes(word.toLowerCase())) {
           triggered = true;
-          reason = `Contient un mot banni : "${word}"`;
-          if (threadTitle && threadTitle.toLowerCase().includes(word.toLowerCase())) {
-            reason += ` (dans le titre du post)`;
-          }
+          reason = rule.customReason || `Contient un mot banni : "${word}"`;
           break;
         }
       }
@@ -305,7 +301,6 @@ async function handleAutomod(message, client) {
     else if (rule.ruleType === 'words_whitelist') {
       const whitelist = parameters;
       if (whitelist.length > 0) {
-        // Also check thread title if this is the first post of a forum thread
         const threadTitle = isThreadStart ? (message.channel.name || '') : '';
         const contentToCheck = content + ' ' + threadTitle;
         const containsApprovedWord = whitelist.some(word => 
@@ -313,7 +308,37 @@ async function handleAutomod(message, client) {
         );
         if (!containsApprovedWord) {
           triggered = true;
-          reason = `Format de message incorrect (ne contient aucun mot requis de la liste : ${whitelist.join(', ')})`;
+          reason = rule.customReason || `Format de message incorrect (ne contient aucun mot requis)`;
+        }
+      }
+    }
+    else if (rule.ruleType === 'min_length') {
+      const minLength = parameters.minLength || 0;
+      if (content.length < minLength) {
+        triggered = true;
+        reason = rule.customReason || `Message trop court (minimum ${minLength} caractères)`;
+      }
+    }
+    else if (rule.ruleType === 'max_length') {
+      const maxLength = parameters.maxLength || 2000;
+      if (content.length > maxLength) {
+        triggered = true;
+        reason = rule.customReason || `Message trop long (maximum ${maxLength} caractères)`;
+      }
+    }
+    else if (rule.ruleType === 'regex') {
+      const pattern = parameters.pattern;
+      if (pattern) {
+        try {
+          const threadTitle = isThreadStart ? (message.channel.name || '') : '';
+          const contentToCheck = content + ' ' + threadTitle;
+          const regex = new RegExp(pattern, 'i');
+          if (regex.test(contentToCheck)) {
+            triggered = true;
+            reason = rule.customReason || `Message correspond à un motif non autorisé`;
+          }
+        } catch (e) {
+          console.error('[Automod] Invalid regex pattern:', pattern, e);
         }
       }
     }

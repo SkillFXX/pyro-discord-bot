@@ -35,7 +35,8 @@ async function logModerationAction(client, { action, target, moderator, reason, 
     ];
 
     if (reason) {
-      fields.push({ name: '📝 Motif', value: reason, inline: false });
+      const safeReason = reason.length > 1024 ? reason.substring(0, 1021) + '...' : reason;
+      fields.push({ name: '📝 Motif', value: safeReason, inline: false });
     }
 
     if (duration) {

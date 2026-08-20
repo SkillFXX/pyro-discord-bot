@@ -131,7 +131,8 @@ function startWebServer(client, port) {
         actions: r.actions,
         action: r.action,
         scope: r.scope,
-        monitoredTypes: r.monitoredTypes
+        monitoredTypes: r.monitoredTypes,
+        customReason: r.customReason
       };
     });
 
@@ -318,7 +319,14 @@ function startWebServer(client, port) {
 
   // 7. Automod Rules Config
   app.post('/dashboard/automod', isAuthenticated, async (req, res) => {
-    const { channelId, ruleType, spam_max, spam_interval, duplicate_max, duplicate_interval, words_list, scope, monitoredTypes } = req.body;
+    const { 
+      channelId, ruleType, 
+      spam_max, spam_interval, 
+      duplicate_max, duplicate_interval, 
+      words_list, 
+      min_length, max_length, regex_pattern,
+      scope, monitoredTypes, customReason 
+    } = req.body;
     
     // Parse multi-actions from checkbox inputs
     let actionsArray = [];
@@ -347,6 +355,12 @@ function startWebServer(client, port) {
         ? words_list.split(',').map(w => w.trim()).filter(w => w.length > 0) 
         : [];
       parameters = JSON.stringify(words);
+    } else if (ruleType === 'min_length') {
+      parameters = JSON.stringify({ minLength: parseInt(min_length || 0) });
+    } else if (ruleType === 'max_length') {
+      parameters = JSON.stringify({ maxLength: parseInt(max_length || 2000) });
+    } else if (ruleType === 'regex') {
+      parameters = JSON.stringify({ pattern: regex_pattern || '' });
     }
 
     await AutomodRule.create({
@@ -355,7 +369,8 @@ function startWebServer(client, port) {
       parameters,
       actions: actionsJson,
       scope: scope || 'all_messages',
-      monitoredTypes: monitoredTypes || 'all'
+      monitoredTypes: monitoredTypes || 'all',
+      customReason: customReason || null
     });
 
     const guildContext = await getGuildContext();

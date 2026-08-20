@@ -142,6 +142,10 @@ const AutomodRule = sequelize.define('AutomodRule', {
     type: DataTypes.TEXT, // JSON serialized array of actions, e.g. ['delete', 'warn']
     defaultValue: '[]',
   },
+  customReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   scope: {
     type: DataTypes.STRING, // 'all_messages' | 'new_threads'
     defaultValue: 'all_messages',

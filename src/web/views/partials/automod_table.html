@@ -32,6 +32,12 @@
               <span class="badge badge-danger">Blacklist</span>
             <% } else if (rule.ruleType === 'words_whitelist') { %>
               <span class="badge badge-success">Whitelist</span>
+            <% } else if (rule.ruleType === 'min_length') { %>
+              <span class="badge badge-warning">Min Length</span>
+            <% } else if (rule.ruleType === 'max_length') { %>
+              <span class="badge badge-warning">Max Length</span>
+            <% } else if (rule.ruleType === 'regex') { %>
+              <span class="badge badge-info">Regex</span>
             <% } %>
           </td>
           <td>
@@ -45,6 +51,15 @@
               <strong><%= params.maxDuplicates %></strong> doublons / <strong><%= params.intervalSeconds %>s</strong>
             <% } else if (rule.ruleType === 'words_blacklist' || rule.ruleType === 'words_whitelist') { %>
               <code style="word-break: break-all; font-size: 0.8em;"><%= Array.isArray(params) ? params.slice(0,3).join(', ') + (params.length > 3 ? '...' : '') : '' %></code>
+            <% } else if (rule.ruleType === 'min_length') { %>
+              Min: <strong><%= params.minLength %></strong> chars
+            <% } else if (rule.ruleType === 'max_length') { %>
+              Max: <strong><%= params.maxLength %></strong> chars
+            <% } else if (rule.ruleType === 'regex') { %>
+              <code style="word-break: break-all; font-size: 0.8em;"><%= params.pattern %></code>
+            <% } %>
+            <% if (rule.customReason) { %>
+              <br><small style="opacity: 0.7;">Motif: "<%= rule.customReason %>"</small>
             <% } %>
           </td>
           <td>
