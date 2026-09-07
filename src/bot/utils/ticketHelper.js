@@ -180,6 +180,22 @@ async function closeTicket(interaction, client) {
     });
   }
 
+  // Authorization check: only the author or staff/admin can close
+  const staffRoleId = await ConfigHelper.get('ticket_staff_role_id');
+  const isStaffOrAdmin = 
+    interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+    interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+  const isAuthor = interaction.user.id === authorId;
+
+  if (!isAuthor && !isStaffOrAdmin) {
+    return interaction.reply({
+      embeds: [embeds.error('Seul l\'auteur du ticket ou un membre du staff est autorisé à fermer ce ticket.')],
+      ephemeral: true
+    });
+  }
+
   await interaction.deferReply();
 
   try {
@@ -258,6 +274,20 @@ async function reopenTicket(interaction, client) {
     });
   }
 
+  // Authorization check: only staff/admin can reopen tickets
+  const staffRoleId = await ConfigHelper.get('ticket_staff_role_id');
+  const isStaffOrAdmin = 
+    interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+    interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+  if (!isStaffOrAdmin) {
+    return interaction.reply({
+      embeds: [embeds.error('Seul un membre du staff ou un administrateur peut réouvrir ce ticket.')],
+      ephemeral: true
+    });
+  }
+
   await interaction.deferReply();
 
   try {
@@ -320,6 +350,20 @@ async function deleteTicket(interaction, client) {
   // Extract Author ID from topic
   const match = channel.topic ? channel.topic.match(/Auteur ID: (\d+)/) : null;
   const authorId = match ? match[1] : null;
+
+  // Authorization check: only staff/admin can delete tickets
+  const staffRoleId = await ConfigHelper.get('ticket_staff_role_id');
+  const isStaffOrAdmin = 
+    interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+    interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+  if (!isStaffOrAdmin) {
+    return interaction.reply({
+      embeds: [embeds.error('Seul un membre du staff ou un administrateur est autorisé à supprimer ce ticket.')],
+      ephemeral: true
+    });
+  }
 
   await interaction.reply({
     embeds: [embeds.warning('Ce salon sera définitivement supprimé dans 5 secondes.')]

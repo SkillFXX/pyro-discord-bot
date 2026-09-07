@@ -354,8 +354,28 @@ const ConfigHelper = {
   }
 };
 
+/**
+ * Configure SQLite high-performance PRAGMAs:
+ * - WAL mode (Write-Ahead Logging): allows concurrent reads during writes, prevents SQLITE_BUSY
+ * - synchronous = NORMAL: faster writes while retaining durability in WAL mode
+ * - cache_size = -64000: 64MB memory page cache
+ * - temp_store = MEMORY: stores temporary tables in RAM
+ */
+async function initDatabasePragmas() {
+  try {
+    await sequelize.query('PRAGMA journal_mode = WAL;');
+    await sequelize.query('PRAGMA synchronous = NORMAL;');
+    await sequelize.query('PRAGMA cache_size = -64000;');
+    await sequelize.query('PRAGMA temp_store = MEMORY;');
+    await sequelize.query('PRAGMA foreign_keys = ON;');
+  } catch (err) {
+    console.warn('[Database] Warning applying SQLite PRAGMAs:', err.message);
+  }
+}
+
 module.exports = {
   sequelize,
+  initDatabasePragmas,
   Config,
   Warn,
   WarnAction,

@@ -330,19 +330,26 @@ const analyticsService = {
       memberWhere.userId = userId;
     }
 
-    // Fetch records
-    let [messages, voiceLogs, memberLogs, snapshots] = await Promise.all([
-      MessageLog.findAll({ where: msgWhere, raw: true }),
-      VoiceLog.findAll({ where: voiceWhere, raw: true }),
-      MemberLog.findAll({ where: memberWhere, order: [['createdAt', 'DESC']], raw: true }),
-      UserSnapshot.findAll({ raw: true }),
+    // 1. Fetch records with projected attributes (performance & memory optimization)
+    let [messages, voiceLogs, memberLogs] = await Promise.all([
+      MessageLog.findAll({
+        where: msgWhere,
+        attributes: ['userId', 'channelId', 'messageLength', 'wordCount', 'roleIds', 'createdAt'],
+        raw: true,
+      }),
+      VoiceLog.findAll({
+        where: voiceWhere,
+        attributes: ['userId', 'channelId', 'durationSeconds', 'roleIds', 'joinedAt'],
+        raw: true,
+      }),
+      MemberLog.findAll({
+        where: memberWhere,
+        attributes: ['id', 'userId', 'eventType', 'createdAt'],
+        order: [['createdAt', 'DESC']],
+        limit: 1000,
+        raw: true,
+      }),
     ]);
-
-    // Build snapshot cache: userId -> snapshot
-    const userMap = new Map();
-    for (const s of snapshots) {
-      userMap.set(s.userId, s);
-    }
 
     // Role filtering (if specified)
     if (roleId && roleId !== 'all') {
@@ -363,6 +370,25 @@ const analyticsService = {
           return false;
         }
       });
+    }
+
+    // 2. Fetch UserSnapshots ONLY for users relevant to these records (huge memory & DB speedup)
+    const activeUserIds = new Set([
+      ...messages.map((m) => m.userId),
+      ...voiceLogs.map((v) => v.userId),
+      ...memberLogs.slice(0, 100).map((l) => l.userId),
+    ]);
+
+    const userMap = new Map();
+    if (activeUserIds.size > 0) {
+      const snapshots = await UserSnapshot.findAll({
+        where: { userId: [...activeUserIds] },
+        attributes: ['userId', 'username', 'displayName', 'avatarUrl', 'roles'],
+        raw: true,
+      });
+      for (const s of snapshots) {
+        userMap.set(s.userId, s);
+      }
     }
 
     // Helper: user details resolver
@@ -434,11 +460,11 @@ const analyticsService = {
     const totalVoiceHours = Number((totalVoiceSeconds / 3600).toFixed(1));
     const formattedVoiceTime = formatDuration(totalVoiceSeconds);
 
-    const activeUserIds = new Set([
+    const activeMemberIds = new Set([
       ...messages.map((m) => m.userId),
       ...voiceLogs.map((v) => v.userId),
     ]);
-    const totalActiveMembers = activeUserIds.size;
+    const totalActiveMembers = activeMemberIds.size;
 
     const joinsCount = memberLogs.filter((l) => l.eventType === 'join').length;
     const leavesCount = memberLogs.filter((l) => l.eventType === 'leave').length;
@@ -779,11 +805,21 @@ const analyticsService = {
   },
 
   /**
-   * Export activity dataset to CSV string
+   * Export activity dataset to CSV string with formula injection protection (CWE-1236)
    */
   async exportCSV(options) {
     const data = await this.getAnalytics(options);
     const rows = [];
+
+    // Safe cell formatter (neutralizes formula injection like =cmd, @SUM, +etc.)
+    function safeCell(val) {
+      if (val === null || val === undefined) return '""';
+      let str = String(val);
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = "'" + str; // Prepend apostrophe so spreadsheet programs don't execute formulas
+      }
+      return `"${str.replace(/"/g, '""')}"`;
+    }
 
     // Header metadata
     rows.push(['# RAPPORT ANALYTIQUE PYRO DISCORD BOT']);
@@ -801,11 +837,11 @@ const analyticsService = {
     data.topMembers.forEach((m, idx) => {
       rows.push([
         idx + 1,
-        `"${m.userId}"`,
-        `"${m.displayName.replace(/"/g, '""')}"`,
-        `"${m.username.replace(/"/g, '""')}"`,
+        safeCell(m.userId),
+        safeCell(m.displayName),
+        safeCell(m.username),
         m.messagesCount,
-        `"${m.voiceFormatted}"`,
+        safeCell(m.voiceFormatted),
         m.avgMessageLength,
       ]);
     });
@@ -817,8 +853,8 @@ const analyticsService = {
     data.topTextChannels.forEach((c, idx) => {
       rows.push([
         idx + 1,
-        `"${c.channelId}"`,
-        `"#${c.channelName.replace(/"/g, '""')}"`,
+        safeCell(c.channelId),
+        safeCell('#' + c.channelName),
         c.messagesCount,
         c.avgMessageLength,
         c.uniqueUsersCount,
@@ -832,9 +868,9 @@ const analyticsService = {
     data.topVoiceChannels.forEach((c, idx) => {
       rows.push([
         idx + 1,
-        `"${c.channelId}"`,
-        `"🔊 ${c.channelName.replace(/"/g, '""')}"`,
-        `"${c.voiceFormatted}"`,
+        safeCell(c.channelId),
+        safeCell('🔊 ' + c.channelName),
+        safeCell(c.voiceFormatted),
         c.sessionsCount,
         c.uniqueUsersCount,
       ]);
@@ -845,7 +881,7 @@ const analyticsService = {
     rows.push(['--- REPARTITION HORAIRE (HEURES DE POINTE) ---']);
     rows.push(['Heure', 'Messages', 'Minutes Vocales']);
     data.peakHours.forEach((h) => {
-      rows.push([`${h.hour}h00`, h.messages, h.voiceMinutes]);
+      rows.push([safeCell(`${h.hour}h00`), h.messages, h.voiceMinutes]);
     });
 
     return rows.map((r) => r.join(',')).join('\n');

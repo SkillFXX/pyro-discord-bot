@@ -1,22 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
-
-function getXPNeededForLevel(level) {
-  if (level <= 0) return 0;
-  return Math.floor(100 * Math.pow(level, 1.5));
-}
-
-function makeProgressBar(current, max, size = 12) {
-  if (max <= 0) return '\`[■■■■■■■■■■■■]\` **100%**';
-  const percentage = Math.max(0, Math.min(1, current / max));
-  const progress = Math.round(size * percentage);
-  const emptyProgress = size - progress;
-  const progressText = '■'.repeat(progress);
-  const emptyProgressText = '□'.repeat(emptyProgress);
-  const percentageText = Math.round(percentage * 100);
-  return `\`[${progressText}${emptyProgressText}]\` **${percentageText}%**`;
-}
+const { getXPNeededForLevel, makeProgressBar } = require('../utils/xpHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()

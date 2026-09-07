@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
+const crypto = require('crypto');
 const { ChannelType } = require('discord.js');
 const { 
   ConfigHelper, 
@@ -15,6 +16,41 @@ const {
 const { updateBotStatus } = require('../bot/events/ready');
 const analyticsService = require('../services/analyticsService');
 
+// Login rate limiting (max 5 failed attempts per 15 minutes)
+const loginAttempts = new Map();
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+  if (attempt) {
+    if (attempt.lockedUntil && now < attempt.lockedUntil) {
+      const remainingMins = Math.ceil((attempt.lockedUntil - now) / 60000);
+      return `Trop de tentatives. Veuillez patienter ${remainingMins} minute(s).`;
+    }
+    if (attempt.lockedUntil && now >= attempt.lockedUntil) {
+      loginAttempts.delete(ip);
+    }
+  }
+  return null;
+}
+
+function recordFailedLogin(ip) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip) || { count: 0, lockedUntil: null };
+  attempt.count += 1;
+  if (attempt.count >= 5) {
+    attempt.lockedUntil = now + 15 * 60 * 1000;
+  }
+  loginAttempts.set(ip, attempt);
+}
+
+function safeCompareTokens(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
 function startWebServer(client, port) {
   const app = express();
 
@@ -27,11 +63,21 @@ function startWebServer(client, port) {
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
   app.use(express.static(path.join(__dirname, 'views')));
+
+  const sessionSecret = process.env.SESSION_SECRET || (() => {
+    console.warn('[Security] SESSION_SECRET non configuré dans .env. Utilisation d\'une clé aléatoire temporaire.');
+    return crypto.randomBytes(32).toString('hex');
+  })();
+
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'pyro-secret-fallback',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Set to true if running over HTTPS
+    cookie: { 
+      secure: false, // Set to true if running over HTTPS
+      httpOnly: true, // Mitigate XSS cookie access
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    }
   }));
 
   // Auth Middleware
@@ -42,8 +88,16 @@ function startWebServer(client, port) {
     res.redirect('/login');
   }
 
-  // Helper: Get guild data
-  async function getGuildContext() {
+  // Helper: Get guild data with 30s memory cache
+  let cachedGuildContext = null;
+  let cachedGuildContextTime = 0;
+
+  async function getGuildContext(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && cachedGuildContext && (now - cachedGuildContextTime < 30000)) {
+      return cachedGuildContext;
+    }
+
     const guildId = process.env.GUILD_ID;
     const guild = client.guilds.cache.get(guildId);
     
@@ -51,7 +105,8 @@ function startWebServer(client, port) {
       return { 
         guildName: 'Serveur Inconnu', 
         channels: { text: [], voice: [], categories: [] }, 
-        roles: [] 
+        roles: [],
+        members: []
       };
     }
 
@@ -68,7 +123,7 @@ function startWebServer(client, port) {
     });
 
     const roles = guild.roles.cache
-      .filter(r => r.id !== guild.id && !r.managed) // Exclude @everyone and bot integration roles
+      .filter(r => r.id !== guild.id && !r.managed)
       .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -84,7 +139,11 @@ function startWebServer(client, port) {
     });
 
     try {
-      const snapshots = await UserSnapshot.findAll({ raw: true });
+      const snapshots = await UserSnapshot.findAll({ 
+        attributes: ['userId', 'username', 'displayName'],
+        limit: 500,
+        raw: true 
+      });
       for (const s of snapshots) {
         if (!membersMap.has(s.userId)) {
           membersMap.set(s.userId, {
@@ -98,7 +157,7 @@ function startWebServer(client, port) {
 
     const members = Array.from(membersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-    return {
+    cachedGuildContext = {
       guildName: guild.name,
       channels: {
         text: textChannels.sort((a, b) => a.name.localeCompare(b.name)),
@@ -108,41 +167,36 @@ function startWebServer(client, port) {
       roles,
       members
     };
+    cachedGuildContextTime = now;
+    return cachedGuildContext;
   }
 
-  // Helper: Fetch all DB lists matched with Discord cache names
-  async function getDashboardLists(guildContext) {
-    const guildId = process.env.GUILD_ID;
-    const guild = client.guilds.cache.get(guildId);
-
-    // Auto-Roles
+  // Modular Table Fetchers (DRY & High Performance)
+  async function fetchAutoRoles(guild) {
     const dbAutoRoles = await AutoRole.findAll();
-    const autoRoles = dbAutoRoles.map(r => {
-      const discordRole = guild ? guild.roles.cache.get(r.roleId) : null;
-      return {
-        roleId: r.roleId,
-        roleName: discordRole ? discordRole.name : 'Rôle Inconnu'
-      };
-    });
+    return dbAutoRoles.map(r => ({
+      roleId: r.roleId,
+      roleName: guild ? (guild.roles.cache.get(r.roleId)?.name || 'Rôle Inconnu') : 'Rôle Inconnu'
+    }));
+  }
 
-    // Warn Actions (Thresholds)
-    const warnActions = await WarnAction.findAll({ order: [['warnsCount', 'ASC']] });
+  async function fetchWarnActions() {
+    return await WarnAction.findAll({ order: [['warnsCount', 'ASC']] });
+  }
 
-    // Role Rewards
+  async function fetchRoleRewards(guild) {
     const dbRoleRewards = await RoleReward.findAll({ order: [['level', 'ASC']] });
-    const roleRewards = dbRoleRewards.map(r => {
-      const discordRole = guild ? guild.roles.cache.get(r.roleId) : null;
-      return {
-        level: r.level,
-        roleId: r.roleId,
-        roleName: discordRole ? discordRole.name : 'Rôle Inconnu',
-        replacePreviousRole: r.replacePreviousRole
-      };
-    });
+    return dbRoleRewards.map(r => ({
+      level: r.level,
+      roleId: r.roleId,
+      roleName: guild ? (guild.roles.cache.get(r.roleId)?.name || 'Rôle Inconnu') : 'Rôle Inconnu',
+      replacePreviousRole: r.replacePreviousRole
+    }));
+  }
 
-    // Automod Rules
+  async function fetchAutomodRules(guild) {
     const dbAutomodRules = await AutomodRule.findAll();
-    const automodRules = dbAutomodRules.map(r => {
+    return dbAutomodRules.map(r => {
       let channelName = 'Inconnu';
       if (r.channelId === 'global') {
         channelName = 'Global';
@@ -150,7 +204,6 @@ function startWebServer(client, port) {
         const c = guild.channels.cache.get(r.channelId);
         if (c) channelName = c.name;
       }
-
       return {
         id: r.id,
         channelId: r.channelId,
@@ -164,10 +217,11 @@ function startWebServer(client, port) {
         customReason: r.customReason
       };
     });
+  }
 
-    // XP Multipliers
+  async function fetchXpMultipliers(guild) {
     const dbXpMultipliers = await XPMultiplier.findAll();
-    const xpMultipliers = dbXpMultipliers.map(m => {
+    return dbXpMultipliers.map(m => {
       let channelName = 'Inconnu';
       if (guild) {
         const c = guild.channels.cache.get(m.channelId);
@@ -179,6 +233,20 @@ function startWebServer(client, port) {
         multiplier: m.multiplier
       };
     });
+  }
+
+  // Combined fetcher for full dashboard load
+  async function getDashboardLists(guildContext) {
+    const guildId = process.env.GUILD_ID;
+    const guild = client.guilds.cache.get(guildId);
+
+    const [autoRoles, warnActions, roleRewards, automodRules, xpMultipliers] = await Promise.all([
+      fetchAutoRoles(guild),
+      fetchWarnActions(),
+      fetchRoleRewards(guild),
+      fetchAutomodRules(guild),
+      fetchXpMultipliers(guild),
+    ]);
 
     return { autoRoles, warnActions, roleRewards, automodRules, xpMultipliers };
   }
@@ -187,18 +255,32 @@ function startWebServer(client, port) {
 
   // Auth Routes
   app.get('/login', (req, res) => {
-    if (req.session.authenticated) {
+    if (req.session && req.session.authenticated) {
       return res.redirect('/dashboard');
     }
     res.render('login.html', { error: null });
   });
 
   app.post('/login', (req, res) => {
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+    
+    // Check brute-force rate limit
+    const rateLimitError = checkLoginRateLimit(clientIp);
+    if (rateLimitError) {
+      return res.render('login.html', { error: rateLimitError });
+    }
+
     const token = req.body.token;
-    if (token === process.env.DISCORD_TOKEN) {
+    const expectedToken = process.env.DISCORD_TOKEN;
+
+    // Constant-time comparison preventing timing attacks
+    if (expectedToken && safeCompareTokens(token, expectedToken)) {
+      loginAttempts.delete(clientIp);
       req.session.authenticated = true;
       return res.redirect('/dashboard');
     }
+
+    recordFailedLogin(clientIp);
     res.render('login.html', { error: 'Token invalide. Veuillez réessayer.' });
   });
 
@@ -316,16 +398,16 @@ function startWebServer(client, port) {
     if (roleId) {
       await AutoRole.findOrCreate({ where: { roleId } });
     }
-    const guildContext = await getGuildContext();
-    const { autoRoles } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const autoRoles = await fetchAutoRoles(guild);
     res.render('partials/autoroles_table.html', { autoRoles });
   });
 
   app.delete('/dashboard/autorole/:roleId', isAuthenticated, async (req, res) => {
     const roleId = req.params.roleId;
     await AutoRole.destroy({ where: { roleId } });
-    const guildContext = await getGuildContext();
-    const { autoRoles } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const autoRoles = await fetchAutoRoles(guild);
     res.render('partials/autoroles_table.html', { autoRoles });
   });
 
@@ -339,16 +421,14 @@ function startWebServer(client, port) {
         duration: action === 'mute' ? parseInt(duration || 86400) : null
       });
     }
-    const guildContext = await getGuildContext();
-    const { warnActions } = await getDashboardLists(guildContext);
+    const warnActions = await fetchWarnActions();
     res.render('partials/warnactions_table.html', { warnActions });
   });
 
   app.delete('/dashboard/warnaction/:count', isAuthenticated, async (req, res) => {
     const count = req.params.count;
     await WarnAction.destroy({ where: { warnsCount: count } });
-    const guildContext = await getGuildContext();
-    const { warnActions } = await getDashboardLists(guildContext);
+    const warnActions = await fetchWarnActions();
     res.render('partials/warnactions_table.html', { warnActions });
   });
 
@@ -383,16 +463,16 @@ function startWebServer(client, port) {
         replacePreviousRole: replacePreviousRole === 'true'
       });
     }
-    const guildContext = await getGuildContext();
-    const { roleRewards } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleRewards = await fetchRoleRewards(guild);
     res.render('partials/rolerewards_table.html', { roleRewards });
   });
 
   app.delete('/dashboard/rolereward/:level', isAuthenticated, async (req, res) => {
     const level = req.params.level;
     await RoleReward.destroy({ where: { level } });
-    const guildContext = await getGuildContext();
-    const { roleRewards } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleRewards = await fetchRoleRewards(guild);
     res.render('partials/rolerewards_table.html', { roleRewards });
   });
 
@@ -452,16 +532,16 @@ function startWebServer(client, port) {
       customReason: customReason || null
     });
 
-    const guildContext = await getGuildContext();
-    const { automodRules } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const automodRules = await fetchAutomodRules(guild);
     res.render('partials/automod_table.html', { automodRules });
   });
 
   app.delete('/dashboard/automod/:id', isAuthenticated, async (req, res) => {
     const id = req.params.id;
     await AutomodRule.destroy({ where: { id } });
-    const guildContext = await getGuildContext();
-    const { automodRules } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const automodRules = await fetchAutomodRules(guild);
     res.render('partials/automod_table.html', { automodRules });
   });
 
@@ -474,16 +554,16 @@ function startWebServer(client, port) {
         multiplier: parseFloat(multiplier)
       });
     }
-    const guildContext = await getGuildContext();
-    const { xpMultipliers } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const xpMultipliers = await fetchXpMultipliers(guild);
     res.render('partials/xpmultipliers_table.html', { xpMultipliers });
   });
 
   app.delete('/dashboard/xpmultiplier/:channelId', isAuthenticated, async (req, res) => {
     const channelId = req.params.channelId;
     await XPMultiplier.destroy({ where: { channelId } });
-    const guildContext = await getGuildContext();
-    const { xpMultipliers } = await getDashboardLists(guildContext);
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const xpMultipliers = await fetchXpMultipliers(guild);
     res.render('partials/xpmultipliers_table.html', { xpMultipliers });
   });
 

@@ -1,11 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
-
-function getXPNeededForLevel(level) {
-  if (level <= 0) return 0;
-  return Math.floor(100 * Math.pow(level, 1.5));
-}
+const { calculateLevelFromXP } = require('../utils/xpHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -62,7 +58,8 @@ module.exports = {
         defaults: { xp: 0, level: 0 }
       });
 
-      let originalXP = record.xp;
+      const originalXP = record.xp;
+      const originalLevel = record.level;
       let newXP = originalXP;
 
       if (subcommand === 'add') {
@@ -71,11 +68,8 @@ module.exports = {
         newXP = Math.max(0, originalXP - amount);
       }
 
-      // Recalculate level
-      let newLevel = 0;
-      while (newXP >= getXPNeededForLevel(newLevel + 1)) {
-        newLevel++;
-      }
+      // Recalculate level using shared helper
+      const newLevel = calculateLevelFromXP(newXP);
 
       record.xp = newXP;
       record.level = newLevel;
@@ -83,7 +77,7 @@ module.exports = {
 
       const successEmbed = embeds.success(
         `L'XP de ${target} a été modifiée avec succès.\n\n` +
-        `**Ancien XP :** \`${originalXP} XP\` (Niveau ${record.level})\n` +
+        `**Ancien XP :** \`${originalXP} XP\` (Niveau ${originalLevel})\n` +
         `**Nouvel XP :** \`${newXP} XP\` (Niveau ${newLevel})\n` +
         `**Différence :** \`${subcommand === 'add' ? '+' : '-'}${amount} XP\``
       );

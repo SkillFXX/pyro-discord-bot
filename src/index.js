@@ -1,15 +1,16 @@
 require('dotenv').config();
-const { sequelize } = require('./database');
+const { sequelize, initDatabasePragmas } = require('./database');
 const { initBot } = require('./bot');
 const { startWebServer } = require('./web/server');
 
 async function main() {
   console.log('[System] Démarrage du système...');
 
-  // 1. Sync Database
+  // 1. Sync Database & Apply Performance PRAGMAs
   try {
     await sequelize.sync({ alter: true });
-    console.log('[Database] Base de données SQLite synchronisée avec succès !');
+    await initDatabasePragmas();
+    console.log('[Database] Base de données SQLite synchronisée (WAL mode activé) !');
   } catch (error) {
     console.error('[Database] Impossible de synchroniser la base de données :', error);
     process.exit(1);

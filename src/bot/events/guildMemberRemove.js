@@ -18,9 +18,12 @@ module.exports = {
       if (leaveChannelId && leaveMessageTemplate) {
         const channel = await guild.channels.fetch(leaveChannelId).catch(() => null);
         if (channel) {
+          const username = member.user?.username || member.displayName || 'Un membre';
+          const avatar = member.user?.displayAvatarURL ? member.user.displayAvatarURL({ dynamic: true }) : null;
+
           // Replace placeholders (cannot use {user} as mention since they left, but we can do username)
           const formattedMessage = leaveMessageTemplate
-            .replace(/{username}/g, member.user.username)
+            .replace(/{username}/g, username)
             .replace(/{server}/g, guild.name)
             .replace(/{memberCount}/g, guild.memberCount.toString());
 
@@ -29,7 +32,7 @@ module.exports = {
             formattedMessage,
             embeds.COLORS.ERROR,
             null,
-            member.user.displayAvatarURL({ dynamic: true })
+            avatar
           );
 
           await channel.send({ embeds: [embed] });

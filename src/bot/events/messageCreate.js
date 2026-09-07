@@ -1,16 +1,32 @@
 const { UserXP, RoleReward, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
+const { calculateLevelFromXP, getXPNeededForLevel } = require('../utils/xpHelper');
 const analyticsService = require('../../services/analyticsService');
 
 // Memory caches to avoid DB spam
 const xpCooldowns = new Map();
 const messageLog = new Map(); // For anti-spam and duplicate detection: userId -> array of message objects
 
-function getXPNeededForLevel(level) {
-  if (level <= 0) return 0;
-  return Math.floor(100 * Math.pow(level, 1.5));
-}
+// Periodic cleanup every 5 minutes to prevent memory leaks from inactive users
+setInterval(() => {
+  const now = Date.now();
+  // 1. Prune XP cooldowns older than 5 minutes
+  for (const [userId, timestamp] of xpCooldowns.entries()) {
+    if (now - timestamp > 300000) {
+      xpCooldowns.delete(userId);
+    }
+  }
+  // 2. Prune anti-spam message logs older than 30 seconds
+  for (const [userId, messages] of messageLog.entries()) {
+    const recent = messages.filter(m => now - m.timestamp < 30000);
+    if (recent.length === 0) {
+      messageLog.delete(userId);
+    } else {
+      messageLog.set(userId, recent);
+    }
+  }
+}, 300000).unref();
 
 module.exports = {
   name: 'messageCreate',
@@ -76,14 +92,9 @@ async function handleXP(message, client) {
     }
 
     const newXP = userRecord.xp + xpGained;
-    let newLevel = userRecord.level;
-
-    // Calculate if level up occurs
-    let levelUp = false;
-    while (newXP >= getXPNeededForLevel(newLevel + 1)) {
-      newLevel++;
-      levelUp = true;
-    }
+    const oldLevel = userRecord.level;
+    const newLevel = calculateLevelFromXP(newXP);
+    const levelUp = newLevel > oldLevel;
 
     // Save user state
     userRecord.xp = newXP;
@@ -332,17 +343,22 @@ async function handleAutomod(message, client) {
     }
     else if (rule.ruleType === 'regex') {
       const pattern = parameters.pattern;
-      if (pattern) {
+      if (pattern && typeof pattern === 'string') {
+        // ReDoS safety: prevent oversized regex or dangerous nested quantifiers that cause event loop freeze
+        if (pattern.length > 200 || /(\+|\*|\{[^}]+\})\s*(\+|\*|\{[^}]+\})/i.test(pattern)) {
+          console.warn('[Automod] Motifs imbriqués dangereux (ReDoS) ou trop longs ignorés :', pattern);
+          continue;
+        }
         try {
           const threadTitle = isThreadStart ? (message.channel.name || '') : '';
-          const contentToCheck = content + ' ' + threadTitle;
+          const contentToCheck = (content + ' ' + threadTitle).substring(0, 4000); // Cap content check length
           const regex = new RegExp(pattern, 'i');
           if (regex.test(contentToCheck)) {
             triggered = true;
             reason = rule.customReason || `Message correspond à un motif non autorisé`;
           }
         } catch (e) {
-          console.error('[Automod] Invalid regex pattern:', pattern, e);
+          console.error('[Automod] Invalid regex pattern:', pattern, e.message);
         }
       }
     }

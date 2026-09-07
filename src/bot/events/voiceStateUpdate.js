@@ -45,8 +45,8 @@ module.exports = {
       }
     }
 
-    // 2. Leave Channel -> Delete if Empty
-    if (oldState.channelId && oldState.channelId !== triggerChannelId) {
+    // 2. Leave Channel -> Delete if Empty (only when member actually left or moved)
+    if (oldState.channelId && oldState.channelId !== newState.channelId && oldState.channelId !== triggerChannelId) {
       try {
         const oldChannel = oldState.channel;
         
