@@ -35,6 +35,8 @@ async function main() {
   startWebServer(client, port);
 }
 
+const analyticsService = require('./services/analyticsService');
+
 // Global exception safety
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[Anti-Crash] Rejet non géré à :', promise, 'raison :', reason);
@@ -43,5 +45,14 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (error) => {
   console.error('[Anti-Crash] Exception non capturée :', error);
 });
+
+async function gracefulShutdown() {
+  console.log('[System] Arrêt en cours, sauvegarde des sessions vocales actives...');
+  await analyticsService.closeAllVoiceSessions();
+  process.exit(0);
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
 
 main();

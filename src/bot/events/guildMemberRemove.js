@@ -1,10 +1,14 @@
 const { ConfigHelper } = require('../../database');
 const embeds = require('../utils/embeds');
+const analyticsService = require('../../services/analyticsService');
 
 module.exports = {
   name: 'guildMemberRemove',
   async execute(member, client) {
     const guild = member.guild;
+
+    // Track member leave in analytics
+    await analyticsService.recordMemberLeave(member);
 
     // Goodbye Message
     try {

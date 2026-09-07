@@ -1,10 +1,14 @@
 const { ConfigHelper, AutoRole } = require('../../database');
 const embeds = require('../utils/embeds');
+const analyticsService = require('../../services/analyticsService');
 
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member, client) {
     const guild = member.guild;
+
+    // Track member join in analytics
+    await analyticsService.recordMemberJoin(member);
 
     // 1. Auto-Roles
     try {

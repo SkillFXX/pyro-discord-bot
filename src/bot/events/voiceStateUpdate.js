@@ -1,11 +1,15 @@
 const { ChannelType } = require('discord.js');
 const { ConfigHelper } = require('../../database');
+const analyticsService = require('../../services/analyticsService');
 
 module.exports = {
   name: 'voiceStateUpdate',
   async execute(oldState, newState, client) {
-    const member = newState.member;
+    const member = newState.member || oldState.member;
     if (!member) return;
+
+    // Track voice analytics
+    await analyticsService.handleVoiceStateUpdate(oldState, newState);
 
     const triggerChannelId = await ConfigHelper.get('voice_creator_channel_id');
     const categoryId = await ConfigHelper.get('voice_creator_category_id');

@@ -9,9 +9,11 @@ const {
   WarnAction, 
   RoleReward, 
   AutomodRule,
-  XPMultiplier
+  XPMultiplier,
+  UserSnapshot
 } = require('../database');
 const { updateBotStatus } = require('../bot/events/ready');
+const analyticsService = require('../services/analyticsService');
 
 function startWebServer(client, port) {
   const app = express();
@@ -67,8 +69,34 @@ function startWebServer(client, port) {
 
     const roles = guild.roles.cache
       .filter(r => r.id !== guild.id && !r.managed) // Exclude @everyone and bot integration roles
-      .map(r => ({ id: r.id, name: r.name }))
+      .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
       .sort((a, b) => a.name.localeCompare(b.name));
+
+    const membersMap = new Map();
+    guild.members.cache.forEach(m => {
+      if (!m.user.bot) {
+        membersMap.set(m.id, {
+          id: m.id,
+          name: m.displayName || m.user.username,
+          tag: m.user.tag || m.user.username
+        });
+      }
+    });
+
+    try {
+      const snapshots = await UserSnapshot.findAll({ raw: true });
+      for (const s of snapshots) {
+        if (!membersMap.has(s.userId)) {
+          membersMap.set(s.userId, {
+            id: s.userId,
+            name: s.displayName || s.username || s.userId,
+            tag: s.username || s.userId
+          });
+        }
+      }
+    } catch (e) {}
+
+    const members = Array.from(membersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
     return {
       guildName: guild.name,
@@ -77,7 +105,8 @@ function startWebServer(client, port) {
         voice: voiceChannels.sort((a, b) => a.name.localeCompare(b.name)),
         categories: categories.sort((a, b) => a.name.localeCompare(b.name)),
       },
-      roles
+      roles,
+      members
     };
   }
 
@@ -203,9 +232,59 @@ function startWebServer(client, port) {
       serverName: guildContext.guildName,
       channels: guildContext.channels,
       roles: guildContext.roles,
+      members: guildContext.members,
       config,
       ...lists
     });
+  });
+
+  // --- ANALYTICS API ROUTES ---
+  app.get('/api/analytics', isAuthenticated, async (req, res) => {
+    try {
+      const guildId = process.env.GUILD_ID;
+      const guild = client.guilds.cache.get(guildId);
+      const { range, startDate, endDate, channelId, roleId, userId } = req.query;
+
+      const data = await analyticsService.getAnalytics({
+        range: range || '7d',
+        startDate,
+        endDate,
+        channelId,
+        roleId,
+        userId,
+        guild,
+      });
+
+      res.json(data);
+    } catch (error) {
+      console.error('[API Analytics] Error:', error);
+      res.status(500).json({ error: 'Erreur lors du calcul des analyses' });
+    }
+  });
+
+  app.get('/api/analytics/export', isAuthenticated, async (req, res) => {
+    try {
+      const guildId = process.env.GUILD_ID;
+      const guild = client.guilds.cache.get(guildId);
+      const { range, startDate, endDate, channelId, roleId, userId } = req.query;
+
+      const csv = await analyticsService.exportCSV({
+        range: range || '7d',
+        startDate,
+        endDate,
+        channelId,
+        roleId,
+        userId,
+        guild,
+      });
+
+      res.header('Content-Type', 'text/csv');
+      res.attachment(`pyro-analytics-${Date.now()}.csv`);
+      res.send(csv);
+    } catch (error) {
+      console.error('[API Analytics Export] Error:', error);
+      res.status(500).send('Erreur lors de l\'exportation CSV');
+    }
   });
 
   // --- API SETTINGS POSTS (AJAX / HTMX) ---

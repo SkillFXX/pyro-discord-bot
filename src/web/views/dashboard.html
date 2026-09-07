@@ -9,6 +9,8 @@
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- Chart.js for Advanced Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Custom styles specific to dashboard - shared styles in styles.css */
   </style>
@@ -45,6 +47,7 @@
         <div class="sidebar">
           <ul class="sidebar-menu">
             <li><a href="#" class="active" onclick="switchTab(event, 'general')"><i data-lucide="settings-2"></i> Général</a></li>
+            <li><a href="#" onclick="switchTab(event, 'analytics')"><i data-lucide="bar-chart-2"></i> Analytics</a></li>
             <li><a href="#" onclick="switchTab(event, 'autoroles')"><i data-lucide="users"></i> Auto-Rôles</a></li>
             <li><a href="#" onclick="switchTab(event, 'moderation')"><i data-lucide="shield-alert"></i> Modération</a></li>
             <li><a href="#" onclick="switchTab(event, 'tickets')"><i data-lucide="ticket"></i> Tickets</a></li>
@@ -143,6 +146,306 @@
 
             <button type="submit" class="primary-btn" style="margin-top: 1.5rem; width: 200px;">Enregistrer</button>
           </form>
+        </div>
+
+        <!-- ================= TAB: ANALYTICS ================= -->
+        <div id="analytics" class="tab-content">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem;">
+            <div>
+              <h2 style="margin-bottom:0.3rem;"><i data-lucide="bar-chart-2" style="vertical-align:middle;margin-right:8px;color:var(--primary);"></i>Analytics &amp; Statistiques Avancées</h2>
+              <p style="margin-bottom:0;color:var(--text-muted);">Suivi en temps réel des messages, salons vocaux, membres actifs et tendances du serveur.</p>
+            </div>
+          </div>
+
+          <!-- Combination Filters Toolbar -->
+          <div class="filter-toolbar">
+            <div class="filter-row">
+              <!-- Date Range Preset -->
+              <div class="filter-group">
+                <label for="analytics_range"><i data-lucide="calendar" style="width:14px;height:14px;vertical-align:middle;"></i> Période</label>
+                <select id="analytics_range" onchange="onDateRangeChange(this.value)">
+                  <option value="today">Dernières 24 heures</option>
+                  <option value="7d" selected>7 derniers jours</option>
+                  <option value="14d">14 derniers jours</option>
+                  <option value="30d">30 derniers jours</option>
+                  <option value="90d">90 derniers jours</option>
+                  <option value="all">Tout l'historique</option>
+                  <option value="custom">Période personnalisée...</option>
+                </select>
+              </div>
+
+              <!-- Custom Dates (hidden by default) -->
+              <div class="filter-group" id="custom_start_wrapper" style="display:none;">
+                <label for="analytics_start_date">Date de début</label>
+                <input type="date" id="analytics_start_date">
+              </div>
+              <div class="filter-group" id="custom_end_wrapper" style="display:none;">
+                <label for="analytics_end_date">Date de fin</label>
+                <input type="date" id="analytics_end_date">
+              </div>
+
+              <!-- Channel Filter -->
+              <div class="filter-group">
+                <label for="analytics_channel"><i data-lucide="hash" style="width:14px;height:14px;vertical-align:middle;"></i> Salon</label>
+                <select id="analytics_channel">
+                  <option value="all">Tous les salons</option>
+                  <optgroup label="Salons Textuels">
+                    <% channels.text.forEach(c => { %>
+                      <option value="<%= c.id %>"># <%= c.name %></option>
+                    <% }) %>
+                  </optgroup>
+                  <optgroup label="Salons Vocaux">
+                    <% channels.voice.forEach(v => { %>
+                      <option value="<%= v.id %>">🔊 <%= v.name %></option>
+                    <% }) %>
+                  </optgroup>
+                </select>
+              </div>
+
+              <!-- Role Filter -->
+              <div class="filter-group">
+                <label for="analytics_role"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;"></i> Rôle</label>
+                <select id="analytics_role">
+                  <option value="all">Tous les rôles</option>
+                  <% roles.forEach(r => { %>
+                    <option value="<%= r.id %>">@<%= r.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+
+              <!-- Member Filter -->
+              <div class="filter-group">
+                <label for="analytics_user"><i data-lucide="user" style="width:14px;height:14px;vertical-align:middle;"></i> Membre</label>
+                <select id="analytics_user">
+                  <option value="all">Tous les membres</option>
+                  <% if (typeof members !== 'undefined' && members.length > 0) { %>
+                    <% members.forEach(m => { %>
+                      <option value="<%= m.id %>"><%= m.name %> (<%= m.tag %>)</option>
+                    <% }) %>
+                  <% } %>
+                </select>
+              </div>
+
+              <!-- Actions -->
+              <div class="filter-actions">
+                <button type="button" class="primary-btn" onclick="loadAnalytics()" title="Appliquer les filtres">
+                  <i data-lucide="filter" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Filtrer
+                </button>
+                <button type="button" class="button" onclick="exportAnalyticsCSV()" title="Télécharger le rapport CSV">
+                  <i data-lucide="download" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>CSV
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Cards Grid -->
+          <div class="analytics-kpi-grid">
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Messages Émis</span>
+                <i data-lucide="message-square"></i>
+              </div>
+              <div class="kpi-value" id="kpi-messages">-</div>
+              <div class="kpi-sub" id="kpi-words">- mots totaux</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Temps Vocal Total</span>
+                <i data-lucide="mic"></i>
+              </div>
+              <div class="kpi-value" id="kpi-voice">-</div>
+              <div class="kpi-sub" id="kpi-voice-hours">- heures</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Longueur Moy. Message</span>
+                <i data-lucide="file-text"></i>
+              </div>
+              <div class="kpi-value" id="kpi-avg-length">-</div>
+              <div class="kpi-sub" id="kpi-avg-words">- mots / message</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Membres Actifs</span>
+                <i data-lucide="users"></i>
+              </div>
+              <div class="kpi-value" id="kpi-active-members">-</div>
+              <div class="kpi-sub">Actifs en texte ou vocal</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Flux de Membres</span>
+                <i data-lucide="user-plus"></i>
+              </div>
+              <div class="kpi-value" id="kpi-member-flow">-</div>
+              <div class="kpi-sub" id="kpi-member-flow-sub">Arrivées / Départs</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+              <div class="kpi-header">
+                <span>Heure de Pointe</span>
+                <i data-lucide="clock"></i>
+              </div>
+              <div class="kpi-value" id="kpi-peak-hour" style="font-size:1.35rem;">-</div>
+              <div class="kpi-sub" id="kpi-peak-hour-sub">Période la plus active</div>
+            </div>
+          </div>
+
+          <!-- Timeline Chart -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h3><i data-lucide="trending-up" style="color:var(--primary);"></i> Évolution Temporelle de l'Activité</h3>
+              <small style="color:var(--text-muted);">Messages &amp; Minutes Vocales</small>
+            </div>
+            <div style="height: 300px; position: relative;">
+              <canvas id="timelineChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Charts 2-Column Grid -->
+          <div class="charts-grid-2">
+            <div class="chart-card" style="margin-bottom:0;">
+              <div class="chart-card-header">
+                <h3><i data-lucide="sun" style="color:var(--warning);"></i> Heures de Pointe (0h - 23h)</h3>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="peakHoursChart"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card" style="margin-bottom:0;">
+              <div class="chart-card-header">
+                <h3><i data-lucide="user-check" style="color:var(--success);"></i> Flux Membres (Arrivées vs Départs)</h3>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="memberFlowChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deep-Dive Leaderboards & Tables -->
+          <div style="margin-top: 2rem;">
+            <div class="table-subtabs">
+              <button type="button" class="subtab-btn active" onclick="switchAnalyticsSubtab('members', this)">
+                <i data-lucide="award"></i> Top Membres
+              </button>
+              <button type="button" class="subtab-btn" onclick="switchAnalyticsSubtab('roles', this)">
+                <i data-lucide="shield"></i> Activité par Rôle
+              </button>
+              <button type="button" class="subtab-btn" onclick="switchAnalyticsSubtab('channels', this)">
+                <i data-lucide="message-circle"></i> Salons Actifs
+              </button>
+              <button type="button" class="subtab-btn" onclick="switchAnalyticsSubtab('flow', this)">
+                <i data-lucide="log-in"></i> Journal Arrivées / Départs
+              </button>
+            </div>
+
+            <!-- Panel: Top Membres -->
+            <div id="subtab-members" class="analytics-subtab-content">
+              <div style="overflow-x:auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:60px;">Rang</th>
+                      <th>Membre</th>
+                      <th>Rôles</th>
+                      <th>Messages</th>
+                      <th>Temps Vocal</th>
+                      <th>Longueur Moy.</th>
+                    </tr>
+                  </thead>
+                  <tbody id="top-members-tbody">
+                    <tr><td colspan="6" style="text-align:center;padding:2rem;">Sélectionnez l'onglet Analytics pour charger les données...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Panel: Top Roles -->
+            <div id="subtab-roles" class="analytics-subtab-content" style="display:none;">
+              <div style="overflow-x:auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:60px;">Rang</th>
+                      <th>Rôle</th>
+                      <th>Messages Totaux</th>
+                      <th>Temps Vocal</th>
+                      <th>Longueur Moyenne</th>
+                      <th>Membres Actifs</th>
+                    </tr>
+                  </thead>
+                  <tbody id="top-roles-tbody">
+                    <tr><td colspan="6" style="text-align:center;padding:2rem;">Chargement...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Panel: Top Salons -->
+            <div id="subtab-channels" class="analytics-subtab-content" style="display:none;">
+              <div class="grid-2">
+                <div>
+                  <h4 style="margin-bottom:0.8rem;"><i data-lucide="message-square" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Salons Textuels</h4>
+                  <div style="overflow-x:auto;">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Salon</th>
+                          <th>Messages</th>
+                          <th>Longueur Moy.</th>
+                          <th>Membres</th>
+                        </tr>
+                      </thead>
+                      <tbody id="top-text-channels-tbody">
+                        <tr><td colspan="4" style="text-align:center;padding:1.5rem;">Chargement...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <h4 style="margin-bottom:0.8rem;"><i data-lucide="volume-2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Salons Vocaux</h4>
+                  <div style="overflow-x:auto;">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Salon</th>
+                          <th>Temps Vocal</th>
+                          <th>Sessions</th>
+                          <th>Membres</th>
+                        </tr>
+                      </thead>
+                      <tbody id="top-voice-channels-tbody">
+                        <tr><td colspan="4" style="text-align:center;padding:1.5rem;">Chargement...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel: Member Flow Logs -->
+            <div id="subtab-flow" class="analytics-subtab-content" style="display:none;">
+              <div style="overflow-x:auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Événement</th>
+                      <th>Utilisateur</th>
+                      <th>Date &amp; Heure</th>
+                    </tr>
+                  </thead>
+                  <tbody id="member-flow-tbody">
+                    <tr><td colspan="3" style="text-align:center;padding:2rem;">Chargement...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ================= TAB: AUTO-ROLES ================= -->
@@ -520,6 +823,11 @@
           tab.classList.remove('active');
         }
       });
+
+      // If switching to analytics, automatically fetch analytics data
+      if (tabId === 'analytics') {
+        loadAnalytics();
+      }
     }
 
     // Toggle threshold duration input visibility
@@ -580,6 +888,404 @@
       setTimeout(() => {
         toast.classList.remove('show');
       }, 3000);
+    }
+
+    // ==========================================
+    // ANALYTICS CONTROLLER & CHART.JS
+    // ==========================================
+    let timelineChart = null;
+    let peakHoursChart = null;
+    let memberFlowChart = null;
+
+    function onDateRangeChange(val) {
+      const startWrap = document.getElementById('custom_start_wrapper');
+      const endWrap = document.getElementById('custom_end_wrapper');
+      if (val === 'custom') {
+        startWrap.style.display = 'block';
+        endWrap.style.display = 'block';
+      } else {
+        startWrap.style.display = 'none';
+        endWrap.style.display = 'none';
+        loadAnalytics();
+      }
+    }
+
+    function switchAnalyticsSubtab(subtab, btn) {
+      document.querySelectorAll('.analytics-subtab-content').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.table-subtabs .subtab-btn').forEach(b => b.classList.remove('active'));
+
+      const target = document.getElementById(`subtab-${subtab}`);
+      if (target) target.style.display = 'block';
+      if (btn) btn.classList.add('active');
+      lucide.createIcons();
+    }
+
+    function buildAnalyticsParams() {
+      const range = document.getElementById('analytics_range').value;
+      const channelId = document.getElementById('analytics_channel').value;
+      const roleId = document.getElementById('analytics_role').value;
+      const userId = document.getElementById('analytics_user').value;
+      const startDate = document.getElementById('analytics_start_date').value;
+      const endDate = document.getElementById('analytics_end_date').value;
+
+      const params = new URLSearchParams();
+      params.set('range', range);
+      if (channelId) params.set('channelId', channelId);
+      if (roleId) params.set('roleId', roleId);
+      if (userId) params.set('userId', userId);
+      if (range === 'custom') {
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+      }
+      return params;
+    }
+
+    function exportAnalyticsCSV() {
+      const params = buildAnalyticsParams();
+      window.location.href = `/api/analytics/export?${params.toString()}`;
+    }
+
+    async function loadAnalytics() {
+      try {
+        const params = buildAnalyticsParams();
+        const response = await fetch(`/api/analytics?${params.toString()}`);
+        if (!response.ok) throw new Error('Erreur réseau');
+        const data = await response.json();
+
+        // 1. Update KPI Cards
+        document.getElementById('kpi-messages').innerText = Number(data.kpi.totalMessages || 0).toLocaleString('fr-FR');
+        document.getElementById('kpi-words').innerText = `${Number(data.kpi.totalWords || 0).toLocaleString('fr-FR')} mots • ${data.kpi.avgWordsPerMessage || 0} mots/msg`;
+
+        document.getElementById('kpi-voice').innerText = data.kpi.formattedVoiceTime || '0s';
+        document.getElementById('kpi-voice-hours').innerText = `${data.kpi.totalVoiceHours || 0} heures totales`;
+
+        document.getElementById('kpi-avg-length').innerText = `${data.kpi.avgMessageLength || 0} car.`;
+        document.getElementById('kpi-avg-words').innerText = `Moyenne par message`;
+
+        document.getElementById('kpi-active-members').innerText = Number(data.kpi.totalActiveMembers || 0).toLocaleString('fr-FR');
+
+        const growthSign = data.kpi.netGrowth > 0 ? '+' : '';
+        document.getElementById('kpi-member-flow').innerText = `+${data.kpi.joinsCount || 0} / -${data.kpi.leavesCount || 0}`;
+        document.getElementById('kpi-member-flow-sub').innerText = `Croissance nette : ${growthSign}${data.kpi.netGrowth || 0}`;
+
+        document.getElementById('kpi-peak-hour').innerText = data.kpi.peakHourIndex !== undefined ? `${data.kpi.peakHourIndex}h00` : '-';
+        document.getElementById('kpi-peak-hour-sub').innerText = data.kpi.peakHourText || 'Pas assez de données';
+
+        // 2. Render Charts
+        renderTimelineChart(data.timeline);
+        renderPeakHoursChart(data.peakHours);
+        renderMemberFlowChart(data.timeline);
+
+        // 3. Render Tables
+        renderTopMembersTable(data.topMembers);
+        renderTopRolesTable(data.topRoles);
+        renderTopChannelsTables(data.topTextChannels, data.topVoiceChannels);
+        renderMemberFlowTable(data.memberEvents);
+
+        lucide.createIcons();
+      } catch (error) {
+        console.error('Error loading analytics:', error);
+      }
+    }
+
+    // Chart.js Default Dark Configuration
+    const chartDarkDefaults = {
+      color: '#94a3b8',
+      font: { family: 'system-ui, sans-serif' },
+      grid: { color: 'rgba(255, 255, 255, 0.06)' }
+    };
+
+    function renderTimelineChart(timeline) {
+      const ctx = document.getElementById('timelineChart').getContext('2d');
+      const labels = timeline.map(t => t.label);
+      const messagesData = timeline.map(t => t.messages);
+      const voiceData = timeline.map(t => t.voiceMinutes);
+
+      if (timelineChart) {
+        timelineChart.destroy();
+      }
+
+      timelineChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Messages',
+              data: messagesData,
+              backgroundColor: 'rgba(255, 107, 53, 0.65)',
+              borderColor: '#ff6b35',
+              borderWidth: 1,
+              borderRadius: 4,
+              yAxisID: 'yMessages',
+            },
+            {
+              label: 'Minutes Vocales',
+              data: voiceData,
+              type: 'line',
+              borderColor: '#3498db',
+              backgroundColor: 'rgba(52, 152, 219, 0.15)',
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              yAxisID: 'yVoice',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: chartDarkDefaults.color } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ctx.datasetIndex === 0 
+                  ? `💬 Messages : ${ctx.raw.toLocaleString()}` 
+                  : `🎙️ Vocal : ${ctx.raw.toLocaleString()} min (${(ctx.raw / 60).toFixed(1)}h)`
+              }
+            }
+          },
+          scales: {
+            x: { grid: chartDarkDefaults.grid, ticks: { color: chartDarkDefaults.color } },
+            yMessages: {
+              type: 'linear',
+              position: 'left',
+              grid: chartDarkDefaults.grid,
+              ticks: { color: chartDarkDefaults.color, precision: 0 },
+              title: { display: true, text: 'Messages', color: '#ff6b35' }
+            },
+            yVoice: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { color: chartDarkDefaults.color, precision: 0 },
+              title: { display: true, text: 'Minutes Vocales', color: '#3498db' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderPeakHoursChart(peakHours) {
+      const ctx = document.getElementById('peakHoursChart').getContext('2d');
+      const labels = peakHours.map(h => `${h.hour}h`);
+      const messagesData = peakHours.map(h => h.messages);
+      const voiceData = peakHours.map(h => h.voiceMinutes);
+
+      if (peakHoursChart) {
+        peakHoursChart.destroy();
+      }
+
+      peakHoursChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Messages',
+              data: messagesData,
+              backgroundColor: 'rgba(255, 107, 53, 0.75)',
+              borderRadius: 3,
+            },
+            {
+              label: 'Minutes Vocales',
+              data: voiceData,
+              backgroundColor: 'rgba(241, 196, 15, 0.75)',
+              borderRadius: 3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: chartDarkDefaults.color } }
+          },
+          scales: {
+            x: { grid: chartDarkDefaults.grid, ticks: { color: chartDarkDefaults.color } },
+            y: { grid: chartDarkDefaults.grid, ticks: { color: chartDarkDefaults.color, precision: 0 } }
+          }
+        }
+      });
+    }
+
+    function renderMemberFlowChart(timeline) {
+      const ctx = document.getElementById('memberFlowChart').getContext('2d');
+      const labels = timeline.map(t => t.label);
+      const joinsData = timeline.map(t => t.joins);
+      const leavesData = timeline.map(t => t.leaves);
+
+      if (memberFlowChart) {
+        memberFlowChart.destroy();
+      }
+
+      memberFlowChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Arrivées (+)',
+              data: joinsData,
+              backgroundColor: 'rgba(46, 204, 113, 0.8)',
+              borderRadius: 3,
+            },
+            {
+              label: 'Départs (-)',
+              data: leavesData,
+              backgroundColor: 'rgba(231, 76, 60, 0.8)',
+              borderRadius: 3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: chartDarkDefaults.color } }
+          },
+          scales: {
+            x: { grid: chartDarkDefaults.grid, ticks: { color: chartDarkDefaults.color } },
+            y: { grid: chartDarkDefaults.grid, ticks: { color: chartDarkDefaults.color, precision: 0 } }
+          }
+        }
+      });
+    }
+
+    function renderTopMembersTable(members) {
+      const tbody = document.getElementById('top-members-tbody');
+      if (!members || members.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-muted);">Aucune activité enregistrée sur cette période.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      members.forEach((m, idx) => {
+        const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+        const rolesHtml = (m.roles || []).slice(0, 3).map(r => 
+          `<span class="role-pill" style="border-color:${r.color};color:${r.color};">@${escapeHtml(r.name)}</span>`
+        ).join('');
+
+        html += `
+          <tr>
+            <td><span class="rank-badge ${rankClass}">${idx + 1}</span></td>
+            <td>
+              <img class="table-avatar" src="${m.avatarUrl || '/public/logo.png'}" onerror="this.src='/public/logo.png'">
+              <strong>${escapeHtml(m.displayName)}</strong>
+              <small style="opacity:0.6;margin-left:4px;">@${escapeHtml(m.username)}</small>
+            </td>
+            <td>${rolesHtml || '<small style="opacity:0.5;">Aucun</small>'}</td>
+            <td><strong>${m.messagesCount.toLocaleString('fr-FR')}</strong></td>
+            <td>${m.voiceFormatted}</td>
+            <td><span class="badge badge-info">${m.avgMessageLength} car.</span></td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function renderTopRolesTable(roles) {
+      const tbody = document.getElementById('top-roles-tbody');
+      if (!roles || roles.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-muted);">Aucune donnée pour les rôles sur cette période.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      roles.forEach((r, idx) => {
+        const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+        html += `
+          <tr>
+            <td><span class="rank-badge ${rankClass}">${idx + 1}</span></td>
+            <td>
+              <span class="role-pill" style="border-color:${r.color};color:${r.color};font-size:0.85rem;">
+                ● @${escapeHtml(r.roleName)}
+              </span>
+            </td>
+            <td><strong>${r.messagesCount.toLocaleString('fr-FR')}</strong></td>
+            <td>${r.voiceFormatted}</td>
+            <td>${r.avgMessageLength} car.</td>
+            <td><span class="badge badge-success">${r.activeMembersCount} membres</span></td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function renderTopChannelsTables(textChannels, voiceChannels) {
+      const textTbody = document.getElementById('top-text-channels-tbody');
+      const voiceTbody = document.getElementById('top-voice-channels-tbody');
+
+      if (!textChannels || textChannels.length === 0) {
+        textTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted);">Aucun message</td></tr>';
+      } else {
+        textTbody.innerHTML = textChannels.map(c => `
+          <tr>
+            <td><strong># ${escapeHtml(c.channelName)}</strong></td>
+            <td><strong>${c.messagesCount.toLocaleString('fr-FR')}</strong></td>
+            <td>${c.avgMessageLength} car.</td>
+            <td><span class="badge badge-info">${c.uniqueUsersCount}</span></td>
+          </tr>
+        `).join('');
+      }
+
+      if (!voiceChannels || voiceChannels.length === 0) {
+        voiceTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted);">Aucun salon vocal utilisé</td></tr>';
+      } else {
+        voiceTbody.innerHTML = voiceChannels.map(v => `
+          <tr>
+            <td><strong>🔊 ${escapeHtml(v.channelName)}</strong></td>
+            <td><strong>${v.voiceFormatted}</strong></td>
+            <td>${v.sessionsCount} sessions</td>
+            <td><span class="badge badge-success">${v.uniqueUsersCount}</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function renderMemberFlowTable(events) {
+      const tbody = document.getElementById('member-flow-tbody');
+      if (!events || events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:var(--text-muted);">Aucun mouvement récent enregistré.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      events.forEach(e => {
+        const isJoin = e.eventType === 'join';
+        html += `
+          <tr>
+            <td>
+              <span class="flow-badge ${isJoin ? 'join' : 'leave'}">
+                <i data-lucide="${isJoin ? 'user-plus' : 'user-minus'}" style="width:14px;height:14px;"></i>
+                ${isJoin ? 'Arrivée sur le serveur' : 'Départ du serveur'}
+              </span>
+            </td>
+            <td>
+              <img class="table-avatar" src="${e.avatarUrl || '/public/logo.png'}" onerror="this.src='/public/logo.png'">
+              <strong>${escapeHtml(e.displayName)}</strong>
+              <small style="opacity:0.6;">(@${escapeHtml(e.username)})</small>
+            </td>
+            <td style="color:var(--text-muted);">${e.formattedDate}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
   </script>
 </body>

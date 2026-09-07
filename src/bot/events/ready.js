@@ -1,5 +1,6 @@
 const { ActivityType } = require('discord.js');
 const { ConfigHelper } = require('../../database');
+const analyticsService = require('../../services/analyticsService');
 
 module.exports = {
   name: 'ready',
@@ -30,6 +31,9 @@ module.exports = {
 
     // Set Bot Status from config
     await updateBotStatus(client);
+
+    // Initialize Voice Analytics for members already in voice
+    await analyticsService.initVoiceSessions(client);
   },
 };
 

@@ -1,6 +1,7 @@
 const { UserXP, RoleReward, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
+const analyticsService = require('../../services/analyticsService');
 
 // Memory caches to avoid DB spam
 const xpCooldowns = new Map();
@@ -23,6 +24,9 @@ module.exports = {
 
     // 2. Run XP System
     await handleXP(message, client);
+
+    // 3. Record Analytics
+    await analyticsService.recordMessage(message);
   },
 };
 

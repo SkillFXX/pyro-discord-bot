@@ -176,6 +176,144 @@ const XPMultiplier = sequelize.define('XPMultiplier', {
   },
 });
 
+// 10. MessageLog: Tracks messages for analytics
+const MessageLog = sequelize.define('MessageLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  channelId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  guildId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  messageLength: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  wordCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  roleIds: {
+    type: DataTypes.TEXT, // JSON serialized array of role IDs
+    defaultValue: '[]',
+  },
+}, {
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['channelId'] },
+    { fields: ['createdAt'] },
+  ],
+});
+
+// 11. VoiceLog: Tracks completed voice sessions for analytics
+const VoiceLog = sequelize.define('VoiceLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  channelId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  guildId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  durationSeconds: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  roleIds: {
+    type: DataTypes.TEXT, // JSON serialized array of role IDs
+    defaultValue: '[]',
+  },
+  joinedAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  leftAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+}, {
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['channelId'] },
+    { fields: ['joinedAt'] },
+    { fields: ['createdAt'] },
+  ],
+});
+
+// 12. MemberLog: Tracks server joins and leaves for analytics
+const MemberLog = sequelize.define('MemberLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  guildId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  eventType: {
+    type: DataTypes.STRING, // 'join' | 'leave'
+    allowNull: false,
+  },
+}, {
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['eventType'] },
+    { fields: ['createdAt'] },
+  ],
+});
+
+// 13. UserSnapshot: Cache of member details for rich analytics displays
+const UserSnapshot = sequelize.define('UserSnapshot', {
+  userId: {
+    type: DataTypes.STRING,
+    primaryKey: true,
+  },
+  username: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  displayName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  avatarUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  roles: {
+    type: DataTypes.TEXT, // JSON serialized array of role IDs
+    defaultValue: '[]',
+  },
+  lastSeenAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+});
+
 // Helper functions for Config key-value store
 const ConfigHelper = {
   async get(key, defaultValue = null) {
@@ -227,5 +365,9 @@ module.exports = {
   AutomodRule,
   AutoRole,
   XPMultiplier,
+  MessageLog,
+  VoiceLog,
+  MemberLog,
+  UserSnapshot,
   ConfigHelper,
 };
