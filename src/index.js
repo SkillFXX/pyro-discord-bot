@@ -31,7 +31,15 @@ async function main() {
   const client = initBot(process.env.DISCORD_TOKEN);
 
   // 4. Start Web Server
-  const port = process.env.PORT || 3000;
+  // Parse port safely: handles numbers, Pterodactyl/Pelican SERVER_PORT, and unexpanded "${SERVER_PORT}"
+  let port = parseInt(process.env.PORT, 10);
+  if (isNaN(port) || port <= 0) {
+    port = parseInt(process.env.SERVER_PORT, 10);
+  }
+  if (isNaN(port) || port <= 0) {
+    port = 3000;
+  }
+
   console.log('[Dashboard Web] Initialisation du serveur...');
   startWebServer(client, port);
 }

@@ -314,6 +314,26 @@ const UserSnapshot = sequelize.define('UserSnapshot', {
   },
 });
 
+// 14. Session: Web dashboard sessions stored persistently in SQLite
+const Session = sequelize.define('Session', {
+  sid: {
+    type: DataTypes.STRING,
+    primaryKey: true,
+  },
+  data: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+  expires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+}, {
+  indexes: [
+    { fields: ['expires'] },
+  ],
+});
+
 // In-memory cache for fast and synchronous access
 const configMemoryCache = new Map();
 
@@ -455,6 +475,7 @@ module.exports = {
   VoiceLog,
   MemberLog,
   UserSnapshot,
+  Session,
   ConfigHelper,
   LOG_CONFIG_KEYS,
 };

@@ -14,10 +14,64 @@ const {
   AutomodRule,
   XPMultiplier,
   UserSnapshot,
+  Session,
   LOG_CONFIG_KEYS
 } = require('../database');
 const { updateBotStatus } = require('../bot/events/ready');
 const analyticsService = require('../services/analyticsService');
+
+// Persistent SQLite Session Store (avoids MemoryStore leak warning and persists logins across bot restarts)
+class SequelizeSessionStore extends session.Store {
+  async get(sid, fn) {
+    try {
+      const sess = await Session.findByPk(sid);
+      if (!sess) return fn();
+      if (sess.expires && new Date(sess.expires).getTime() < Date.now()) {
+        await sess.destroy();
+        return fn();
+      }
+      const data = JSON.parse(sess.data);
+      fn(null, data);
+    } catch (err) {
+      fn(err);
+    }
+  }
+
+  async set(sid, sess, fn) {
+    try {
+      const expires = sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires) : null;
+      await Session.upsert({
+        sid,
+        data: JSON.stringify(sess),
+        expires
+      });
+      if (fn) fn();
+    } catch (err) {
+      if (fn) fn(err);
+    }
+  }
+
+  async destroy(sid, fn) {
+    try {
+      await Session.destroy({ where: { sid } });
+      if (fn) fn();
+    } catch (err) {
+      if (fn) fn(err);
+    }
+  }
+
+  async touch(sid, sess, fn) {
+    try {
+      const expires = sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires) : null;
+      if (expires) {
+        await Session.update({ expires }, { where: { sid } });
+      }
+      if (fn) fn();
+    } catch (err) {
+      if (fn) fn(err);
+    }
+  }
+}
 
 // Login rate limiting (max 5 failed attempts per 15 minutes)
 const loginAttempts = new Map();
@@ -54,7 +108,19 @@ function safeCompareTokens(a, b) {
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
-function startWebServer(client, port) {
+function startWebServer(client, rawPort) {
+  // Ensure port is a valid integer (handles Pterodactyl/Pelican SERVER_PORT and string literals)
+  let port = parseInt(rawPort, 10);
+  if (isNaN(port) || port <= 0) {
+    port = parseInt(process.env.PORT, 10);
+  }
+  if (isNaN(port) || port <= 0) {
+    port = parseInt(process.env.SERVER_PORT, 10);
+  }
+  if (isNaN(port) || port <= 0) {
+    port = 3000;
+  }
+
   const app = express();
 
   // Trust first proxy for correct client IP detection and HTTPS recognition behind reverse proxies
@@ -79,6 +145,7 @@ function startWebServer(client, port) {
   const isSecureCookie = process.env.COOKIE_SECURE === 'true' || isProduction;
 
   app.use(session({
+    store: new SequelizeSessionStore(),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -665,9 +732,9 @@ function startWebServer(client, port) {
     next(err);
   });
 
-  // Start Express listener
-  app.listen(port, () => {
-    console.log(`[Dashboard Web] Serveur démarré avec succès sur le port ${port} (http://localhost:${port})`);
+  // Start Express listener explicitly binding to 0.0.0.0 and integer port
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`[Dashboard Web] Serveur démarré avec succès sur le port ${port} (http://0.0.0.0:${port})`);
   });
 }
 
