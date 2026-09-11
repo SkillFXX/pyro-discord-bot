@@ -959,8 +959,8 @@
                     <div>
                       <strong style="display:block;font-size:0.95rem;color:#f2f3f5;"><%= typeof serverName !== 'undefined' ? serverName : 'Pyro' %> Bot</strong>
                       <small id="preview-status-text" style="color:#949ba4;font-size:0.85rem;">
-                        <%= config.bot_status_type === 'WATCHING' ? 'Regarde' : (config.bot_status_type === 'LISTENING' ? 'Écoute' : (config.bot_status_type === 'STREAMING' ? 'Streame' : (config.bot_status_type === 'COMPETING' ? 'Participe à' : 'Joue à'))) %> 
-                        <strong><%= config.bot_status_text || 'la modération de Pyro' %></strong>
+                        <span id="preview-status-prefix"><%= config.bot_status_type === 'WATCHING' ? 'Regarde' : (config.bot_status_type === 'LISTENING' ? 'Écoute' : (config.bot_status_type === 'STREAMING' ? 'Streame' : (config.bot_status_type === 'COMPETING' ? 'Participe à' : 'Joue à'))) %></span> 
+                        <strong id="preview-status-bold"><%= config.bot_status_text || 'la modération de Pyro' %></strong>
                       </small>
                     </div>
                   </div>
@@ -1094,7 +1094,7 @@
     // Notification toast trigger
     function showToast(message) {
       const toast = document.getElementById('notification-toast');
-      toast.innerText = message;
+      toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => {
         toast.classList.remove('show');
@@ -1538,15 +1538,17 @@
         else dot.style.background = '#23a55a';
       }
 
-      // Update Status text
-      const statusLabel = document.getElementById('preview-status-text');
-      if (statusLabel) {
+      // Update Status text safely via textContent (satisfies CodeQL js/xss-through-dom)
+      const prefixEl = document.getElementById('preview-status-prefix');
+      const boldEl = document.getElementById('preview-status-bold');
+      if (prefixEl && boldEl) {
         let prefix = 'Joue à';
         if (statusType === 'WATCHING') prefix = 'Regarde';
         else if (statusType === 'LISTENING') prefix = 'Écoute';
         else if (statusType === 'STREAMING') prefix = 'Streame';
         else if (statusType === 'COMPETING') prefix = 'Participe à';
-        statusLabel.innerHTML = `${prefix} <strong>${escapeHtml(statusText)}</strong>`;
+        prefixEl.textContent = prefix;
+        boldEl.textContent = statusText;
       }
 
       // Update Embed Card Border
@@ -1555,19 +1557,21 @@
         card.style.borderLeftColor = color;
       }
 
-      // Update Footer text
+      // Update Footer text safely via textContent
       const ftText = document.getElementById('preview-footer-text');
       if (ftText) {
-        ftText.innerText = footerText;
+        ftText.textContent = footerText;
       }
 
-      // Update Footer icon
+      // Update Footer icon safely with protocol validation
       const ftIcon = document.getElementById('preview-footer-icon');
       if (ftIcon) {
-        if (footerIcon && footerIcon.trim().length > 0) {
-          ftIcon.src = footerIcon;
+        const trimmedIcon = footerIcon ? footerIcon.trim() : '';
+        if (trimmedIcon.startsWith('https://') || trimmedIcon.startsWith('http://') || trimmedIcon.startsWith('/')) {
+          ftIcon.src = trimmedIcon;
           ftIcon.style.display = 'inline-block';
         } else {
+          ftIcon.src = '';
           ftIcon.style.display = 'none';
         }
       }
