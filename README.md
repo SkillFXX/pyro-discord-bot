@@ -24,6 +24,9 @@
 
 - 🛡️ **Modération Complète & Sanctions Automatiques** : Avertissements (`/warn`), exclusions temporaires (`/mute`), expulsions (`/kick`), bannissements (`/ban`), escalade automatique configurable (ex: 3 warns = timeout, 5 = ban).
 - 🤖 **Automodération Modulaire** : Anti-spam fréquentiel, détection de doublons, blacklist/whitelist de mots, longueurs de messages, filtres Regex, compatible avec les forums.
+- 📋 **Système de Logs & Audit Sur-Mesure** : Salon de logs dédié avec sélection granulaire des événements à router via le dashboard :
+  - *Logs Pyro Bot* : Démarrage / Boot du bot (latence, stats système), Tickets (création/fermeture/membres), Sanctions & Warns, Vocaux temporaires Join-to-Create, Modération du Staff, XP & Level-up, Infractions Automod.
+  - *Logs Serveur Discord (Couverture Intégrale)* : Création/Suppression/Modification de Rôles et Salons, Création & Expiration de Liens d'Invitation, Paramètres du Serveur (nom, icône, bannière, AFK), Arrivées & Départs de membres, Ajout de Bots & Intégrations, Changements de pseudo, Modifications de rôles de membres, Kicks, Bans & Débans, Mutes (Timeouts), Activité vocale, Messages supprimés & édités, Threads & Posts Forum, Émojis & Autocollants, Événements Planifiés, Webhooks.
 - ⭐ **Système d'XP & Niveaux** : Gain d'XP paramétrable avec cooldown anti-spam, multiplicateurs par salon (ex: ×2 XP), attribution de rôles de récompenses avec cumul ou remplacement.
 - 🎫 **Support & Système de Tickets** : Panneaux interactifs avec boutons Discord (`/ticketsetup`), gestion des salons privés et permissions du rôle Staff (`/ticketmod`).
 - 🔊 **Salons Vocaux Temporaires (Join-to-Create)** : Création automatique de salon vocal lors de la connexion au canal créateur et suppression instantanée dès qu'il devient vide.

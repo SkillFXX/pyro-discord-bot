@@ -17,7 +17,7 @@
     /* Custom styles specific to dashboard - shared styles in styles.css */
   </style>
 </head>
-<body hx-headers='{"x-csrf-token": "<%= locals._csrf || \"\" %>"}'>
+<body hx-headers='{"x-csrf-token": "<%= locals._csrf || "" %>"}'>
 
   <!-- Top Navigation Bar -->
   <header class="header-bar">
@@ -55,6 +55,7 @@
             <li><a href="#" onclick="switchTab(event, 'tickets')"><i data-lucide="ticket"></i> Tickets</a></li>
             <li><a href="#" onclick="switchTab(event, 'xp')"><i data-lucide="star"></i> XP &amp; Niveaux</a></li>
             <li><a href="#" onclick="switchTab(event, 'automod')"><i data-lucide="bot"></i> Automod</a></li>
+            <li><a href="#" onclick="switchTab(event, 'logs')"><i data-lucide="clipboard-list"></i> Logs</a></li>
           </ul>
         </div>
       </aside>
@@ -788,6 +789,89 @@
           </div>
         </div>
 
+        <!-- ================= TAB: LOGS ================= -->
+        <div id="logs" class="tab-content">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem;">
+            <div>
+              <h2><i data-lucide="clipboard-list" style="vertical-align:middle;margin-right:8px;color:var(--primary);"></i> Configuration des Logs du Serveur</h2>
+              <p style="color:var(--text-muted);margin-bottom:0;">Configurez le salon de destination et sélectionnez les types d'événements à journaliser en direct.</p>
+            </div>
+          </div>
+
+          <form hx-post="/dashboard/logs" hx-swap="none" hx-on::after-request="showToast('Configuration des logs enregistrée avec succès !')">
+            
+            <!-- Channel Selector Card -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;">
+              <h3 style="margin-top:0;margin-bottom:0.6rem;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                <i data-lucide="hash" style="color:var(--primary);width:18px;height:18px;"></i> Salon des Logs
+              </h3>
+              <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">Tous les événements activés ci-dessous seront envoyés sous forme d'Embeds dans ce salon.</p>
+              
+              <div style="max-width:450px;">
+                <select id="log_channel_id_logs" name="log_channel_id">
+                  <option value="">-- Aucun salon (Logs désactivés) --</option>
+                  <% channels.text.forEach(c => { %>
+                    <option value="<%= c.id %>" <%= config.log_channel_id === c.id ? 'selected' : '' %>># <%= c.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+
+            <!-- Quick Toggle Toolbar -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:0.8rem;">
+              <h3 style="margin:0;font-size:1.15rem;"><i data-lucide="sliders" style="vertical-align:middle;margin-right:6px;color:var(--primary);"></i> Sélection des Événements</h3>
+              <div style="display:flex;gap:0.5rem;">
+                <button type="button" class="button" onclick="toggleAllLogs(true)" style="padding:0.4rem 0.8rem;font-size:0.85rem;">
+                  <i data-lucide="check-square" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Tout Activer
+                </button>
+                <button type="button" class="button" onclick="toggleAllLogs(false)" style="padding:0.4rem 0.8rem;font-size:0.85rem;">
+                  <i data-lucide="square" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Tout Désactiver
+                </button>
+              </div>
+            </div>
+
+            <!-- Logs Grid: Category 1 - Bot Logs -->
+            <h4 style="color:var(--primary);margin-top:1.5rem;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;">
+              <i data-lucide="bot" style="width:18px;height:18px;"></i> Événements &amp; Actions de Pyro Bot
+            </h4>
+            <div class="grid-2" style="gap:1rem;">
+              <% (typeof logConfigKeys !== 'undefined' ? logConfigKeys : []).filter(k => k.category === 'bot').forEach(item => { %>
+                <div class="log-toggle-card" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.2rem;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <strong style="display:block;font-size:0.95rem;margin-bottom:0.2rem;"><%= item.label %></strong>
+                    <small style="color:var(--text-muted);font-size:0.82rem;"><%= item.description %></small>
+                  </div>
+                  <label style="margin:0;margin-left:1rem;cursor:pointer;">
+                    <input type="checkbox" name="<%= item.key %>" value="true" class="log-checkbox" role="switch" <%= config[item.key] !== false ? 'checked' : '' %>>
+                  </label>
+                </div>
+              <% }) %>
+            </div>
+
+            <!-- Logs Grid: Category 2 - Discord Logs -->
+            <h4 style="color:#5865F2;margin-top:2rem;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;">
+              <i data-lucide="activity" style="width:18px;height:18px;"></i> Activité &amp; Événements Discord
+            </h4>
+            <div class="grid-2" style="gap:1rem;">
+              <% (typeof logConfigKeys !== 'undefined' ? logConfigKeys : []).filter(k => k.category === 'discord').forEach(item => { %>
+                <div class="log-toggle-card" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.2rem;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <strong style="display:block;font-size:0.95rem;margin-bottom:0.2rem;"><%= item.label %></strong>
+                    <small style="color:var(--text-muted);font-size:0.82rem;"><%= item.description %></small>
+                  </div>
+                  <label style="margin:0;margin-left:1rem;cursor:pointer;">
+                    <input type="checkbox" name="<%= item.key %>" value="true" class="log-checkbox" role="switch" <%= config[item.key] === true ? 'checked' : '' %>>
+                  </label>
+                </div>
+              <% }) %>
+            </div>
+
+            <button type="submit" class="primary-btn" style="margin-top:2rem;width:240px;">
+              <i data-lucide="save" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Enregistrer les Logs
+            </button>
+          </form>
+        </div>
+
       </section>
     </div>
   </main>
@@ -1296,6 +1380,13 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    // Toggle all log checkboxes
+    function toggleAllLogs(enabled) {
+      document.querySelectorAll('.log-checkbox').forEach(cb => {
+        cb.checked = enabled;
+      });
     }
   </script>
 </body>

@@ -84,6 +84,22 @@ module.exports = {
 
       await interaction.editReply({ embeds: [successEmbed] });
 
+      // Log Admin XP modification
+      const loggerService = require('../../services/loggerService');
+      await loggerService.log(client, 'log_bot_xp', {
+        title: '⭐ Modification Manuelle d\'XP',
+        description: `L'XP de **${target.tag}** a été ajustée par ${interaction.user}.`,
+        color: '#F39C12',
+        thumbnail: target.displayAvatarURL({ dynamic: true }),
+        fields: [
+          { name: '👤 Membre', value: `${target} (\`${target.id}\`)`, inline: true },
+          { name: '🛡️ Modérateur', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
+          { name: 'Action', value: `${subcommand === 'add' ? 'Ajout de' : 'Retrait de'} \`${amount} XP\``, inline: true },
+          { name: 'Niveau Résultant', value: `Niveau ${newLevel} (\`${newXP} XP\`)`, inline: true },
+        ],
+        footer: { text: `Pyro XP Management` },
+      });
+
     } catch (error) {
       console.error('Error modifying admin XP:', error);
       await interaction.editReply({

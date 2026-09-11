@@ -233,15 +233,49 @@
           <div class="feature-icon-wrapper">
             <i data-lucide="bar-chart-2"></i>
           </div>
-          <h3>Dashboard Web &amp; Sécurité Renforcée</h3>
+          <h3>Dashboard Web &amp; Analytics en Direct</h3>
           <p>
-            Pilotez l'ensemble des modules du bot via une interface web réactive (Express, HTMX, Chart.js) dotée d'un socle de sécurité conforme aux standards CodeQL.
+            Pilotez l'ensemble des modules du bot via une interface web réactive (Express, HTMX, Chart.js) avec des statistiques d'activité détaillées.
           </p>
           <ul class="feature-list">
-            <li><i data-lucide="check"></i> Graphiques d'activité (messages, vocal, heures de pointe)</li>
-            <li><i data-lucide="check"></i> Protection anti-CSRF intégrale &amp; Rate-limiting anti-bruteforce</li>
-            <li><i data-lucide="check"></i> Cookies sécurisés HTTPS &amp; support Reverse Proxy (FlowHost)</li>
-            <li><i data-lucide="check"></i> Export complet des statistiques au format CSV</li>
+            <li><i data-lucide="check"></i> Graphiques en direct (messages, temps vocal, heures d'affluence)</li>
+            <li><i data-lucide="check"></i> Reconfiguration à chaud sans redémarrage du bot</li>
+            <li><i data-lucide="check"></i> Analyse du flux de membres et filtres temporels</li>
+            <li><i data-lucide="check"></i> Export complet des statistiques d'activité au format CSV</li>
+          </ul>
+        </div>
+
+        <!-- Feature 7: Logs & Audit -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="scroll-text"></i>
+          </div>
+          <h3>Logs &amp; Audit Événementiel Intégral</h3>
+          <p>
+            Centralisez et auditez l'ensemble des événements Discord et Pyro dans un salon dédié configurable avec sélection granulaire.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> <strong>Logs Bot</strong> : Démarrage/Boot, tickets, sanctions, modération, Join-to-Create, XP, automod</li>
+            <li><i data-lucide="check"></i> <strong>Logs Serveur</strong> : Rôles, salons, liens d'invitation, paramètres guild, ajouts de bots</li>
+            <li><i data-lucide="check"></i> <strong>Membres &amp; Activité</strong> : Arrivées/départs, mutes, bans, vocaux, messages édités/supprimés</li>
+            <li><i data-lucide="check"></i> <strong>Contenu</strong> : Événements planifiés, webhooks, émojis et autocollants personnalisés</li>
+          </ul>
+        </div>
+
+        <!-- Feature 8: Sécurité & Robustesse -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="lock"></i>
+          </div>
+          <h3>Sécurité Renforcée &amp; Conforme CodeQL</h3>
+          <p>
+            Un socle technique solide et sécurisé répondant aux exigences strictes de sécurité et de performances.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Protection anti-CSRF intégrale sur l'ensemble des requêtes (lusca)</li>
+            <li><i data-lucide="check"></i> Rate-limiting anti-bruteforce sur l'authentification et l'API</li>
+            <li><i data-lucide="check"></i> Cookies durcis HTTPS &amp; support Reverse Proxy (FlowHost)</li>
+            <li><i data-lucide="check"></i> Base SQLite haute performance avec mode WAL</li>
           </ul>
         </div>
 

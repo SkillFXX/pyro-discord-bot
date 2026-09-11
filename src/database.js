@@ -373,6 +373,38 @@ async function initDatabasePragmas() {
   }
 }
 
+// Log Event Configuration Keys and Definitions
+const LOG_CONFIG_KEYS = [
+  // Bot Logs
+  { key: 'log_bot_tickets', label: 'Tickets', description: 'Ouverture, fermeture, réouverture, suppression et membres ajoutés/retirés', category: 'bot', default: true },
+  { key: 'log_bot_sanctions', label: 'Sanctions & Avertissements', description: 'Avertissements (/warn) et sanctions automatiques par seuil', category: 'bot', default: true },
+  { key: 'log_bot_moderation', label: 'Modération du Staff', description: 'Actions manuelles exécutées via le bot (/mute, /kick, /ban)', category: 'bot', default: true },
+  { key: 'log_bot_voice_create', label: 'Salons Vocaux Temporaires', description: 'Création et suppression des salons Join-to-Create', category: 'bot', default: true },
+  { key: 'log_bot_xp', label: 'XP & Niveaux', description: 'Passage de niveau (Level Up), rôles récompenses et commandes /adminxp', category: 'bot', default: true },
+  { key: 'log_bot_automod', label: 'Automodération', description: 'Infractions détectées par l\'automod (spam, doublons, mots interdits, regex)', category: 'bot', default: true },
+  { key: 'log_bot_boot', label: 'Démarrage & Boot du Bot', description: 'Notification au démarrage et redémarrage de Pyro (ping, stats système)', category: 'bot', default: true },
+
+  // Discord Logs
+  { key: 'log_discord_member_join', label: 'Arrivée de Membre', description: 'Nouveaux membres rejoignant le serveur', category: 'discord', default: true },
+  { key: 'log_discord_member_leave', label: 'Départ de Membre', description: 'Membres quittant le serveur', category: 'discord', default: true },
+  { key: 'log_discord_bot_add', label: 'Ajout de Bots & Intégrations', description: 'Nouveaux bots ou intégrations ajoutés au serveur', category: 'discord', default: true },
+  { key: 'log_discord_nickname_update', label: 'Changement de Pseudo', description: 'Modifications de surnom ou pseudo de membre', category: 'discord', default: true },
+  { key: 'log_discord_role_update', label: 'Changement de Rôles Membres', description: 'Rôles ajoutés ou retirés aux membres', category: 'discord', default: true },
+  { key: 'log_discord_server_roles', label: 'Rôles du Serveur', description: 'Création, suppression ou modification des rôles sur le serveur', category: 'discord', default: true },
+  { key: 'log_discord_channels', label: 'Salons & Catégories', description: 'Création, suppression ou modification de salons et catégories', category: 'discord', default: true },
+  { key: 'log_discord_invites', label: 'Liens d\'Invitation', description: 'Création et révocation d\'invitations sur le serveur', category: 'discord', default: true },
+  { key: 'log_discord_timeouts', label: 'Timeouts / Mutes Discord', description: 'Exclusions temporaires appliquées ou levées', category: 'discord', default: true },
+  { key: 'log_discord_bans', label: 'Bannissements & Débannissements', description: 'Membres bannis ou débannis sur Discord', category: 'discord', default: true },
+  { key: 'log_discord_kicks', label: 'Expulsions (Kicks)', description: 'Membres expulsés du serveur', category: 'discord', default: true },
+  { key: 'log_discord_voice_activity', label: 'Activité Vocale', description: 'Connexion, déconnexion ou changement de salon vocal', category: 'discord', default: false },
+  { key: 'log_discord_threads', label: 'Threads & Posts Forum', description: 'Création ou suppression de fils de discussion ou posts forum', category: 'discord', default: true },
+  { key: 'log_discord_message_events', label: 'Messages Supprimés & Modifiés', description: 'Suppression ou édition de messages avec historique', category: 'discord', default: true },
+  { key: 'log_discord_guild_update', label: 'Paramètres du Serveur', description: 'Modifications du nom, icône, bannière, salon AFK, niveau de sécurité', category: 'discord', default: true },
+  { key: 'log_discord_emojis', label: 'Émojis & Autocollants', description: 'Ajout, suppression ou renommage d\'émojis et stickers personnalisés', category: 'discord', default: true },
+  { key: 'log_discord_scheduled_events', label: 'Événements Planifiés', description: 'Création, modification ou annulation d\'événements du serveur', category: 'discord', default: true },
+  { key: 'log_discord_webhooks', label: 'Webhooks de Salons', description: 'Création, modification ou suppression de webhooks dans les salons', category: 'discord', default: true },
+];
+
 module.exports = {
   sequelize,
   initDatabasePragmas,
@@ -390,4 +422,5 @@ module.exports = {
   MemberLog,
   UserSnapshot,
   ConfigHelper,
+  LOG_CONFIG_KEYS,
 };

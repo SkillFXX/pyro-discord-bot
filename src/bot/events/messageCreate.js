@@ -119,7 +119,23 @@ async function handleXP(message, client) {
         }
       }
 
-      // 2. Distribute Role Rewards
+      // 2. Log in centralized logger
+      const loggerService = require('../../services/loggerService');
+      await loggerService.log(client, 'log_bot_xp', {
+        title: '⭐ Montée de Niveau (Level Up)',
+        description: `**${message.author.tag}** a progressé jusqu'au **Niveau ${newLevel}** !`,
+        color: '#F1C40F',
+        thumbnail: message.author.displayAvatarURL({ dynamic: true }),
+        fields: [
+          { name: '👤 Membre', value: `${message.author} (\`${message.author.id}\`)`, inline: true },
+          { name: 'Niveau Précédent', value: `${oldLevel}`, inline: true },
+          { name: 'Nouveau Niveau', value: `${newLevel}`, inline: true },
+          { name: 'XP Totale', value: `${newXP} XP`, inline: true },
+        ],
+        footer: { text: 'Pyro Niveaux & XP' },
+      });
+
+      // 3. Distribute Role Rewards
       await handleRoleRewards(message.member, newLevel);
     }
 

@@ -18,17 +18,13 @@ async function sendDM(member, embed) {
   }
 }
 
+const loggerService = require('../../services/loggerService');
+
 /**
  * Logs a moderation action in the configured log channel.
  */
 async function logModerationAction(client, { action, target, moderator, reason, duration = null, warnId = null }) {
-  const logChannelId = await ConfigHelper.get('log_channel_id');
-  if (!logChannelId) return;
-
   try {
-    const channel = await client.channels.fetch(logChannelId);
-    if (!channel) return;
-
     const fields = [
       { name: '👤 Membre', value: `${target} (\`${target.id}\`)`, inline: true },
       { name: '🛡️ Modérateur', value: `${moderator} (\`${moderator.id}\`)`, inline: true },
@@ -47,14 +43,21 @@ async function logModerationAction(client, { action, target, moderator, reason, 
       fields.push({ name: '🔢 Warn ID', value: `\`#${warnId}\``, inline: true });
     }
 
-    const embed = embeds.custom(
-      `🔔 Action de Modération : ${action}`,
-      null,
-      embeds.COLORS.INFO,
-      fields
-    );
+    let logKey = 'log_bot_moderation';
+    if (action.toLowerCase().includes('ticket')) {
+      logKey = 'log_bot_tickets';
+    } else if (action.toLowerCase().includes('automod')) {
+      logKey = 'log_bot_automod';
+    } else if (warnId != null || action.toLowerCase().includes('avertissement') || action.toLowerCase().includes('automatique') || action.toLowerCase().includes('warn')) {
+      logKey = 'log_bot_sanctions';
+    }
 
-    await channel.send({ embeds: [embed] });
+    await loggerService.log(client, logKey, {
+      title: `🔔 Action : ${action}`,
+      color: action.toLowerCase().includes('ticket') ? '#3498DB' : '#E74C3C',
+      fields,
+      footer: { text: `Pyro Surveillance • Cible ID: ${target.id || 'N/A'}` },
+    });
   } catch (error) {
     console.error('Error logging moderation action:', error);
   }

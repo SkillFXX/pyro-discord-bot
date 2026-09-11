@@ -8,6 +8,10 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildInvites,
+    GatewayIntentBits.GuildEmojisAndStickers,
+    GatewayIntentBits.GuildScheduledEvents,
+    GatewayIntentBits.GuildWebhooks,
   ],
   partials: [
     Partials.Message,

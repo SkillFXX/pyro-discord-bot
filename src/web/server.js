@@ -13,7 +13,8 @@ const {
   RoleReward, 
   AutomodRule,
   XPMultiplier,
-  UserSnapshot
+  UserSnapshot,
+  LOG_CONFIG_KEYS
 } = require('../database');
 const { updateBotStatus } = require('../bot/events/ready');
 const analyticsService = require('../services/analyticsService');
@@ -333,13 +334,15 @@ function startWebServer(client, port) {
     const lists = await getDashboardLists(guildContext);
 
     // Fetch config keys
+    const logKeys = LOG_CONFIG_KEYS.map(k => k.key);
     const configKeys = [
       'bot_status_type', 'bot_status_text',
       'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
       'voice_creator_channel_id', 'voice_creator_category_id',
       'welcome_message_template', 'leave_message_template',
       'ticket_category_id', 'ticket_staff_role_id',
-      'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id'
+      'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
+      ...logKeys
     ];
 
     const config = {};
@@ -354,6 +357,7 @@ function startWebServer(client, port) {
       roles: guildContext.roles,
       members: guildContext.members,
       config,
+      logConfigKeys: LOG_CONFIG_KEYS,
       ...lists
     });
   });
@@ -426,6 +430,22 @@ function startWebServer(client, port) {
 
     // Instantly update Bot Status presence
     await updateBotStatus(client);
+
+    res.status(200).send();
+  });
+
+  // Logs Config Save
+  app.post('/dashboard/logs', isAuthenticated, async (req, res) => {
+    // 1. Update log channel
+    if (req.body.log_channel_id !== undefined) {
+      await ConfigHelper.set('log_channel_id', req.body.log_channel_id || null);
+    }
+
+    // 2. Update each log event toggle
+    for (const item of LOG_CONFIG_KEYS) {
+      const isEnabled = req.body[item.key] === 'true' || req.body[item.key] === 'on' || req.body[item.key] === true;
+      await ConfigHelper.set(item.key, isEnabled);
+    }
 
     res.status(200).send();
   });

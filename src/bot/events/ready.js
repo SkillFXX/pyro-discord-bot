@@ -34,6 +34,28 @@ module.exports = {
 
     // Initialize Voice Analytics for members already in voice
     await analyticsService.initVoiceSessions(client);
+
+    // Send Boot / Startup Log
+    try {
+      const loggerService = require('../../services/loggerService');
+      await loggerService.log(client, 'log_bot_boot', {
+        title: '🚀 Pyro Bot est en ligne !',
+        description: `Le bot a démarré et s'est synchronisé avec succès sur **${guild.name}**.`,
+        color: '#2ECC71',
+        thumbnail: client.user.displayAvatarURL({ dynamic: true }),
+        fields: [
+          { name: '🤖 Bot', value: `${client.user.tag} (\`${client.user.id}\`)`, inline: true },
+          { name: '⚡ Latence WebSocket', value: `\`${client.ws.ping}ms\``, inline: true },
+          { name: '👥 Membres', value: `\`${guild.memberCount}\``, inline: true },
+          { name: '📁 Salons', value: `\`${guild.channels.cache.size}\``, inline: true },
+          { name: '💻 Commandes Slash', value: `\`${client.commands.size}\``, inline: true },
+          { name: '⚙️ Node.js', value: `\`${process.version}\``, inline: true },
+        ],
+        footer: { text: `Pyro Démarrage • PID ${process.pid}` },
+      });
+    } catch (logErr) {
+      console.error('[Bot ready] Erreur lors de l\'envoi du log de démarrage :', logErr);
+    }
   },
 };
 
