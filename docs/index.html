@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pyro Discord Bot • Modération, Automod, XP & Dashboard Web</title>
+  <meta name="description" content="Pyro est un bot Discord polyvalent tout-en-un doté d'un système de modération avancée, automodération paramétrable, système d'XP & rôles récompenses, tickets de support, salons vocaux temporaires et un tableau de bord web interactif.">
+  <meta name="theme-color" content="#ff6b35">
+
+  <!-- Open Graph / Meta -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pyro Discord Bot • Modération, Automod, XP & Dashboard">
+  <meta property="og:description" content="Propulsez votre serveur Discord au niveau supérieur avec Pyro : modération, niveaux XP, tickets, automod et dashboard web interactif.">
+  <meta property="og:image" content="assets/logo.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="assets/styles.css">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- ================= Navigation ================= -->
+  <header class="navbar">
+    <div class="container">
+      <a href="#" class="brand">
+        <img src="assets/logo.png" alt="Pyro Logo">
+        <span>Pyro<span class="text-gradient">Bot</span></span>
+      </a>
+
+      <nav class="nav-menu" id="navMenu">
+        <a href="#features" class="nav-link">Fonctionnalités</a>
+        <a href="#install" class="nav-link">Installation</a>
+        <a href="#commands" class="nav-link">Commandes</a>
+        <a href="#flowhost" class="nav-link">Hébergement</a>
+        <a href="#contact" class="nav-link">Contact</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="https://flowhost.dev" target="_blank" rel="noopener noreferrer" class="btn btn-flowhost btn-sm">
+          <i data-lucide="server" style="width:16px;height:16px;"></i> Héberger sur FlowHost
+        </a>
+      </div>
+
+      <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu">
+        <i data-lucide="menu"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= Hero Section ================= -->
+  <section class="hero" id="home">
+    <div class="container">
+      <div class="hero-grid">
+        
+        <!-- Hero Text -->
+        <div class="hero-text-content">
+          <div class="hero-badge">
+            <span class="pulse-dot"></span>
+            <span>Bot Discord Polyvalent &amp; Dashboard Web v1.0</span>
+          </div>
+
+          <h1 class="hero-title">
+            Propulsez votre serveur Discord avec <span class="text-gradient">Pyro</span>
+          </h1>
+
+          <p class="hero-subtitle">
+            Le bot tout-en-un alliant <strong>modération automatisée</strong>, <strong>automod intelligent</strong>, 
+            <strong>système d'XP complet</strong> avec récompenses de rôles, <strong>tickets de support</strong>, 
+            <strong>salons vocaux temporaires</strong> et un <strong>tableau de bord web interactif</strong> avec statistiques en temps réel.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="https://flowhost.dev" target="_blank" rel="noopener noreferrer" class="btn btn-flowhost">
+              <i data-lucide="rocket"></i> Héberger simplement chez FlowHost
+            </a>
+            <a href="#install" class="btn btn-secondary">
+              <i data-lucide="download-cloud"></i> Guide de déploiement
+            </a>
+            <a href="https://github.com/SkillFXX/pyro-discord-bot" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+              <i data-lucide="github"></i> Dépôt GitHub
+            </a>
+          </div>
+
+          <div class="hero-stats">
+            <div class="hero-stat-item">
+              <h4><i data-lucide="shield-check" style="color:var(--primary);width:22px;height:22px;"></i> 100%</h4>
+              <p>Modération sécurisée</p>
+            </div>
+            <div class="hero-stat-item">
+              <h4><i data-lucide="zap" style="color:var(--primary);width:22px;height:22px;"></i> &lt; 50ms</h4>
+              <p>Temps de réponse direct</p>
+            </div>
+            <div class="hero-stat-item">
+              <h4><i data-lucide="layout" style="color:var(--primary);width:22px;height:22px;"></i> Web</h4>
+              <p>Dashboard intégré</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Preview Mockup -->
+        <div class="hero-preview">
+          <div class="preview-card">
+            <div class="preview-topbar">
+              <div class="preview-dots">
+                <span class="preview-dot red"></span>
+                <span class="preview-dot yellow"></span>
+                <span class="preview-dot green"></span>
+              </div>
+              <div class="preview-title">
+                <i data-lucide="terminal" style="width:14px;height:14px;color:var(--primary);"></i>
+                pyro-discord-bot • live status
+              </div>
+              <span class="code-badge">En Ligne</span>
+            </div>
+
+            <div class="preview-content">
+              <div class="preview-stats-grid">
+                <div class="mini-kpi">
+                  <div class="mini-kpi-header">
+                    <span>Messages Analysés</span>
+                    <i data-lucide="message-square" style="width:14px;height:14px;color:var(--primary);"></i>
+                  </div>
+                  <div class="mini-kpi-val text-gradient">24 850</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-header">
+                    <span>Heures Vocales</span>
+                    <i data-lucide="mic" style="width:14px;height:14px;color:var(--warning);"></i>
+                  </div>
+                  <div class="mini-kpi-val">142h</div>
+                </div>
+              </div>
+
+              <div class="preview-code-block">
+                <div><span class="code-comment">// Événements & Modération en direct</span></div>
+                <div><span class="code-keyword">&gt;</span> <span class="code-cmd">/warn</span> user:@spammer reason:"Spam discord.gg"</div>
+                <div><span style="color:#2ecc71;">✓</span> Sanction auto déclenchée : <span style="color:#f39c12;">Timeout 10 min</span> (Seuil: 3 warns)</div>
+                <div style="margin-top:0.4rem;"><span class="code-keyword">&gt;</span> <span class="code-cmd">/niveau</span> user:@membre</div>
+                <div><span style="color:#38bdf8;">★</span> Niveau 5 atteint (1 240 XP) → Rôle <span style="color:#ff8e5e;">@Membre Vérifié</span> attribué !</div>
+                <div style="margin-top:0.4rem;"><span class="code-keyword">&gt;</span> [Join-to-Create] Salon vocal éphémère créé pour @flowskill</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Features Section ================= -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag"><i data-lucide="layers" style="width:14px;height:14px;"></i> Fonctionnalités Clés</span>
+        <h2 class="section-title">Tout ce dont votre serveur a besoin dans <span class="text-gradient">un seul bot</span></h2>
+        <p class="section-desc">
+          Conçu avec Discord.js v14, SQLite en mode haute performance WAL et une architecture moderne, Pyro assure une fiabilité irréprochable.
+        </p>
+      </div>
+
+      <div class="features-grid">
+
+        <!-- Feature 1: Modération -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="shield-alert"></i>
+          </div>
+          <h3>Modération &amp; Sanctions Automatiques</h3>
+          <p>
+            Gérez votre serveur avec rigueur grâce à un système complet d'avertissements (warns) avec escalade automatique paramétrable.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Seuil de warns configurable (ex: 3 warns = mute, 5 = ban)</li>
+            <li><i data-lucide="check"></i> Commandes <code>/warn</code>, <code>/mute</code>, <code>/kick</code>, <code>/ban</code></li>
+            <li><i data-lucide="check"></i> Historique des sanctions consultable par membre</li>
+          </ul>
+        </div>
+
+        <!-- Feature 2: Automod -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="bot"></i>
+          </div>
+          <h3>Automodération Avancée &amp; Modulaire</h3>
+          <p>
+            Protégez vos salons en temps réel contre les spams, doublons et contenus inappropriés grâce à des règles multicritères.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Anti-spam fréquentiel et détection de doublons</li>
+            <li><i data-lucide="check"></i> Blacklist / Whitelist de mots et motifs Regex</li>
+            <li><i data-lucide="check"></i> Multi-actions : suppression, avertissement DM, mute, ban</li>
+            <li><i data-lucide="check"></i> Compatible avec les salons textuels et Forums</li>
+          </ul>
+        </div>
+
+        <!-- Feature 3: XP & Niveaux -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="star"></i>
+          </div>
+          <h3>Système d'XP &amp; Rôles Récompenses</h3>
+          <p>
+            Dynamisez l'engagement de votre communauté en récompensant l'activité textuelle avec gain d'XP et attribution de rôles.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Cooldown et gain d'XP aléatoire anti-spam</li>
+            <li><i data-lucide="check"></i> Multiplicateurs d'XP personnalisables par salon</li>
+            <li><i data-lucide="check"></i> Rôles de niveau avec mode cumul ou remplacement</li>
+            <li><i data-lucide="check"></i> Commandes <code>/niveau</code>, <code>/topniveau</code> et <code>/adminxp</code></li>
+          </ul>
+        </div>
+
+        <!-- Feature 4: Tickets -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="ticket"></i>
+          </div>
+          <h3>Support &amp; Système de Tickets</h3>
+          <p>
+            Offrez un support structuré avec des panneaux interactifs contenant des boutons Discord et des canaux de discussion privés dédiés.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Déploiement en 1 clic via <code>/ticketsetup</code></li>
+            <li><i data-lucide="check"></i> Attribution des permissions au rôle Staff</li>
+            <li><i data-lucide="check"></i> Commandes <code>/ticketmod</code> pour fermer ou inviter un membre</li>
+          </ul>
+        </div>
+
+        <!-- Feature 5: Join to Create -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="mic"></i>
+          </div>
+          <h3>Salons Vocaux Temporaires (Join-to-Create)</h3>
+          <p>
+            Désencombrez votre liste de salons. Lorsqu'un utilisateur rejoint le canal créateur, Pyro génère automatiquement un salon vocal privé.
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Création instantanée à la connexion</li>
+            <li><i data-lucide="check"></i> Suppression automatique dès que le salon est vide</li>
+            <li><i data-lucide="check"></i> Catégorie et salon créateur configurables dans le dashboard</li>
+          </ul>
+        </div>
+
+        <!-- Feature 6: Dashboard Web -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i data-lucide="bar-chart-2"></i>
+          </div>
+          <h3>Dashboard Web &amp; Analytics en Direct</h3>
+          <p>
+            Pilotez l'ensemble des modules du bot via une interface web fluide et réactive (Express, HTMX, Chart.js).
+          </p>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Graphiques d'activité (messages, vocal, heures de pointe)</li>
+            <li><i data-lucide="check"></i> Filtrage par période, rôle, salon et membre</li>
+            <li><i data-lucide="check"></i> Export complet des statistiques au format CSV</li>
+            <li><i data-lucide="check"></i> Configuration modifiable sans redémarrage du bot</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Installation Section ================= -->
+  <section class="install-section" id="install">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag"><i data-lucide="terminal" style="width:14px;height:14px;"></i> Déploiement</span>
+        <h2 class="section-title">Comment installer &amp; utiliser <span class="text-gradient">Pyro</span></h2>
+        <p class="section-desc">Déployez Pyro sur votre propre infrastructure ou machine locale en moins de 5 minutes.</p>
+      </div>
+
+      <div class="steps-wrapper">
+
+        <!-- Step 1 -->
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3>Créer l'Application Discord</h3>
+          <p>Rendez-vous sur le <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:underline;">Discord Developer Portal</a>, créez une application, ajoutez un bot et activez les Privileged Gateway Intents requis :</p>
+          <ul class="feature-list" style="margin-bottom:0.5rem;">
+            <li><i data-lucide="check-circle-2"></i> <strong>Server Members Intent</strong> (Bienvenue, auto-rôles, tracking)</li>
+            <li><i data-lucide="check-circle-2"></i> <strong>Message Content Intent</strong> (Automod, messages d'XP)</li>
+          </ul>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3>Cloner &amp; Installer les Dépendances</h3>
+          <p>Clonez le dépôt officiel et installez les paquets Node.js (Node.js version 18 ou supérieure recommandée) :</p>
+          <div class="code-box">
+            <div class="code-box-header">
+              <span>bash</span>
+              <button class="copy-btn copy-trigger" data-copy="git clone https://github.com/SkillFXX/pyro-discord-bot.git
+cd pyro-discord-bot
+npm install" data-label="Commandes d'installation">
+                <i data-lucide="copy" style="width:12px;height:12px;"></i> Copier
+              </button>
+            </div>
+            <pre><code>git clone https://github.com/SkillFXX/pyro-discord-bot.git
+cd pyro-discord-bot
+npm install</code></pre>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3>Configurer les Variables d'Environnement</h3>
+          <p>Dupliquez le fichier <code>.env.example</code> en <code>.env</code> et renseignez votre token de bot et vos identifiants :</p>
+          <div class="code-box">
+            <div class="code-box-header">
+              <span>.env</span>
+              <button class="copy-btn copy-trigger" data-copy="DISCORD_TOKEN=votre_bot_token_ici
+CLIENT_ID=votre_application_id_ici
+GUILD_ID=votre_serveur_guild_id_ici
+PORT=3000
+SESSION_SECRET=cle_secrete_aleatoire_dashboard" data-label="Variables .env">
+                <i data-lucide="copy" style="width:12px;height:12px;"></i> Copier
+              </button>
+            </div>
+            <pre><code>DISCORD_TOKEN=votre_bot_token_ici
+CLIENT_ID=votre_application_id_ici
+GUILD_ID=votre_serveur_guild_id_ici
+PORT=3000
+SESSION_SECRET=cle_secrete_aleatoire_dashboard</code></pre>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step-card">
+          <div class="step-number">4</div>
+          <h3>Lancer le Bot &amp; Ouvrir le Dashboard</h3>
+          <p>Démarrez Pyro. Les tables de données SQLite et les commandes slash seront enregistrées automatiquement :</p>
+          <div class="code-box">
+            <div class="code-box-header">
+              <span>bash</span>
+              <button class="copy-btn copy-trigger" data-copy="npm start" data-label="Commande npm start">
+                <i data-lucide="copy" style="width:12px;height:12px;"></i> Copier
+              </button>
+            </div>
+            <pre><code>npm start</code></pre>
+          </div>
+          <p style="margin-top: 0.9rem; font-size: 0.88rem;">
+            Rendez-vous ensuite sur <a href="http://localhost:3000" target="_blank" style="color:var(--primary);text-decoration:underline;">http://localhost:3000</a> et connectez-vous avec votre <code>DISCORD_TOKEN</code> pour accéder au tableau de bord.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Commands Section ================= -->
+  <section class="commands-section" id="commands">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag"><i data-lucide="slash" style="width:14px;height:14px;"></i> Commandes Slash</span>
+        <h2 class="section-title">Aperçu des commandes Discord</h2>
+        <p class="section-desc">Toutes les commandes sont préenregistrées et exploitent les dernières fonctionnalités d'interactions de Discord.</p>
+      </div>
+
+      <div class="commands-table-wrapper">
+        <table class="commands-table">
+          <thead>
+            <tr>
+              <th>Commande</th>
+              <th>Catégorie</th>
+              <th>Description</th>
+              <th>Permission Requise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="cmd-badge">/warn</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Avertit un utilisateur et enregistre la sanction en base.</td>
+              <td>Modérer les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/warns</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Consulte l'historique des avertissements d'un membre ou les réinitialise.</td>
+              <td>Modérer les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/mute</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Exclut temporairement (Timeout) un utilisateur avec une durée personnalisée.</td>
+              <td>Modérer les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/kick</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Expulse un utilisateur du serveur avec notification et motif.</td>
+              <td>Expulser des membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/ban</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Bannit définitivement un utilisateur avec motif et notification DM.</td>
+              <td>Bannir des membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/sanctions</span></td>
+              <td><span class="category-badge cat-mod">Modération</span></td>
+              <td>Affiche la liste récapitulative des sanctions subies par un utilisateur.</td>
+              <td>Modérer les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/niveau</span></td>
+              <td><span class="category-badge cat-xp">XP &amp; Niveaux</span></td>
+              <td>Affiche la carte de niveau, l'XP accumulée et la progression du membre.</td>
+              <td>Tous les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/topniveau</span></td>
+              <td><span class="category-badge cat-xp">XP &amp; Niveaux</span></td>
+              <td>Affiche le classement (Leaderboard) des membres les plus actifs.</td>
+              <td>Tous les membres</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/adminxp</span></td>
+              <td><span class="category-badge cat-xp">XP &amp; Niveaux</span></td>
+              <td>Ajoute, retire ou réinitialise l'XP d'un membre manuellement.</td>
+              <td>Administrateur</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/ticketsetup</span></td>
+              <td><span class="category-badge cat-ticket">Tickets</span></td>
+              <td>Déploie le message d'ouverture de ticket avec bouton interactif.</td>
+              <td>Administrateur</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/ticketmod</span></td>
+              <td><span class="category-badge cat-ticket">Tickets</span></td>
+              <td>Gère un ticket ouvert (fermeture, réouverture, ajout ou retrait de membre).</td>
+              <td>Rôle Staff configuré</td>
+            </tr>
+            <tr>
+              <td><span class="cmd-badge">/analytics</span></td>
+              <td><span class="category-badge cat-stats">Statistiques</span></td>
+              <td>Affiche un résumé analytique complet des messages et de l'activité vocale.</td>
+              <td>Administrateur</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FlowHost Partnership CTA ================= -->
+  <section class="flowhost-section" id="flowhost">
+    <div class="container">
+      <div class="flowhost-banner">
+        
+        <div class="flowhost-content">
+          <div class="flowhost-badge">
+            <i data-lucide="award" style="width:14px;height:14px;"></i> Hébergement Recommandé
+          </div>
+          <h2>Hébergez Pyro 24/7 en toute simplicité sur <span class="text-gradient">FlowHost</span></h2>
+          <p>
+            Pour garantir un fonctionnement sans interruption de vos règles d'automodération, du système d'XP et de votre tableau de bord web, confiez l'hébergement de votre bot à <strong>FlowHost</strong>.
+            Une infrastructure robuste et optimisée pour les applications Node.js et Discord.
+          </p>
+
+          <div class="flowhost-perks">
+            <div class="perk-item">
+              <i data-lucide="check-circle-2"></i>
+              <span>Déploiement Node.js instantané</span>
+            </div>
+            <div class="perk-item">
+              <i data-lucide="check-circle-2"></i>
+              <span>Disponibilité 99.9% sans coupure</span>
+            </div>
+            <div class="perk-item">
+              <i data-lucide="check-circle-2"></i>
+              <span>Protection Anti-DDoS haute sécurité</span>
+            </div>
+            <div class="perk-item">
+              <i data-lucide="check-circle-2"></i>
+              <span>Panel d'administration fluide &amp; intuitif</span>
+            </div>
+          </div>
+
+          <a href="https://flowhost.dev" target="_blank" rel="noopener noreferrer" class="btn btn-flowhost">
+            <i data-lucide="external-link"></i> Découvrir FlowHost (flowhost.dev)
+          </a>
+        </div>
+
+        <div class="flowhost-card-box">
+          <i data-lucide="cloud-lightning" style="width:48px;height:48px;color:var(--primary);margin-bottom:1rem;"></i>
+          <h4>FlowHost Cloud</h4>
+          <span class="flowhost-url">flowhost.dev</span>
+          <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1.5rem;">
+            La solution d'hébergement idéale pour les créateurs de serveurs Discord et les développeurs exigeants.
+          </p>
+          <a href="https://flowhost.dev" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="width:100%;">
+            Visiter le site officiel <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Contact Section ================= -->
+  <section class="contact-section" id="contact">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Support &amp; Contact</span>
+        <h2 class="section-title">Besoin d'aide ou d'un bot <span class="text-gradient">sur-mesure</span> ?</h2>
+        <p class="section-desc">Une question sur la configuration de Pyro, une suggestion d'amélioration ou un projet de bot Discord personnalisé ? N'hésitez pas à me contacter directement.</p>
+      </div>
+
+      <div class="contact-grid">
+
+        <!-- Contact 1: Email -->
+        <div class="contact-card">
+          <div class="contact-icon">
+            <i data-lucide="mail"></i>
+          </div>
+          <h3>Contact par Email</h3>
+          <p>Pour toute question formelle, support technique ou proposition commerciale :</p>
+          
+          <div class="contact-value-box">
+            <span>skillfx.dev@gmail.com</span>
+            <button class="copy-btn copy-trigger" data-copy="skillfx.dev@gmail.com" data-label="skillfx.dev@gmail.com" title="Copier l'adresse email">
+              <i data-lucide="copy" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+
+          <a href="mailto:skillfx.dev@gmail.com" class="btn btn-primary btn-sm" style="width:100%;">
+            <i data-lucide="send" style="width:14px;height:14px;"></i> Envoyer un Email
+          </a>
+        </div>
+
+        <!-- Contact 2: Discord -->
+        <div class="contact-card">
+          <div class="contact-icon">
+            <i data-lucide="message-square"></i>
+          </div>
+          <h3>Contact sur Discord</h3>
+          <p>Contactez-moi directement en message privé sur Discord pour une réponse rapide :</p>
+          
+          <div class="contact-value-box">
+            <span>@flowskill</span>
+            <button class="copy-btn copy-trigger" data-copy="@flowskill" data-label="@flowskill" title="Copier le tag Discord">
+              <i data-lucide="copy" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+
+          <button class="btn btn-secondary btn-sm copy-trigger" data-copy="@flowskill" data-label="@flowskill" style="width:100%;">
+            <i data-lucide="copy" style="width:14px;height:14px;"></i> Copier mon tag Discord
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Footer ================= -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <img src="assets/logo.png" alt="Pyro Logo">
+          <span>Pyro Discord Bot</span>
+        </div>
+
+        <div class="footer-links">
+          <a href="#features">Fonctionnalités</a>
+          <a href="#install">Installation</a>
+          <a href="#commands">Commandes</a>
+          <a href="https://flowhost.dev" target="_blank" rel="noopener noreferrer">FlowHost</a>
+          <a href="https://github.com/SkillFXX/pyro-discord-bot" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="#contact">Contact</a>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>Développé avec passion par <strong>FlowSkill</strong> • Tous droits réservés.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= Toast Notification ================= -->
+  <div id="toastNotification" class="toast" role="alert">
+    <i data-lucide="check-circle" style="color:var(--success);width:18px;height:18px;"></i>
+    <span id="toastText">Copié dans le presse-papier !</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="assets/script.js"></script>
+</body>
+</html>
+
