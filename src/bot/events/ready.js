@@ -1,9 +1,9 @@
-const { ActivityType } = require('discord.js');
+const { ActivityType, Events } = require('discord.js');
 const { ConfigHelper } = require('../../database');
 const analyticsService = require('../../services/analyticsService');
 
 module.exports = {
-  name: 'ready',
+  name: Events.ClientReady,
   once: true,
   async execute(client) {
     console.log(`[Bot ready] Connecté en tant que ${client.user.tag}!`);
