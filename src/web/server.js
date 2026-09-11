@@ -3,6 +3,8 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
+const lusca = require('lusca');
 const { ChannelType } = require('discord.js');
 const { 
   ConfigHelper, 
@@ -54,6 +56,9 @@ function safeCompareTokens(a, b) {
 function startWebServer(client, port) {
   const app = express();
 
+  // Trust first proxy for correct client IP detection and HTTPS recognition behind reverse proxies
+  app.set('trust proxy', 1);
+
   // Configure templates using EJS but rendering HTML files
   app.engine('html', require('ejs').renderFile);
   app.set('view engine', 'html');
@@ -69,16 +74,49 @@ function startWebServer(client, port) {
     return crypto.randomBytes(32).toString('hex');
   })();
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isSecureCookie = process.env.COOKIE_SECURE === 'true' || isProduction;
+
   app.use(session({
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    name: 'pyro_session',
     cookie: { 
-      secure: false, // Set to true if running over HTTPS
+      secure: isSecureCookie,
       httpOnly: true, // Mitigate XSS cookie access
+      sameSite: 'lax', // Protect against CSRF via cookie leaking
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     }
   }));
+
+  // CSRF Protection (fixes CodeQL alert: Missing CSRF middleware)
+  app.use(lusca.csrf());
+
+  // Rate Limiting (fixes CodeQL alert: Missing rate limiting)
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Max 10 attempts per IP per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.',
+    handler: (req, res) => {
+      res.status(429).render('login.html', { 
+        error: 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.',
+        _csrf: res.locals._csrf || ''
+      });
+    }
+  });
+
+  const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 150, // 150 requests per minute
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  app.use('/dashboard', apiLimiter);
+  app.use('/api', apiLimiter);
 
   // Auth Middleware
   function isAuthenticated(req, res, next) {
@@ -258,16 +296,16 @@ function startWebServer(client, port) {
     if (req.session && req.session.authenticated) {
       return res.redirect('/dashboard');
     }
-    res.render('login.html', { error: null });
+    res.render('login.html', { error: null, _csrf: res.locals._csrf || '' });
   });
 
-  app.post('/login', (req, res) => {
+  app.post('/login', loginLimiter, (req, res) => {
     const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
     
     // Check brute-force rate limit
     const rateLimitError = checkLoginRateLimit(clientIp);
     if (rateLimitError) {
-      return res.render('login.html', { error: rateLimitError });
+      return res.render('login.html', { error: rateLimitError, _csrf: res.locals._csrf || '' });
     }
 
     const token = req.body.token;
@@ -281,7 +319,7 @@ function startWebServer(client, port) {
     }
 
     recordFailedLogin(clientIp);
-    res.render('login.html', { error: 'Token invalide. Veuillez réessayer.' });
+    res.render('login.html', { error: 'Token invalide. Veuillez réessayer.', _csrf: res.locals._csrf || '' });
   });
 
   app.get('/logout', (req, res) => {
@@ -570,6 +608,21 @@ function startWebServer(client, port) {
   // Root redirect
   app.get('/', (req, res) => {
     res.redirect('/dashboard');
+  });
+
+  // CSRF and Security Error Handler
+  app.use((err, req, res, next) => {
+    if (err && (err.code === 'EBADCSRFTOKEN' || (err.message && err.message.toLowerCase().includes('csrf')))) {
+      console.warn(`[Security] Requête CSRF bloquée depuis l'IP ${req.ip} sur ${req.originalUrl}`);
+      if (req.headers['hx-request']) {
+        return res.status(403).send('<div style="color:#e74c3c;padding:1rem;background:#1a1115;border-radius:6px;font-weight:600;">⚠️ Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.</div>');
+      }
+      return res.status(403).render('login.html', { 
+        error: 'Session ou jeton de sécurité expiré. Veuillez vous reconnecter.',
+        _csrf: res.locals._csrf || ''
+      });
+    }
+    next(err);
   });
 
   // Start Express listener

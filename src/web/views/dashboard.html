@@ -7,6 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="/public/logo.png">
   <link rel="stylesheet" href="/partials/styles.css">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <!-- CSRF Token -->
+  <meta name="csrf-token" content="<%= locals._csrf || '' %>">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <!-- Chart.js for Advanced Analytics -->
@@ -15,7 +17,7 @@
     /* Custom styles specific to dashboard - shared styles in styles.css */
   </style>
 </head>
-<body>
+<body hx-headers='{"x-csrf-token": "<%= locals._csrf || \"\" %>"}'>
 
   <!-- Top Navigation Bar -->
   <header class="header-bar">
@@ -793,6 +795,14 @@
   <script>
     // Initialize Lucide icons on page load
     lucide.createIcons();
+
+    // Ensure HTMX sends the CSRF token on every request
+    document.body.addEventListener('htmx:configRequest', function(evt) {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (csrfMeta && csrfMeta.content) {
+        evt.detail.headers['x-csrf-token'] = csrfMeta.content;
+      }
+    });
 
     // Also re-initialize after every HTMX request (for swapped content)
     document.body.addEventListener('htmx:afterSwap', function() {

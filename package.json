@@ -13,7 +13,9 @@
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.18.0",
+    "lusca": "^1.7.0",
     "sequelize": "^6.37.8",
     "sqlite3": "^5.1.7"
   },
