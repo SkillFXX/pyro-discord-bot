@@ -1563,12 +1563,15 @@
         ftText.textContent = footerText;
       }
 
-      // Update Footer icon safely with protocol validation
+      // Update Footer icon safely with protocol validation and URI sanitization (satisfies CodeQL js/xss-through-dom)
       const ftIcon = document.getElementById('preview-footer-icon');
       if (ftIcon) {
         const trimmedIcon = footerIcon ? footerIcon.trim() : '';
-        if (trimmedIcon.startsWith('https://') || trimmedIcon.startsWith('http://') || trimmedIcon.startsWith('/')) {
-          ftIcon.src = trimmedIcon;
+        if (
+          (trimmedIcon.startsWith('https://') || trimmedIcon.startsWith('http://') || trimmedIcon.startsWith('/')) &&
+          !/["'&<>]/.test(trimmedIcon)
+        ) {
+          ftIcon.src = encodeURI(trimmedIcon);
           ftIcon.style.display = 'inline-block';
         } else {
           ftIcon.src = '';
