@@ -28,6 +28,7 @@
 - 🎫 **Support & Système de Tickets** : Panneaux interactifs avec boutons Discord (`/ticketsetup`), gestion des salons privés et permissions du rôle Staff (`/ticketmod`).
 - 🔊 **Salons Vocaux Temporaires (Join-to-Create)** : Création automatique de salon vocal lors de la connexion au canal créateur et suppression instantanée dès qu'il devient vide.
 - 📊 **Dashboard Web & Analytics en Direct** : Suivi des statistiques (messages, temps vocal, heures de pointe, flux de membres), export CSV, et réglage de la configuration à chaud sans redémarrage.
+- 🔒 **Sécurité Renforcée (Conforme CodeQL)** : Protection anti-CSRF intégrale (`lusca`), limitation de débit anti-bruteforce (`express-rate-limit`), cookies de session durcis et support reverse proxy (`trust proxy`).
 
 ---
 
@@ -64,6 +65,8 @@ CLIENT_ID=votre_bot_client_id_ici
 GUILD_ID=votre_serveur_guild_id_ici
 PORT=3000
 SESSION_SECRET=cle_secrete_aleatoire_pour_le_dashboard
+COOKIE_SECURE=false
+NODE_ENV=development
 ```
 
 ### 4. Lancement
@@ -101,7 +104,7 @@ Accédez au tableau de bord web sur : `http://localhost:3000` *(connectez-vous a
 
 ## ☁️ Hébergement Recommandé : FlowHost
 
-Pour maintenir Pyro en ligne 24h/24 sans interruption avec une faible latence et une protection anti-DDoS robuste, nous recommandons **FlowHost** :
+Pour maintenir Pyro en ligne 24h/24 sans interruption avec une faible latence, une haute disponibilité et des performances optimales, nous recommandons **FlowHost** :
 
 👉 **[Héberger simplement sur FlowHost (flowhost.dev)](https://flowhost.dev)**
 
@@ -118,6 +121,6 @@ Besoin d'aide, d'une assistance pour configurer Pyro ou d'un développement sur-
 ---
 
 <div align="center">
-  <sub>Développé avec ❤️ par <strong>FlowSkill</strong>.</sub>
+  <sub>Développé avec ❤️ par <strong>SkillFX</strong>.</sub>
 </div>
 

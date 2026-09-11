@@ -426,6 +426,26 @@ img {
   gap: 0.4rem;
 }
 
+.preview-image-wrapper {
+  overflow: hidden;
+  position: relative;
+  background: #090a0f;
+  line-height: 0;
+  display: block;
+}
+
+.hero-panel-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.preview-card:hover .hero-panel-img {
+  transform: scale(1.02);
+}
+
 .preview-content {
   padding: 1.5rem;
 }

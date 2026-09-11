@@ -117,38 +117,14 @@
                 <span class="preview-dot green"></span>
               </div>
               <div class="preview-title">
-                <i data-lucide="terminal" style="width:14px;height:14px;color:var(--primary);"></i>
-                pyro-discord-bot • live status
+                <i data-lucide="layout-dashboard" style="width:14px;height:14px;color:var(--primary);"></i>
+                Pyro Dashboard • Interface Web
               </div>
-              <span class="code-badge">En Ligne</span>
+              <span class="code-badge">Live Preview</span>
             </div>
 
-            <div class="preview-content">
-              <div class="preview-stats-grid">
-                <div class="mini-kpi">
-                  <div class="mini-kpi-header">
-                    <span>Messages Analysés</span>
-                    <i data-lucide="message-square" style="width:14px;height:14px;color:var(--primary);"></i>
-                  </div>
-                  <div class="mini-kpi-val text-gradient">24 850</div>
-                </div>
-                <div class="mini-kpi">
-                  <div class="mini-kpi-header">
-                    <span>Heures Vocales</span>
-                    <i data-lucide="mic" style="width:14px;height:14px;color:var(--warning);"></i>
-                  </div>
-                  <div class="mini-kpi-val">142h</div>
-                </div>
-              </div>
-
-              <div class="preview-code-block">
-                <div><span class="code-comment">// Événements & Modération en direct</span></div>
-                <div><span class="code-keyword">&gt;</span> <span class="code-cmd">/warn</span> user:@spammer reason:"Spam discord.gg"</div>
-                <div><span style="color:#2ecc71;">✓</span> Sanction auto déclenchée : <span style="color:#f39c12;">Timeout 10 min</span> (Seuil: 3 warns)</div>
-                <div style="margin-top:0.4rem;"><span class="code-keyword">&gt;</span> <span class="code-cmd">/niveau</span> user:@membre</div>
-                <div><span style="color:#38bdf8;">★</span> Niveau 5 atteint (1 240 XP) → Rôle <span style="color:#ff8e5e;">@Membre Vérifié</span> attribué !</div>
-                <div style="margin-top:0.4rem;"><span class="code-keyword">&gt;</span> [Join-to-Create] Salon vocal éphémère créé pour @flowskill</div>
-              </div>
+            <div class="preview-image-wrapper">
+              <img src="assets/panel.png" alt="Aperçu du Dashboard Web de Pyro Bot" class="hero-panel-img">
             </div>
           </div>
         </div>
@@ -257,15 +233,15 @@
           <div class="feature-icon-wrapper">
             <i data-lucide="bar-chart-2"></i>
           </div>
-          <h3>Dashboard Web &amp; Analytics en Direct</h3>
+          <h3>Dashboard Web &amp; Sécurité Renforcée</h3>
           <p>
-            Pilotez l'ensemble des modules du bot via une interface web fluide et réactive (Express, HTMX, Chart.js).
+            Pilotez l'ensemble des modules du bot via une interface web réactive (Express, HTMX, Chart.js) dotée d'un socle de sécurité conforme aux standards CodeQL.
           </p>
           <ul class="feature-list">
             <li><i data-lucide="check"></i> Graphiques d'activité (messages, vocal, heures de pointe)</li>
-            <li><i data-lucide="check"></i> Filtrage par période, rôle, salon et membre</li>
+            <li><i data-lucide="check"></i> Protection anti-CSRF intégrale &amp; Rate-limiting anti-bruteforce</li>
+            <li><i data-lucide="check"></i> Cookies sécurisés HTTPS &amp; support Reverse Proxy (FlowHost)</li>
             <li><i data-lucide="check"></i> Export complet des statistiques au format CSV</li>
-            <li><i data-lucide="check"></i> Configuration modifiable sans redémarrage du bot</li>
           </ul>
         </div>
 
@@ -319,7 +295,7 @@ npm install</code></pre>
         <div class="step-card">
           <div class="step-number">3</div>
           <h3>Configurer les Variables d'Environnement</h3>
-          <p>Dupliquez le fichier <code>.env.example</code> en <code>.env</code> et renseignez votre token de bot et vos identifiants :</p>
+          <p>Dupliquez le fichier <code>.env.example</code> en <code>.env</code> et renseignez vos identifiants :</p>
           <div class="code-box">
             <div class="code-box-header">
               <span>.env</span>
@@ -327,7 +303,9 @@ npm install</code></pre>
 CLIENT_ID=votre_application_id_ici
 GUILD_ID=votre_serveur_guild_id_ici
 PORT=3000
-SESSION_SECRET=cle_secrete_aleatoire_dashboard" data-label="Variables .env">
+SESSION_SECRET=cle_secrete_aleatoire_dashboard
+COOKIE_SECURE=false
+NODE_ENV=development" data-label="Variables .env">
                 <i data-lucide="copy" style="width:12px;height:12px;"></i> Copier
               </button>
             </div>
@@ -335,7 +313,9 @@ SESSION_SECRET=cle_secrete_aleatoire_dashboard" data-label="Variables .env">
 CLIENT_ID=votre_application_id_ici
 GUILD_ID=votre_serveur_guild_id_ici
 PORT=3000
-SESSION_SECRET=cle_secrete_aleatoire_dashboard</code></pre>
+SESSION_SECRET=cle_secrete_aleatoire_dashboard
+COOKIE_SECURE=false
+NODE_ENV=development</code></pre>
           </div>
         </div>
 
@@ -486,7 +466,7 @@ SESSION_SECRET=cle_secrete_aleatoire_dashboard</code></pre>
             </div>
             <div class="perk-item">
               <i data-lucide="check-circle-2"></i>
-              <span>Protection Anti-DDoS haute sécurité</span>
+              <span>Infrastructure cloud haute performance</span>
             </div>
             <div class="perk-item">
               <i data-lucide="check-circle-2"></i>
@@ -521,7 +501,7 @@ SESSION_SECRET=cle_secrete_aleatoire_dashboard</code></pre>
       <div class="section-header">
         <span class="section-tag"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Support &amp; Contact</span>
         <h2 class="section-title">Besoin d'aide ou d'un bot <span class="text-gradient">sur-mesure</span> ?</h2>
-        <p class="section-desc">Une question sur la configuration de Pyro, une suggestion d'amélioration ou un projet de bot Discord personnalisé ? N'hésitez pas à me contacter directement.</p>
+        <p class="section-desc">Une question sur la configuration de Pyro, une suggestion d'amélioration ou un projet de bot Discord personnalisé ? N'hésitez pas à contacter SkillFX directement.</p>
       </div>
 
       <div class="contact-grid">
@@ -590,7 +570,7 @@ SESSION_SECRET=cle_secrete_aleatoire_dashboard</code></pre>
       </div>
 
       <div class="footer-bottom">
-        <p>Développé avec passion par <strong>FlowSkill</strong> • Tous droits réservés.</p>
+        <p>Développé avec passion par <strong>SkillFX</strong> • Tous droits réservés.</p>
       </div>
     </div>
   </footer>
