@@ -1,0 +1,119 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PANEL",
+    "meta": {
+        "version": "PLCN_v3",
+        "update_url": null
+    },
+    "exported_at": "2026-09-11T14:33:50+00:00",
+    "name": "Pyro Bot",
+    "author": "skillfx.dev@gmail.com",
+    "uuid": "b4314a31-2a03-47fa-b6f9-2f20dc4847d2",
+    "description": "Bot Discord tout-en-un avec Dashboard Web, mod\u00e9ration avanc\u00e9e, logs d'audit complets, syst\u00e8me d'XP et salons vocaux temporaires.",
+    "icon": null,
+    "tags": [
+        "discord",
+        "nodejs",
+        "bot"
+    ],
+    "features": [],
+    "docker_images": {
+        "Node.js 20": "ghcr.io/pelican-eggs/yolks:nodejs_20"
+    },
+    "file_denylist": [],
+    "startup_commands": {
+        "Lancer Pyro Bot": "if [ -d .git ] && [ \"${AUTO_UPDATE}\" = \"1\" ]; then git pull && npm install --omit=dev; fi; node src/index.js"
+    },
+    "config": {
+        "files": "{}",
+        "startup": "{\n  \"done\": \"Connect\u00e9 en tant que\"\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Installation automatique de Pyro Bot pour Pelican / FlowHost\napt update\napt install -y git curl jq ca-certificates\n\ncd /mnt/server\n\nGIT_ADDRESS=${GIT_ADDRESS:-\"https://github.com/SkillFXX/pyro-discord-bot.git\"}\nBRANCH=${BRANCH:-\"main\"}\n\necho \"[Pyro Install] Clonage du d\u00e9p\u00f4t Git (${GIT_ADDRESS}, branche: ${BRANCH})...\"\nif [ ! -d .git ]; then\n    git clone --branch ${BRANCH} ${GIT_ADDRESS} .\nelse\n    git fetch origin\n    git checkout ${BRANCH}\n    git pull\nfi\n\n# Installation de Node.js 20 si absent du conteneur\nif ! command -v node &> /dev/null; then\n    echo \"[Pyro Install] Installation de Node.js 20...\"\n    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n    apt install -y nodejs\nfi\n\necho \"[Pyro Install] Installation des d\u00e9pendances npm...\"\nnpm install --omit=dev\n\necho \"[Pyro Install] G\u00e9n\u00e9ration du fichier .env initial...\"\ncat << 'ENVEOF' > .env\nDISCORD_TOKEN=${DISCORD_TOKEN}\nCLIENT_ID=${CLIENT_ID}\nGUILD_ID=${GUILD_ID}\nPORT=${SERVER_PORT}\nSESSION_SECRET=${SESSION_SECRET:-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)}\nCOOKIE_SECURE=false\nNODE_ENV=production\nENVEOF\n\necho \"[Pyro Install] Installation termin\u00e9e avec succ\u00e8s !\"",
+            "container": "ghcr.io/pelican-eggs/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "sort": 4,
+            "name": "Mise \u00e0 jour automatique (Git)",
+            "description": "",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "boolean"
+            ]
+        },
+        {
+            "sort": 6,
+            "name": "Branche Git",
+            "description": "",
+            "env_variable": "BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 2,
+            "name": "Client ID (Application ID)",
+            "description": "",
+            "env_variable": "CLIENT_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 1,
+            "name": "Token Discord du Bot",
+            "description": "",
+            "env_variable": "DISCORD_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 5,
+            "name": "D\u00e9p\u00f4t Git",
+            "description": "",
+            "env_variable": "GIT_ADDRESS",
+            "default_value": "https://github.com/SkillFXX/pyro-discord-bot.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 3,
+            "name": "ID du Serveur Discord (Guild ID)",
+            "description": "",
+            "env_variable": "GUILD_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        }
+    ]
+}
