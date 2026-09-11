@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { ConfigHelper } = require('../../database');
 
 const COLORS = {
   PRIMARY: '#FF6B35', // Pyro Orange
@@ -8,9 +9,13 @@ const COLORS = {
   WARNING: '#F1C40F',
 };
 
-function createEmbed({ title, description, fields, color = COLORS.PRIMARY, footer, thumbnail, image }) {
+function createEmbed({ title, description, fields, color = null, footer, thumbnail, image }) {
+  const customColor = ConfigHelper.getSync('embed_color', null);
+  const defaultPrimary = customColor || COLORS.PRIMARY;
+  const finalColor = color || defaultPrimary;
+
   const embed = new EmbedBuilder()
-    .setColor(color)
+    .setColor(finalColor)
     .setTimestamp();
 
   if (title) embed.setTitle(title);
@@ -19,10 +24,19 @@ function createEmbed({ title, description, fields, color = COLORS.PRIMARY, foote
   if (thumbnail) embed.setThumbnail(thumbnail);
   if (image) embed.setImage(image);
   
+  const customFooterText = ConfigHelper.getSync('embed_footer_text', null);
+  const customFooterIcon = ConfigHelper.getSync('embed_footer_icon_url', null) || undefined;
+
   if (footer) {
-    embed.setFooter({ text: footer.text, iconURL: footer.iconURL });
+    embed.setFooter({
+      text: footer.text || customFooterText || 'Pyro Bot • Modération & Utilitaires',
+      iconURL: footer.iconURL || customFooterIcon,
+    });
   } else {
-    embed.setFooter({ text: 'Pyro Bot • Modération & Utilitaires' });
+    embed.setFooter({
+      text: customFooterText || 'Pyro Bot • Modération & Utilitaires',
+      iconURL: customFooterIcon,
+    });
   }
 
   return embed;

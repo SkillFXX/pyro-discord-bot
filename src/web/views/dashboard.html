@@ -49,6 +49,7 @@
         <div class="sidebar">
           <ul class="sidebar-menu">
             <li><a href="#" class="active" onclick="switchTab(event, 'general')"><i data-lucide="settings-2"></i> Général</a></li>
+            <li><a href="#" onclick="switchTab(event, 'customization')"><i data-lucide="palette"></i> Personnalisation</a></li>
             <li><a href="#" onclick="switchTab(event, 'analytics')"><i data-lucide="bar-chart-2"></i> Analytics</a></li>
             <li><a href="#" onclick="switchTab(event, 'autoroles')"><i data-lucide="users"></i> Auto-Rôles</a></li>
             <li><a href="#" onclick="switchTab(event, 'moderation')"><i data-lucide="shield-alert"></i> Modération</a></li>
@@ -68,22 +69,6 @@
           <h2>Configuration Générale</h2>
           <form hx-post="/dashboard/general" hx-swap="none" hx-on::after-request="showToast('Configuration générale sauvegardée !')">
             
-            <div class="grid-2">
-              <div>
-                <label for="bot_status_type">Type de Statut du Bot</label>
-                <select id="bot_status_type" name="bot_status_type">
-                  <option value="PLAYING" <%= config.bot_status_type === 'PLAYING' ? 'selected' : '' %>>Joue à</option>
-                  <option value="WATCHING" <%= config.bot_status_type === 'WATCHING' ? 'selected' : '' %>>Regarde</option>
-                  <option value="LISTENING" <%= config.bot_status_type === 'LISTENING' ? 'selected' : '' %>>Écoute</option>
-                  <option value="STREAMING" <%= config.bot_status_type === 'STREAMING' ? 'selected' : '' %>>Streame</option>
-                </select>
-              </div>
-              <div>
-                <label for="bot_status_text">Texte du Statut</label>
-                <input type="text" id="bot_status_text" name="bot_status_text" value="<%= config.bot_status_text || '' %>" placeholder="Ex: la modération de Pyro">
-              </div>
-            </div>
-
             <div class="grid-2">
               <div>
                 <label for="log_channel_id">Salon des Logs</label>
@@ -872,6 +857,138 @@
           </form>
         </div>
 
+        <!-- ================= TAB: CUSTOMIZATION ================= -->
+        <div id="customization" class="tab-content">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem;">
+            <div>
+              <h2><i data-lucide="palette" style="vertical-align:middle;margin-right:8px;color:var(--primary);"></i> Personnalisation &amp; Branding</h2>
+              <p style="color:var(--text-muted);margin-bottom:0;">Personnalisez la présence Discord du bot, son statut et l'apparence des embeds générés (footer, icône, couleur).</p>
+            </div>
+          </div>
+
+          <form hx-post="/dashboard/customization" hx-swap="none" hx-on::after-request="showToast('Personnalisation enregistrée avec succès !')">
+            
+            <div class="grid" style="grid-template-columns: 1.2fr 1fr; gap: 2rem; align-items:start;">
+              <!-- Left Column: Settings -->
+              <div>
+                <!-- Section 1: Statut du Bot -->
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;">
+                  <h3 style="margin-top:0;margin-bottom:1.2rem;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                    <i data-lucide="activity" style="color:var(--primary);width:18px;height:18px;"></i> Statut &amp; Présence Discord
+                  </h3>
+
+                  <div class="grid-2" style="gap:1rem;">
+                    <div>
+                      <label for="bot_status_type">Type d'Activité</label>
+                      <select id="bot_status_type" name="bot_status_type" onchange="updatePreview()">
+                        <option value="PLAYING" <%= config.bot_status_type === 'PLAYING' ? 'selected' : '' %>>🎮 Joue à</option>
+                        <option value="WATCHING" <%= config.bot_status_type === 'WATCHING' ? 'selected' : '' %>>👁️ Regarde</option>
+                        <option value="LISTENING" <%= config.bot_status_type === 'LISTENING' ? 'selected' : '' %>>🎧 Écoute</option>
+                        <option value="STREAMING" <%= config.bot_status_type === 'STREAMING' ? 'selected' : '' %>>🟣 Streame</option>
+                        <option value="COMPETING" <%= config.bot_status_type === 'COMPETING' ? 'selected' : '' %>>🏆 Participe à</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label for="bot_status_state">Statut en Ligne</label>
+                      <select id="bot_status_state" name="bot_status_state" onchange="updatePreview()">
+                        <option value="online" <%= config.bot_status_state === 'online' ? 'selected' : '' %>>🟢 En ligne</option>
+                        <option value="idle" <%= config.bot_status_state === 'idle' ? 'selected' : '' %>>🟡 Inactif (Idle)</option>
+                        <option value="dnd" <%= config.bot_status_state === 'dnd' ? 'selected' : '' %>>🔴 Ne pas déranger (DND)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:1rem;">
+                    <label for="bot_status_text">Texte du Statut</label>
+                    <input type="text" id="bot_status_text" name="bot_status_text" value="<%= config.bot_status_text || '' %>" placeholder="Ex: la modération de Pyro" oninput="updatePreview()">
+                  </div>
+
+                  <div id="streaming_url_wrapper" style="margin-top:1rem; display: <%= config.bot_status_type === 'STREAMING' ? 'block' : 'none' %>;">
+                    <label for="bot_status_url">URL Twitch / YouTube (Streaming)</label>
+                    <input type="url" id="bot_status_url" name="bot_status_url" value="<%= config.bot_status_url || '' %>" placeholder="https://twitch.tv/votre_chaine">
+                  </div>
+                </div>
+
+                <!-- Section 2: Embed Footer & Branding -->
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;">
+                  <h3 style="margin-top:0;margin-bottom:1.2rem;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                    <i data-lucide="layout" style="color:var(--primary);width:18px;height:18px;"></i> Personnalisation des Embeds
+                  </h3>
+
+                  <div style="margin-bottom:1rem;">
+                    <label for="embed_footer_text">Texte du Footer</label>
+                    <input type="text" id="embed_footer_text" name="embed_footer_text" value="<%= config.embed_footer_text || '' %>" placeholder="Ex: Pyro Bot • Modération &amp; Utilitaires" oninput="updatePreview()">
+                    <small style="color:var(--text-muted);font-size:0.8rem;">Ce texte apparaîtra au bas de tous les messages embeds générés par le bot.</small>
+                  </div>
+
+                  <div style="margin-bottom:1rem;">
+                    <label for="embed_footer_icon_url">URL de l'Icône du Footer (Optionnel)</label>
+                    <input type="url" id="embed_footer_icon_url" name="embed_footer_icon_url" value="<%= config.embed_footer_icon_url || '' %>" placeholder="https://i.imgur.com/votre_icone.png" oninput="updatePreview()">
+                    <small style="color:var(--text-muted);font-size:0.8rem;">Lien direct (PNG/JPEG) vers la miniature affichée à côté du texte du footer.</small>
+                  </div>
+
+                  <div style="margin-bottom:1rem;">
+                    <label for="embed_color">Couleur d'Accentuation Principale</label>
+                    <div style="display:flex;gap:0.8rem;align-items:center;">
+                      <input type="color" id="embed_color" name="embed_color" value="<%= config.embed_color || '#FF6B35' %>" style="width:50px;height:42px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid var(--border);" oninput="document.getElementById('embed_color_hex').value = this.value; updatePreview();">
+                      <input type="text" id="embed_color_hex" value="<%= config.embed_color || '#FF6B35' %>" style="flex:1;" oninput="document.getElementById('embed_color').value = this.value; updatePreview();" placeholder="#FF6B35">
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" class="primary-btn" style="width:260px;">
+                  <i data-lucide="save" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Sauvegarder
+                </button>
+              </div>
+
+              <!-- Right Column: Interactive Live Embed Preview -->
+              <div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;position:sticky;top:2rem;">
+                  <h3 style="margin-top:0;margin-bottom:1rem;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                    <i data-lucide="eye" style="color:var(--primary);width:18px;height:18px;"></i> Aperçu en Direct
+                  </h3>
+                  <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1.2rem;">Prévisualisation du rendu de vos embeds et de la présence Discord.</p>
+
+                  <!-- Bot Presence Preview Widget -->
+                  <div style="background:#1e1f22;border-radius:8px;padding:0.9rem 1.2rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="position:relative;">
+                      <img src="/public/logo.png" alt="Pyro" style="width:42px;height:42px;border-radius:50%;display:block;">
+                      <span id="preview-status-dot" style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:<%= config.bot_status_state === 'idle' ? '#f0b232' : (config.bot_status_state === 'dnd' ? '#f23f43' : '#23a55a') %>;border:2px solid #1e1f22;"></span>
+                    </div>
+                    <div>
+                      <strong style="display:block;font-size:0.95rem;color:#f2f3f5;"><%= typeof serverName !== 'undefined' ? serverName : 'Pyro' %> Bot</strong>
+                      <small id="preview-status-text" style="color:#949ba4;font-size:0.85rem;">
+                        <%= config.bot_status_type === 'WATCHING' ? 'Regarde' : (config.bot_status_type === 'LISTENING' ? 'Écoute' : (config.bot_status_type === 'STREAMING' ? 'Streame' : (config.bot_status_type === 'COMPETING' ? 'Participe à' : 'Joue à'))) %> 
+                        <strong><%= config.bot_status_text || 'la modération de Pyro' %></strong>
+                      </small>
+                    </div>
+                  </div>
+
+                  <!-- Discord Embed Preview Widget -->
+                  <div id="preview-embed-card" style="background:#2b2d31;border-radius:4px;border-left:4px solid <%= config.embed_color || '#FF6B35' %>;padding:1rem 1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                      <span style="font-weight:600;font-size:0.95rem;color:#f2f3f5;">🔔 Notification Exemple</span>
+                    </div>
+                    <p style="font-size:0.88rem;color:#dbdee1;margin:0 0 1rem 0;line-height:1.4;">
+                      Ceci est une démonstration du rendu visuel de vos messages embeds générés par Pyro Bot.
+                    </p>
+
+                    <!-- Embed Footer Preview -->
+                    <div style="display:flex;align-items:center;gap:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(255,255,255,0.06);">
+                      <img id="preview-footer-icon" src="<%= config.embed_footer_icon_url || '/public/logo.png' %>" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover; <%= config.embed_footer_icon_url ? '' : 'display:none;' %>">
+                      <span id="preview-footer-text" style="font-size:0.78rem;color:#949ba4;"><%= config.embed_footer_text || 'Pyro Bot • Modération & Utilitaires' %></span>
+                      <span style="font-size:0.75rem;color:#949ba4;opacity:0.6;">• Aujourd'hui à 12:00</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
       </section>
     </div>
   </main>
@@ -1387,6 +1504,73 @@
       document.querySelectorAll('.log-checkbox').forEach(cb => {
         cb.checked = enabled;
       });
+    }
+
+    // Interactive Embed & Presence Live Preview
+    function updatePreview() {
+      const typeEl = document.getElementById('bot_status_type');
+      const stateEl = document.getElementById('bot_status_state');
+      const textEl = document.getElementById('bot_status_text');
+      const colorEl = document.getElementById('embed_color');
+      const footerTextEl = document.getElementById('embed_footer_text');
+      const footerIconEl = document.getElementById('embed_footer_icon_url');
+
+      if (!typeEl || !stateEl || !textEl) return;
+
+      const statusType = typeEl.value;
+      const statusState = stateEl.value;
+      const statusText = textEl.value || 'la modération de Pyro';
+      const color = (colorEl ? colorEl.value : null) || '#FF6B35';
+      const footerText = (footerTextEl && footerTextEl.value) ? footerTextEl.value : 'Pyro Bot • Modération & Utilitaires';
+      const footerIcon = footerIconEl ? footerIconEl.value : '';
+
+      // Stream URL toggle
+      const streamWrap = document.getElementById('streaming_url_wrapper');
+      if (streamWrap) {
+        streamWrap.style.display = statusType === 'STREAMING' ? 'block' : 'none';
+      }
+
+      // Update Status dot
+      const dot = document.getElementById('preview-status-dot');
+      if (dot) {
+        if (statusState === 'idle') dot.style.background = '#f0b232';
+        else if (statusState === 'dnd') dot.style.background = '#f23f43';
+        else dot.style.background = '#23a55a';
+      }
+
+      // Update Status text
+      const statusLabel = document.getElementById('preview-status-text');
+      if (statusLabel) {
+        let prefix = 'Joue à';
+        if (statusType === 'WATCHING') prefix = 'Regarde';
+        else if (statusType === 'LISTENING') prefix = 'Écoute';
+        else if (statusType === 'STREAMING') prefix = 'Streame';
+        else if (statusType === 'COMPETING') prefix = 'Participe à';
+        statusLabel.innerHTML = `${prefix} <strong>${escapeHtml(statusText)}</strong>`;
+      }
+
+      // Update Embed Card Border
+      const card = document.getElementById('preview-embed-card');
+      if (card) {
+        card.style.borderLeftColor = color;
+      }
+
+      // Update Footer text
+      const ftText = document.getElementById('preview-footer-text');
+      if (ftText) {
+        ftText.innerText = footerText;
+      }
+
+      // Update Footer icon
+      const ftIcon = document.getElementById('preview-footer-icon');
+      if (ftIcon) {
+        if (footerIcon && footerIcon.trim().length > 0) {
+          ftIcon.src = footerIcon;
+          ftIcon.style.display = 'inline-block';
+        } else {
+          ftIcon.style.display = 'none';
+        }
+      }
     }
   </script>
 </body>

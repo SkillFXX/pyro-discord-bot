@@ -336,7 +336,8 @@ function startWebServer(client, port) {
     // Fetch config keys
     const logKeys = LOG_CONFIG_KEYS.map(k => k.key);
     const configKeys = [
-      'bot_status_type', 'bot_status_text',
+      'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
+      'embed_footer_text', 'embed_footer_icon_url', 'embed_color',
       'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
       'voice_creator_channel_id', 'voice_creator_category_id',
       'welcome_message_template', 'leave_message_template',
@@ -446,6 +447,25 @@ function startWebServer(client, port) {
       const isEnabled = req.body[item.key] === 'true' || req.body[item.key] === 'on' || req.body[item.key] === true;
       await ConfigHelper.set(item.key, isEnabled);
     }
+
+    res.status(200).send();
+  });
+
+  // Customization Config Save (Status, Presences, Embed Footer & Color)
+  app.post('/dashboard/customization', isAuthenticated, async (req, res) => {
+    const fields = [
+      'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
+      'embed_footer_text', 'embed_footer_icon_url', 'embed_color'
+    ];
+
+    for (const field of fields) {
+      if (req.body[field] !== undefined) {
+        await ConfigHelper.set(field, req.body[field]);
+      }
+    }
+
+    // Instantly update Bot Status presence
+    await updateBotStatus(client);
 
     res.status(200).send();
   });

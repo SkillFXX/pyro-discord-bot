@@ -314,13 +314,44 @@ const UserSnapshot = sequelize.define('UserSnapshot', {
   },
 });
 
+// In-memory cache for fast and synchronous access
+const configMemoryCache = new Map();
+
 // Helper functions for Config key-value store
 const ConfigHelper = {
+  getSync(key, defaultValue = null) {
+    if (configMemoryCache.has(key)) {
+      return configMemoryCache.get(key);
+    }
+    return defaultValue;
+  },
+
+  async preloadCache() {
+    try {
+      const records = await Config.findAll();
+      for (const r of records) {
+        try {
+          configMemoryCache.set(r.key, JSON.parse(r.value));
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[Database] Preload cache warning:', e.message);
+    }
+  },
+
   async get(key, defaultValue = null) {
+    if (configMemoryCache.has(key)) {
+      return configMemoryCache.get(key);
+    }
     try {
       const record = await Config.findByPk(key);
-      if (!record) return defaultValue;
-      return JSON.parse(record.value);
+      if (!record) {
+        configMemoryCache.set(key, defaultValue);
+        return defaultValue;
+      }
+      const val = JSON.parse(record.value);
+      configMemoryCache.set(key, val);
+      return val;
     } catch (e) {
       console.error(`Error reading config for key ${key}:`, e);
       return defaultValue;
@@ -333,6 +364,7 @@ const ConfigHelper = {
         key,
         value: JSON.stringify(value),
       });
+      configMemoryCache.set(key, value);
       return true;
     } catch (e) {
       console.error(`Error setting config for key ${key}:`, e);
@@ -346,6 +378,7 @@ const ConfigHelper = {
       if (record) {
         await record.destroy();
       }
+      configMemoryCache.delete(key);
       return true;
     } catch (e) {
       console.error(`Error deleting config for key ${key}:`, e);
@@ -368,6 +401,7 @@ async function initDatabasePragmas() {
     await sequelize.query('PRAGMA cache_size = -64000;');
     await sequelize.query('PRAGMA temp_store = MEMORY;');
     await sequelize.query('PRAGMA foreign_keys = ON;');
+    await ConfigHelper.preloadCache();
   } catch (err) {
     console.warn('[Database] Warning applying SQLite PRAGMAs:', err.message);
   }

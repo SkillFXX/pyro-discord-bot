@@ -31,6 +31,7 @@
 - 🎫 **Support & Système de Tickets** : Panneaux interactifs avec boutons Discord (`/ticketsetup`), gestion des salons privés et permissions du rôle Staff (`/ticketmod`).
 - 🔊 **Salons Vocaux Temporaires (Join-to-Create)** : Création automatique de salon vocal lors de la connexion au canal créateur et suppression instantanée dès qu'il devient vide.
 - 📊 **Dashboard Web & Analytics en Direct** : Suivi des statistiques (messages, temps vocal, heures de pointe, flux de membres), export CSV, et réglage de la configuration à chaud sans redémarrage.
+- 🎨 **Personnalisation & Branding Complet** : Onglet dédié dans le Dashboard avec prévisualisation en direct : statut dynamique du bot (Joue à, Regarde, Écoute, Streame, Participe à), présence (En ligne, Inactif, DND), personnalisation intégrale des embeds (texte du footer, icône d'en-tête/pied de page, couleur d'accentuation principale).
 - 🔒 **Sécurité Renforcée (Conforme CodeQL)** : Protection anti-CSRF intégrale (`lusca`), limitation de débit anti-bruteforce (`express-rate-limit`), cookies de session durcis et support reverse proxy (`trust proxy`).
 
 ---

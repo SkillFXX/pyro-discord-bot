@@ -61,8 +61,10 @@ module.exports = {
 
 async function updateBotStatus(client) {
   try {
-    const statusType = await ConfigHelper.get('bot_status_type', 'PLAYING'); // PLAYING, WATCHING, LISTENING, STREAMING
+    const statusType = await ConfigHelper.get('bot_status_type', 'PLAYING'); // PLAYING, WATCHING, LISTENING, STREAMING, COMPETING
     const statusText = await ConfigHelper.get('bot_status_text', 'la modération de Pyro');
+    const statusState = await ConfigHelper.get('bot_status_state', 'online'); // online, idle, dnd
+    const statusUrl = await ConfigHelper.get('bot_status_url', '');
     
     let activityType;
     switch (statusType.toUpperCase()) {
@@ -75,6 +77,9 @@ async function updateBotStatus(client) {
       case 'STREAMING':
         activityType = ActivityType.Streaming;
         break;
+      case 'COMPETING':
+        activityType = ActivityType.Competing;
+        break;
       case 'PLAYING':
       default:
         activityType = ActivityType.Playing;
@@ -85,11 +90,11 @@ async function updateBotStatus(client) {
       activities: [{
         name: statusText,
         type: activityType,
-        url: statusType === 'STREAMING' ? 'https://twitch.tv/discord' : undefined,
+        url: statusType === 'STREAMING' ? (statusUrl || 'https://twitch.tv/discord') : undefined,
       }],
-      status: 'online',
+      status: ['online', 'idle', 'dnd'].includes(statusState) ? statusState : 'online',
     });
-    console.log(`[Bot Status] Statut mis à jour : ${statusType} "${statusText}"`);
+    console.log(`[Bot Status] Statut mis à jour : ${statusType} "${statusText}" (${statusState})`);
   } catch (error) {
     console.error('[Bot Status] Erreur lors de la mise à jour du statut :', error);
   }

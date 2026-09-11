@@ -93,10 +93,19 @@ async function log(client, eventKey, {
     if (thumbnail) embed.setThumbnail(thumbnail);
     if (image) embed.setImage(image);
 
+    const customFooterText = ConfigHelper.getSync('embed_footer_text', null);
+    const customFooterIcon = ConfigHelper.getSync('embed_footer_icon_url', null) || undefined;
+
     if (footer) {
-      embed.setFooter(footer);
+      embed.setFooter({
+        text: footer.text,
+        iconURL: footer.iconURL || customFooterIcon,
+      });
     } else {
-      embed.setFooter({ text: 'Pyro Logs • Surveillance Serveur' });
+      embed.setFooter({
+        text: customFooterText || 'Pyro Logs • Surveillance Serveur',
+        iconURL: customFooterIcon,
+      });
     }
 
     await channel.send({ embeds: [embed] });
