@@ -596,6 +596,47 @@ function startWebServer(client, rawPort) {
     res.status(200).send();
   });
 
+  app.post('/dashboard/tickets/deploy', isAuthenticated, async (req, res) => {
+    try {
+      const channelId = req.body.channel_id;
+      if (!channelId) return res.status(400).send('Salon requis');
+
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      if (!guild) return res.status(500).send('Serveur introuvable');
+
+      const channel = await guild.channels.fetch(channelId).catch(() => null);
+      if (!channel) return res.status(404).send('Salon introuvable');
+
+      const embeds = require('../bot/utils/embeds');
+      const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+      const ticketEmbed = embeds.custom(
+        '🎫 Support - Ouvrir un Ticket',
+        `Besoin d'aide ? Vous rencontrez un problème ?\n` +
+        `Cliquez sur le bouton ci-dessous pour ouvrir un ticket et entrer en contact avec notre équipe.`,
+        embeds.COLORS.PRIMARY
+      );
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('create_ticket_btn')
+          .setLabel('🎫 Créer un Ticket')
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      await channel.send({
+        embeds: [ticketEmbed],
+        components: [row]
+      });
+
+      console.log(`[Dashboard] Message d'ouverture de ticket déployé dans #${channel.name} (${channel.id})`);
+      res.status(200).send();
+    } catch (error) {
+      console.error('[Dashboard Tickets Deploy] Erreur :', error);
+      res.status(500).send('Erreur lors de l\'envoi du message');
+    }
+  });
+
   // 5. XP General Config
   app.post('/dashboard/xp', isAuthenticated, async (req, res) => {
     const { xp_enabled, xp_min_gain, xp_max_gain, xp_cooldown_seconds, xp_announcement_channel_id } = req.body;

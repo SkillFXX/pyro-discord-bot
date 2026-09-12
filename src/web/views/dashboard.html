@@ -567,6 +567,35 @@
 
             <button type="submit" class="primary-btn" style="margin-top: 1rem; width: 200px;">Enregistrer</button>
           </form>
+
+          <!-- Deploy Ticket Panel Message -->
+          <div style="margin-top: 2rem; padding: 1.25rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+            <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="send" style="width: 18px; height: 18px; color: var(--primary);"></i>
+              Déployer le Message d'Ouverture de Ticket
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+              Envoie automatiquement le message interactif avec le bouton "🎫 Créer un Ticket" dans le salon choisi.
+            </p>
+            <form hx-post="/dashboard/tickets/deploy" hx-swap="none" hx-on::after-request="showToast('Message d\'ouverture de ticket envoyé avec succès !')">
+              <div class="grid-2">
+                <div>
+                  <label for="deploy_ticket_channel_id">Salon d'envoi</label>
+                  <select id="deploy_ticket_channel_id" name="channel_id" required>
+                    <option value="">-- Choisir un salon textuel --</option>
+                    <% channels.text.forEach(c => { %>
+                      <option value="<%= c.id %>"># <%= c.name %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                  <button type="submit" class="primary-btn" style="width: 100%; height: 42px;">
+                    <i data-lucide="send" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i>Envoyer le message
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- ================= TAB: XP ================= -->
