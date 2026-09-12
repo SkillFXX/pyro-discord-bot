@@ -408,6 +408,7 @@ function startWebServer(client, rawPort) {
       'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
       'voice_creator_channel_id', 'voice_creator_category_id',
       'welcome_message_template', 'leave_message_template',
+      'member_counter_channel_id', 'member_counter_template',
       'ticket_category_id', 'ticket_staff_role_id',
       'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
       ...logKeys
@@ -487,7 +488,8 @@ function startWebServer(client, rawPort) {
       'bot_status_type', 'bot_status_text',
       'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
       'voice_creator_channel_id', 'voice_creator_category_id',
-      'welcome_message_template', 'leave_message_template'
+      'welcome_message_template', 'leave_message_template',
+      'member_counter_channel_id', 'member_counter_template'
     ];
 
     for (const field of fields) {
@@ -498,6 +500,15 @@ function startWebServer(client, rawPort) {
 
     // Instantly update Bot Status presence
     await updateBotStatus(client);
+
+    // Instantly update Member Counter channel if modified
+    if (req.body.member_counter_channel_id !== undefined || req.body.member_counter_template !== undefined) {
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      if (guild) {
+        const memberCounterService = require('../services/memberCounterService');
+        await memberCounterService.updateMemberCounter(guild, { force: true });
+      }
+    }
 
     res.status(200).send();
   });

@@ -132,6 +132,49 @@
             <textarea id="leave_message_template" name="leave_message_template" rows="3" placeholder="Ex: {username} a quitté le serveur."><%= config.leave_message_template || '' %></textarea>
             <small>Placeholders dispo : <code>{username}</code>, <code>{server}</code>, <code>{memberCount}</code></small>
 
+            <!-- Member Counter in Channel Name -->
+            <div style="margin-top: 1.5rem; padding: 1.25rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+              <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="hash" style="width: 18px; height: 18px; color: var(--primary);"></i>
+                Compteur de Membres dans le Nom d'un Salon
+              </h3>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                Renomme automatiquement un salon avec le nombre de membres du serveur. Les salons vocaux sont fortement recommandés pour préserver les espaces, majuscules et emojis.
+              </p>
+
+              <div class="grid-2">
+                <div>
+                  <label for="member_counter_channel_id">Salon Associé</label>
+                  <select id="member_counter_channel_id" name="member_counter_channel_id">
+                    <option value="">-- Désactivé --</option>
+                    <optgroup label="Salons Vocaux (Recommandé)">
+                      <% channels.voice.forEach(v => { %>
+                        <option value="<%= v.id %>" <%= config.member_counter_channel_id === v.id ? 'selected' : '' %>>🔊 <%= v.name %></option>
+                      <% }) %>
+                    </optgroup>
+                    <optgroup label="Salons Textuels">
+                      <% channels.text.forEach(c => { %>
+                        <option value="<%= c.id %>" <%= config.member_counter_channel_id === c.id ? 'selected' : '' %>># <%= c.name %></option>
+                      <% }) %>
+                    </optgroup>
+                    <optgroup label="Catégories">
+                      <% channels.categories.forEach(cat => { %>
+                        <option value="<%= cat.id %>" <%= config.member_counter_channel_id === cat.id ? 'selected' : '' %>>📁 <%= cat.name %></option>
+                      <% }) %>
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label for="member_counter_template">Format du Nom (Template)</label>
+                  <input type="text" id="member_counter_template" name="member_counter_template" value="<%= config.member_counter_template || '👥・Membres : {count}' %>" placeholder="Ex: Utilisateurs : X ou 👥・Membres : {count}">
+                </div>
+              </div>
+              <small style="display: block; margin-top: 0.5rem; color: var(--text-muted);">
+                Variables disponibles : <code>{count}</code>, <code>{memberCount}</code>, ou <code>X</code> (ex: <code>Utilisateurs : X</code>).<br>
+                <em>⚠️ Note : Discord limite le renommage d'un même salon à 2 fois par 10 minutes maximum pour éviter les blocages API. Le bot gère automatiquement cette temporisation.</em>
+              </small>
+            </div>
+
             <button type="submit" class="primary-btn" style="margin-top: 1.5rem; width: 200px;">Enregistrer</button>
           </form>
         </div>

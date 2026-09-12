@@ -2,6 +2,7 @@ const { ConfigHelper } = require('../../database');
 const embeds = require('../utils/embeds');
 const analyticsService = require('../../services/analyticsService');
 const loggerService = require('../../services/loggerService');
+const memberCounterService = require('../../services/memberCounterService');
 
 module.exports = {
   name: 'guildMemberRemove',
@@ -10,6 +11,9 @@ module.exports = {
 
     // Track member leave in analytics
     await analyticsService.recordMemberLeave(member);
+
+    // Update member counter channel (rate-limit safe)
+    memberCounterService.updateMemberCounter(guild).catch(() => {});
 
     // Goodbye Message
     try {

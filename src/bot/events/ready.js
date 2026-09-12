@@ -35,6 +35,13 @@ module.exports = {
     // Initialize Voice Analytics for members already in voice
     await analyticsService.initVoiceSessions(client);
 
+    // Initialize Member Counter channel & start periodic sync (every 10 minutes)
+    const memberCounterService = require('../../services/memberCounterService');
+    await memberCounterService.updateMemberCounter(guild, { force: false });
+    setInterval(() => {
+      memberCounterService.updateMemberCounter(guild, { force: false });
+    }, 10 * 60 * 1000).unref();
+
     // Send Boot / Startup Log
     try {
       const loggerService = require('../../services/loggerService');

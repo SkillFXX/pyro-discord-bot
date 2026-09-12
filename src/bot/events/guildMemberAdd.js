@@ -2,6 +2,7 @@ const { ConfigHelper, AutoRole } = require('../../database');
 const embeds = require('../utils/embeds');
 const analyticsService = require('../../services/analyticsService');
 const loggerService = require('../../services/loggerService');
+const memberCounterService = require('../../services/memberCounterService');
 
 module.exports = {
   name: 'guildMemberAdd',
@@ -10,6 +11,9 @@ module.exports = {
 
     // Track member join in analytics
     await analyticsService.recordMemberJoin(member);
+
+    // Update member counter channel (rate-limit safe)
+    memberCounterService.updateMemberCounter(guild).catch(() => {});
 
     // 1. Auto-Roles
     try {
