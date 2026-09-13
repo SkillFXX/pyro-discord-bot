@@ -17,9 +17,10 @@ tags:
 features: {  }
 docker_images:
   'Node.js 20': 'ghcr.io/pelican-eggs/yolks:nodejs_20'
+  'Node.js 22': 'ghcr.io/pelican-eggs/yolks:nodejs_22'
 file_denylist: {  }
 startup_commands:
-  'Lancer Pyro Bot': 'if [ -d .git ] && [ "${AUTO_UPDATE}" = "1" ]; then git pull && npm install --omit=dev; fi; node src/index.js'
+  'Lancer Pyro Bot': 'if [ -d .git ] && [ "${AUTO_UPDATE}" = "1" ]; then git pull && npm install && npm run build; elif [ ! -d src/web/dist ]; then npm install && npm run build; fi; node src/index.js'
 config:
   files: {  }
   startup:
@@ -56,7 +57,10 @@ scripts:
       fi
 
       echo "[Pyro Install] Installation des dépendances npm..."
-      npm install --omit=dev
+      npm install
+
+      echo "[Pyro Install] Compilation du Dashboard Web..."
+      npm run build
 
       echo "[Pyro Install] Génération du fichier .env initial..."
       cat << 'ENVEOF' > .env

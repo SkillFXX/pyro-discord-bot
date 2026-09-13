@@ -53,6 +53,9 @@ cd pyro-discord-bot
 
 # Installer les dépendances
 npm install
+
+# Compiler le tableau de bord web (Svelte / Vite)
+npm run build
 ```
 
 ### 3. Configuration (.env)
