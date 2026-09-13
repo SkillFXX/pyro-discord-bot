@@ -1009,7 +1009,7 @@
                     <input type="text" id="bot_status_text" name="bot_status_text" value="<%= config.bot_status_text || '' %>" placeholder="Ex: la modération de Pyro" oninput="updatePreview()">
                   </div>
 
-                  <div id="streaming_url_wrapper" style="margin-top:1rem; display: <%= config.bot_status_type === 'STREAMING' ? 'block' : 'none' %>;">
+                  <div id="streaming_url_wrapper" style="margin-top:1rem;">
                     <label for="bot_status_url">URL Twitch / YouTube (Streaming)</label>
                     <input type="url" id="bot_status_url" name="bot_status_url" value="<%= config.bot_status_url || '' %>" placeholder="https://twitch.tv/votre_chaine">
                   </div>
@@ -1059,7 +1059,7 @@
                   <div style="background:#1e1f22;border-radius:8px;padding:0.9rem 1.2rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;border:1px solid rgba(255,255,255,0.05);">
                     <div style="position:relative;">
                       <img src="/public/logo.png" alt="Pyro" style="width:42px;height:42px;border-radius:50%;display:block;">
-                      <span id="preview-status-dot" style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:<%= config.bot_status_state === 'idle' ? '#f0b232' : (config.bot_status_state === 'dnd' ? '#f23f43' : '#23a55a') %>;border:2px solid #1e1f22;"></span>
+                      <span id="preview-status-dot" style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;border:2px solid #1e1f22;background:#23a55a;"></span>
                     </div>
                     <div>
                       <strong style="display:block;font-size:0.95rem;color:#f2f3f5;"><%= typeof serverName !== 'undefined' ? serverName : 'Pyro' %> Bot</strong>
@@ -1071,7 +1071,7 @@
                   </div>
 
                   <!-- Discord Embed Preview Widget -->
-                  <div id="preview-embed-card" style="background:#2b2d31;border-radius:4px;border-left:4px solid <%= config.embed_color || '#FF6B35' %>;padding:1rem 1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                  <div id="preview-embed-card" style="background:#2b2d31;border-radius:4px;border-left:4px solid var(--primary);padding:1rem 1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
                     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
                       <span style="font-weight:600;font-size:0.95rem;color:#f2f3f5;">🔔 Notification Exemple</span>
                     </div>
@@ -1081,7 +1081,7 @@
 
                     <!-- Embed Footer Preview -->
                     <div style="display:flex;align-items:center;gap:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(255,255,255,0.06);">
-                      <img id="preview-footer-icon" src="<%= config.embed_footer_icon_url || '/public/logo.png' %>" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover; <%= config.embed_footer_icon_url ? '' : 'display:none;' %>">
+                      <img id="preview-footer-icon" src="<%= config.embed_footer_icon_url || '/public/logo.png' %>" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover;">
                       <span id="preview-footer-text" style="font-size:0.78rem;color:#949ba4;"><%= config.embed_footer_text || 'Pyro Bot • Modération & Utilitaires' %></span>
                       <span style="font-size:0.75rem;color:#949ba4;opacity:0.6;">• Aujourd'hui à 12:00</span>
                     </div>
@@ -1099,8 +1099,9 @@
   </main>
 
   <script>
-    // Initialize Lucide icons on page load
+    // Initialize Lucide icons and live preview on page load
     lucide.createIcons();
+    updatePreview();
 
     // Ensure HTMX sends the CSRF token on every request
     document.body.addEventListener('htmx:configRequest', function(evt) {
