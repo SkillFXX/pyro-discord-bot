@@ -127,21 +127,19 @@ function startWebServer(client, rawPort) {
   // Trust first proxy for correct client IP detection and HTTPS recognition behind reverse proxies
   app.set('trust proxy', 1);
 
-  // Configure templates using EJS but rendering HTML files
-  app.engine('html', require('ejs').renderFile);
-  app.set('view engine', 'html');
-  app.set('views', path.join(__dirname, 'views'));
-
   // Middleware
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
 
   const distDir = path.join(__dirname, 'dist');
-  if (fs.existsSync(path.join(distDir, 'index.html'))) {
+  const clientPublicDir = path.join(__dirname, 'client', 'public');
+  if (fs.existsSync(distDir)) {
     app.use(express.static(distDir));
   }
-  app.use('/public', express.static(path.join(__dirname, 'views', 'public')));
-  app.use(express.static(path.join(__dirname, 'views')));
+  if (fs.existsSync(clientPublicDir)) {
+    app.use('/public', express.static(clientPublicDir));
+    app.use(express.static(clientPublicDir));
+  }
 
   const sessionSecret = process.env.SESSION_SECRET || (() => {
     console.warn('[Security] SESSION_SECRET non configuré dans .env. Utilisation d\'une clé aléatoire temporaire.');
@@ -177,13 +175,7 @@ function startWebServer(client, rawPort) {
     message: 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.',
     handler: (req, res) => {
       const errMsg = 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.';
-      if (req.accepts('json') || req.path.startsWith('/api')) {
-        return res.status(429).json({ error: errMsg });
-      }
-      res.status(429).render('login.html', { 
-        error: errMsg,
-        _csrf: res.locals._csrf || ''
-      });
+      return res.status(429).json({ error: errMsg });
     }
   });
 
@@ -417,7 +409,7 @@ function startWebServer(client, rawPort) {
     });
   });
 
-  // Legacy Auth Routes
+  // Auth Routes
   app.get('/login', (req, res) => {
     if (req.session && req.session.authenticated) {
       return res.redirect('/dashboard');
@@ -426,7 +418,7 @@ function startWebServer(client, rawPort) {
     if (fs.existsSync(distIndexPath)) {
       return res.sendFile(distIndexPath);
     }
-    res.render('login.html', { error: null, _csrf: res.locals._csrf || '' });
+    res.status(200).send('Pyro Bot Dashboard - Veuillez exécuter "npm run build".');
   });
 
   app.post('/login', loginLimiter, (req, res) => {
@@ -435,8 +427,7 @@ function startWebServer(client, rawPort) {
     // Check brute-force rate limit
     const rateLimitError = checkLoginRateLimit(clientIp);
     if (rateLimitError) {
-      if (req.accepts('json')) return res.status(429).json({ error: rateLimitError });
-      return res.render('login.html', { error: rateLimitError, _csrf: res.locals._csrf || '' });
+      return res.status(429).json({ error: rateLimitError });
     }
 
     const token = req.body.token;
@@ -446,18 +437,17 @@ function startWebServer(client, rawPort) {
     if (expectedToken && safeCompareTokens(token, expectedToken)) {
       loginAttempts.delete(clientIp);
       req.session.authenticated = true;
-      if (req.accepts('json')) return res.json({ success: true, csrfToken: res.locals._csrf || '' });
-      return res.redirect('/dashboard');
+      return res.json({ success: true, csrfToken: res.locals._csrf || '' });
     }
 
     recordFailedLogin(clientIp);
-    if (req.accepts('json')) return res.status(401).json({ error: 'Token invalide. Veuillez réessayer.' });
-    res.render('login.html', { error: 'Token invalide. Veuillez réessayer.', _csrf: res.locals._csrf || '' });
+    return res.status(401).json({ error: 'Token invalide. Veuillez réessayer.' });
   });
 
   app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/login');
+    req.session.destroy(() => {
+      res.redirect('/login');
+    });
   });
 
   // SPA Dashboard Bootstrap JSON API
@@ -508,51 +498,12 @@ function startWebServer(client, rawPort) {
   });
 
   // Dashboard Main protected route
-  app.get('/dashboard', isAuthenticated, async (req, res) => {
+  app.get('/dashboard', isAuthenticated, (req, res) => {
     const distIndexPath = path.join(__dirname, 'dist', 'index.html');
     if (fs.existsSync(distIndexPath)) {
       return res.sendFile(distIndexPath);
     }
-
-    const guildContext = await getGuildContext();
-    const lists = await getDashboardLists(guildContext);
-
-    // Fetch config keys
-    const logKeys = LOG_CONFIG_KEYS.map(k => k.key);
-    const configKeys = [
-      'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
-      'embed_footer_text', 'embed_footer_icon_url', 'embed_color',
-      'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
-      'voice_creator_channel_id', 'voice_creator_category_id',
-      'welcome_message_template', 'leave_message_template',
-      'member_counter_channel_id', 'member_counter_template',
-      'ticket_category_id', 'ticket_staff_role_id',
-      'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
-      ...logKeys
-    ];
-
-    const config = {};
-    for (const key of configKeys) {
-      config[key] = await ConfigHelper.get(key);
-    }
-
-    const bot = {
-      username: client.user ? (client.user.displayName || client.user.username) : 'Pyro',
-      avatarUrl: client.user ? (client.user.displayAvatarURL({ size: 128, extension: 'png' }) || '/icon.svg') : '/icon.svg',
-      id: client.user ? client.user.id : ''
-    };
-
-    res.render('dashboard.html', {
-      guildId: process.env.GUILD_ID,
-      serverName: guildContext.guildName,
-      bot,
-      channels: guildContext.channels,
-      roles: guildContext.roles,
-      members: guildContext.members,
-      config,
-      logConfigKeys: LOG_CONFIG_KEYS,
-      ...lists
-    });
+    res.status(200).send('Pyro Bot Dashboard - Veuillez exécuter "npm run build".');
   });
 
   // --- ANALYTICS API ROUTES ---
@@ -733,12 +684,9 @@ function startWebServer(client, rawPort) {
     res.status(200).send();
   });
 
-  // Helper to send JSON or HTML table depending on request
+  // Helper to send JSON response
   function sendTableOrJson(req, res, template, data) {
-    if (req.accepts('json') || req.path.startsWith('/api')) {
-      return res.json(data);
-    }
-    return res.render(template, data);
+    return res.json(data);
   }
 
   // 2. Auto-Role Routes
@@ -1026,7 +974,7 @@ function startWebServer(client, rawPort) {
 
     if (req.path === '/login') {
       if (req.session && req.session.authenticated) return res.redirect('/dashboard');
-      return res.render('login.html', { error: null, _csrf: res.locals._csrf || '' });
+      return res.status(200).send('Pyro Bot Dashboard - Veuillez exécuter "npm run build".');
     }
 
     return res.redirect('/dashboard');
@@ -1036,16 +984,7 @@ function startWebServer(client, rawPort) {
   app.use((err, req, res, next) => {
     if (err && (err.code === 'EBADCSRFTOKEN' || (err.message && err.message.toLowerCase().includes('csrf')))) {
       console.warn(`[Security] Requête CSRF bloquée depuis l'IP ${req.ip} sur ${req.originalUrl}`);
-      if (req.accepts('json') || req.path.startsWith('/api')) {
-        return res.status(403).json({ error: 'Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.' });
-      }
-      if (req.headers['hx-request']) {
-        return res.status(403).send('<div style="color:#e74c3c;padding:1rem;background:#1a1115;border-radius:6px;font-weight:600;">⚠️ Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.</div>');
-      }
-      return res.status(403).render('login.html', { 
-        error: 'Session ou jeton de sécurité expiré. Veuillez vous reconnecter.',
-        _csrf: res.locals._csrf || ''
-      });
+      return res.status(403).json({ error: 'Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.' });
     }
     next(err);
   });
