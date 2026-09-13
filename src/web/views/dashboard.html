@@ -220,13 +220,20 @@
                 <label for="analytics_channel"><i data-lucide="hash" style="width:14px;height:14px;vertical-align:middle;"></i> Salon</label>
                 <select id="analytics_channel">
                   <option value="all">Tous les salons</option>
-                  <optgroup label="Salons Textuels">
-                    <% channels.text.forEach(c => { %>
+                  <% if (typeof channels !== 'undefined' && channels.forums && channels.forums.length > 0) { %>
+                    <optgroup label="📑 Salons Forums">
+                      <% channels.forums.forEach(f => { %>
+                        <option value="<%= f.id %>">📑 <%= f.name %></option>
+                      <% }) %>
+                    </optgroup>
+                  <% } %>
+                  <optgroup label="💬 Salons Textuels">
+                    <% (channels.text || []).filter(c => !c.forum).forEach(c => { %>
                       <option value="<%= c.id %>"># <%= c.name %></option>
                     <% }) %>
                   </optgroup>
-                  <optgroup label="Salons Vocaux">
-                    <% channels.voice.forEach(v => { %>
+                  <optgroup label="🔊 Salons Vocaux">
+                    <% (channels.voice || []).forEach(v => { %>
                       <option value="<%= v.id %>">🔊 <%= v.name %></option>
                     <% }) %>
                   </optgroup>
@@ -417,11 +424,37 @@
               </div>
             </div>
 
-            <!-- Panel: Top Salons -->
+            <!-- Panel: Top Salons & Forums -->
             <div id="subtab-channels" class="analytics-subtab-content" style="display:none;">
+              <!-- Section Dédiée : Salons Forum -->
+              <div style="margin-bottom: 2rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem;">
+                  <h4 style="margin:0;"><i data-lucide="messages-square" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;color:#ff6b35;"></i> Trafic des Salons Forum &amp; Sujets Populaires</h4>
+                  <small style="color:var(--text-muted);">Trafic global agrégé par forum et répartition des posts</small>
+                </div>
+                <div style="overflow-x:auto;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Forum</th>
+                        <th>Messages Totaux</th>
+                        <th>Sujets Actifs</th>
+                        <th>Sujet le Plus Actif</th>
+                        <th>Longueur Moy.</th>
+                        <th>Participants</th>
+                      </tr>
+                    </thead>
+                    <tbody id="top-forums-tbody">
+                      <tr><td colspan="6" style="text-align:center;padding:1.5rem;">Chargement...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Section Salons Textuels Classiques & Vocaux -->
               <div class="grid-2">
                 <div>
-                  <h4 style="margin-bottom:0.8rem;"><i data-lucide="message-square" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Salons Textuels</h4>
+                  <h4 style="margin-bottom:0.8rem;"><i data-lucide="message-square" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Salons Textuels Classiques</h4>
                   <div style="overflow-x:auto;">
                     <table>
                       <thead>
@@ -1262,7 +1295,7 @@
         // 3. Render Tables
         renderTopMembersTable(data.topMembers);
         renderTopRolesTable(data.topRoles);
-        renderTopChannelsTables(data.topTextChannels, data.topVoiceChannels);
+        renderTopChannelsTables(data.topTextChannels, data.topVoiceChannels, data.topForums);
         renderMemberFlowTable(data.memberEvents);
 
         lucide.createIcons();
@@ -1500,12 +1533,59 @@
       tbody.innerHTML = html;
     }
 
-    function renderTopChannelsTables(textChannels, voiceChannels) {
+    function renderTopChannelsTables(textChannels, voiceChannels, forumChannels) {
+      const forumTbody = document.getElementById('top-forums-tbody');
       const textTbody = document.getElementById('top-text-channels-tbody');
       const voiceTbody = document.getElementById('top-voice-channels-tbody');
 
+      // 1. Salons Forums
+      if (forumTbody) {
+        if (!forumChannels || forumChannels.length === 0) {
+          forumTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.2rem;color:var(--text-muted);">Aucun salon forum détecté ou aucune activité sur cette période.</td></tr>';
+        } else {
+          forumTbody.innerHTML = forumChannels.map(f => {
+            let topThreadHtml = '<span style="opacity:0.5;">Aucun sujet</span>';
+            if (f.topThread) {
+              topThreadHtml = `<span>📌 <strong>${escapeHtml(f.topThread.name)}</strong> <small style="color:var(--text-muted);">(${f.topThread.messagesCount.toLocaleString('fr-FR')} msgs)</small></span>`;
+            }
+
+            let subThreadsHtml = '';
+            if (f.topThreads && f.topThreads.length > 1) {
+              const otherThreads = f.topThreads.slice(1, 4).map(t => 
+                `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.06);font-size:0.75rem;color:var(--text-muted);">
+                  ${escapeHtml(t.name)} <strong style="color:var(--text-primary);">${t.messagesCount}</strong>
+                </span>`
+              ).join('');
+              if (otherThreads) {
+                subThreadsHtml = `<div style="margin-top:4px;">${otherThreads}</div>`;
+              }
+            }
+
+            return `
+              <tr>
+                <td>
+                  <span class="badge" style="background:rgba(255,107,53,0.15);color:#ff6b35;border:1px solid rgba(255,107,53,0.3);margin-right:6px;font-size:0.75rem;">
+                    <i data-lucide="messages-square" style="width:12px;height:12px;vertical-align:middle;margin-right:2px;"></i> Forum
+                  </span>
+                  <strong>${escapeHtml(f.channelName)}</strong>
+                </td>
+                <td><strong>${f.messagesCount.toLocaleString('fr-FR')}</strong></td>
+                <td><span class="badge badge-info">${f.threadsCount} sujet${f.threadsCount > 1 ? 's' : ''}</span></td>
+                <td>
+                  ${topThreadHtml}
+                  ${subThreadsHtml}
+                </td>
+                <td>${f.avgMessageLength} car.</td>
+                <td><span class="badge badge-success">${f.uniqueUsersCount}</span></td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+      // 2. Salons Textuels Classiques
       if (!textChannels || textChannels.length === 0) {
-        textTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted);">Aucun message</td></tr>';
+        textTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted);">Aucun message dans les salons textuels classiques.</td></tr>';
       } else {
         textTbody.innerHTML = textChannels.map(c => `
           <tr>
@@ -1517,6 +1597,7 @@
         `).join('');
       }
 
+      // 3. Salons Vocaux
       if (!voiceChannels || voiceChannels.length === 0) {
         voiceTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted);">Aucun salon vocal utilisé</td></tr>';
       } else {

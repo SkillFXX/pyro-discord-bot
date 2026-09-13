@@ -217,13 +217,17 @@ function startWebServer(client, rawPort) {
     }
 
     const textChannels = [];
+    const forumChannels = [];
     const voiceChannels = [];
     const categories = [];
     
     guild.channels.cache.forEach(c => {
       const channelData = { id: c.id, name: c.name };
       if (c.type === ChannelType.GuildText) textChannels.push({ ...channelData, forum: false });
-      else if (c.type === ChannelType.GuildForum) textChannels.push({ ...channelData, forum: true });
+      else if (c.type === ChannelType.GuildForum || c.type === ChannelType.GuildMedia) {
+        textChannels.push({ ...channelData, forum: true });
+        forumChannels.push(channelData);
+      }
       else if (c.type === ChannelType.GuildVoice) voiceChannels.push(channelData);
       else if (c.type === ChannelType.GuildCategory) categories.push(channelData);
     });
@@ -267,6 +271,7 @@ function startWebServer(client, rawPort) {
       guildName: guild.name,
       channels: {
         text: textChannels.sort((a, b) => a.name.localeCompare(b.name)),
+        forums: forumChannels.sort((a, b) => a.name.localeCompare(b.name)),
         voice: voiceChannels.sort((a, b) => a.name.localeCompare(b.name)),
         categories: categories.sort((a, b) => a.name.localeCompare(b.name)),
       },

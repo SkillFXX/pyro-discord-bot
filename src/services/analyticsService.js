@@ -45,7 +45,20 @@ const analyticsService = {
       if (!message || message.author?.bot || !message.guild) return;
 
       const userId = message.author.id;
+      const isThread = typeof message.channel.isThread === 'function' && message.channel.isThread();
       const channelId = message.channel.id;
+      const parentChannelId = isThread ? message.channel.parentId : null;
+      let threadName = null;
+      let isForum = false;
+
+      if (isThread) {
+        threadName = message.channel.name || null;
+        const parent = message.channel.parent || (message.guild?.channels?.cache?.get(message.channel.parentId));
+        if (parent && (parent.type === 15 || parent.type === 16)) { // 15 = GuildForum, 16 = GuildMedia
+          isForum = true;
+        }
+      }
+
       const guildId = message.guild.id;
       const content = message.content || '';
       const messageLength = content.length;
@@ -56,6 +69,9 @@ const analyticsService = {
       await MessageLog.create({
         userId,
         channelId,
+        parentChannelId,
+        threadName,
+        isForum,
         guildId,
         messageLength,
         wordCount,
@@ -320,7 +336,19 @@ const analyticsService = {
     };
 
     if (channelId && channelId !== 'all') {
-      msgWhere.channelId = channelId;
+      const targetChannelIds = [channelId];
+      if (guild) {
+        guild.channels.cache.forEach((c) => {
+          if (typeof c.isThread === 'function' && c.isThread() && c.parentId === channelId) {
+            targetChannelIds.push(c.id);
+          }
+        });
+      }
+
+      msgWhere[Op.or] = [
+        { channelId: { [Op.in]: targetChannelIds } },
+        { parentChannelId: channelId },
+      ];
       voiceWhere.channelId = channelId;
     }
 
@@ -334,7 +362,17 @@ const analyticsService = {
     let [messages, voiceLogs, memberLogs] = await Promise.all([
       MessageLog.findAll({
         where: msgWhere,
-        attributes: ['userId', 'channelId', 'messageLength', 'wordCount', 'roleIds', 'createdAt'],
+        attributes: [
+          'userId',
+          'channelId',
+          'parentChannelId',
+          'threadName',
+          'isForum',
+          'messageLength',
+          'wordCount',
+          'roleIds',
+          'createdAt',
+        ],
         raw: true,
       }),
       VoiceLog.findAll({
@@ -685,35 +723,123 @@ const analyticsService = {
       .sort((a, b) => b.messagesCount - a.messagesCount);
 
     // ==========================================
-    // 5. TOP CHAT ROOMS / CHANNELS
+    // 5. TOP CHAT ROOMS & FORUMS
     // ==========================================
     const textChannelStats = new Map();
+
+    // Pre-populate known forum channels from guild cache so they appear even if 0 messages
+    if (guild) {
+      guild.channels.cache.forEach((ch) => {
+        if (ch.type === 15 || ch.type === 16) {
+          textChannelStats.set(ch.id, {
+            channelId: ch.id,
+            isForum: true,
+            messagesCount: 0,
+            totalChars: 0,
+            usersSet: new Set(),
+            threadsMap: new Map(),
+          });
+        }
+      });
+    }
+
     for (const m of messages) {
-      if (!textChannelStats.has(m.channelId)) {
-        textChannelStats.set(m.channelId, {
-          channelId: m.channelId,
+      let effectiveChannelId = m.channelId;
+      let threadId = null;
+      let threadName = m.threadName || null;
+      let isForum = Boolean(m.isForum);
+
+      if (m.parentChannelId) {
+        effectiveChannelId = m.parentChannelId;
+        threadId = m.channelId;
+      } else if (guild) {
+        const ch = guild.channels.cache.get(m.channelId);
+        if (ch && typeof ch.isThread === 'function' && ch.isThread()) {
+          effectiveChannelId = ch.parentId;
+          threadId = m.channelId;
+          threadName = ch.name;
+          const parentCh = ch.parent || guild.channels.cache.get(ch.parentId);
+          if (parentCh && (parentCh.type === 15 || parentCh.type === 16)) {
+            isForum = true;
+          }
+        }
+      }
+
+      // Check if effective channel is a Forum channel in guild cache
+      if (!isForum && guild) {
+        const effCh = guild.channels.cache.get(effectiveChannelId);
+        if (effCh && (effCh.type === 15 || effCh.type === 16)) {
+          isForum = true;
+        }
+      }
+
+      if (!textChannelStats.has(effectiveChannelId)) {
+        textChannelStats.set(effectiveChannelId, {
+          channelId: effectiveChannelId,
+          isForum,
           messagesCount: 0,
           totalChars: 0,
           usersSet: new Set(),
+          threadsMap: new Map(),
         });
       }
-      const cs = textChannelStats.get(m.channelId);
+
+      const cs = textChannelStats.get(effectiveChannelId);
+      if (isForum) cs.isForum = true;
       cs.messagesCount += 1;
       cs.totalChars += m.messageLength || 0;
       cs.usersSet.add(m.userId);
+
+      if (threadId) {
+        if (!cs.threadsMap.has(threadId)) {
+          let tName = threadName;
+          if (!tName && guild) {
+            const tCh = guild.channels.cache.get(threadId);
+            if (tCh) tName = tCh.name;
+          }
+          cs.threadsMap.set(threadId, {
+            id: threadId,
+            name: tName || `Sujet #${threadId.slice(0, 4)}`,
+            messagesCount: 0,
+            usersSet: new Set(),
+          });
+        }
+        const ts = cs.threadsMap.get(threadId);
+        ts.messagesCount += 1;
+        ts.usersSet.add(m.userId);
+      }
     }
 
-    const topTextChannels = Array.from(textChannelStats.values())
-      .map((c) => {
-        const chInfo = resolveChannel(c.channelId, false);
-        return {
-          channelId: c.channelId,
-          channelName: chInfo.name,
-          messagesCount: c.messagesCount,
-          avgMessageLength: c.messagesCount > 0 ? Math.round(c.totalChars / c.messagesCount) : 0,
-          uniqueUsersCount: c.usersSet.size,
-        };
-      })
+    const allAggregatedChannels = Array.from(textChannelStats.values()).map((c) => {
+      const chInfo = resolveChannel(c.channelId, false);
+      const threadsArray = Array.from(c.threadsMap.values())
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          messagesCount: t.messagesCount,
+          uniqueUsersCount: t.usersSet.size,
+        }))
+        .sort((a, b) => b.messagesCount - a.messagesCount);
+
+      return {
+        channelId: c.channelId,
+        channelName: chInfo.name,
+        isForum: c.isForum,
+        messagesCount: c.messagesCount,
+        avgMessageLength: c.messagesCount > 0 ? Math.round(c.totalChars / c.messagesCount) : 0,
+        uniqueUsersCount: c.usersSet.size,
+        threadsCount: c.threadsMap.size,
+        topThreads: threadsArray.slice(0, 5),
+        topThread: threadsArray.length > 0 ? threadsArray[0] : null,
+      };
+    });
+
+    const topForums = allAggregatedChannels
+      .filter((c) => c.isForum)
+      .sort((a, b) => b.messagesCount - a.messagesCount);
+
+    const topTextChannels = allAggregatedChannels
+      .filter((c) => !c.isForum && c.messagesCount > 0)
       .sort((a, b) => b.messagesCount - a.messagesCount);
 
     const voiceChannelStats = new Map();
@@ -798,6 +924,7 @@ const analyticsService = {
       timeline,
       topMembers: topMembers.slice(0, 25),
       topRoles: topRoles.slice(0, 25),
+      topForums: topForums.slice(0, 25),
       topTextChannels: topTextChannels.slice(0, 25),
       topVoiceChannels: topVoiceChannels.slice(0, 25),
       memberEvents,
@@ -847,7 +974,27 @@ const analyticsService = {
     });
     rows.push([]);
 
-    // 2. Top Salons Textuels
+    // 2. Top Salons Forums
+    if (data.topForums && data.topForums.length > 0) {
+      rows.push(['--- SALONS FORUMS ---']);
+      rows.push(['Rang', 'ID Forum', 'Nom du Forum', 'Messages', 'Sujets Actifs', 'Sujet le Plus Actif', 'Longueur Moy.', 'Membres Uniques']);
+      data.topForums.forEach((f, idx) => {
+        const topTopicInfo = f.topThread ? `${f.topThread.name} (${f.topThread.messagesCount} msgs)` : 'Aucun';
+        rows.push([
+          idx + 1,
+          safeCell(f.channelId),
+          safeCell('📑 ' + f.channelName),
+          f.messagesCount,
+          f.threadsCount,
+          safeCell(topTopicInfo),
+          f.avgMessageLength,
+          f.uniqueUsersCount,
+        ]);
+      });
+      rows.push([]);
+    }
+
+    // 3. Top Salons Textuels
     rows.push(['--- SALONS TEXTUELS ---']);
     rows.push(['Rang', 'ID Salon', 'Nom du Salon', 'Messages', 'Longueur Moy.', 'Membres Uniques']);
     data.topTextChannels.forEach((c, idx) => {

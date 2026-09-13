@@ -203,6 +203,18 @@ const MessageLog = sequelize.define('MessageLog', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  parentChannelId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  threadName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  isForum: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   roleIds: {
     type: DataTypes.TEXT, // JSON serialized array of role IDs
     defaultValue: '[]',
@@ -211,6 +223,8 @@ const MessageLog = sequelize.define('MessageLog', {
   indexes: [
     { fields: ['userId'] },
     { fields: ['channelId'] },
+    { fields: ['parentChannelId'] },
+    { fields: ['isForum'] },
     { fields: ['createdAt'] },
   ],
 });
@@ -408,6 +422,29 @@ const ConfigHelper = {
 };
 
 /**
+ * Ensures newly added columns exist in SQLite MessageLogs table
+ */
+async function ensureMessageLogColumns() {
+  try {
+    const [columns] = await sequelize.query('PRAGMA table_info(MessageLogs);');
+    const columnNames = (columns || []).map(c => c.name);
+    if (columnNames.length > 0) {
+      if (!columnNames.includes('parentChannelId')) {
+        await sequelize.query('ALTER TABLE MessageLogs ADD COLUMN parentChannelId VARCHAR(255);');
+      }
+      if (!columnNames.includes('threadName')) {
+        await sequelize.query('ALTER TABLE MessageLogs ADD COLUMN threadName VARCHAR(255);');
+      }
+      if (!columnNames.includes('isForum')) {
+        await sequelize.query('ALTER TABLE MessageLogs ADD COLUMN isForum BOOLEAN DEFAULT 0;');
+      }
+    }
+  } catch (err) {
+    console.warn('[Database] Column check notice:', err.message);
+  }
+}
+
+/**
  * Configure SQLite high-performance PRAGMAs:
  * - WAL mode (Write-Ahead Logging): allows concurrent reads during writes, prevents SQLITE_BUSY
  * - synchronous = NORMAL: faster writes while retaining durability in WAL mode
@@ -421,6 +458,7 @@ async function initDatabasePragmas() {
     await sequelize.query('PRAGMA cache_size = -64000;');
     await sequelize.query('PRAGMA temp_store = MEMORY;');
     await sequelize.query('PRAGMA foreign_keys = ON;');
+    await ensureMessageLogColumns();
     await ConfigHelper.preloadCache();
   } catch (err) {
     console.warn('[Database] Warning applying SQLite PRAGMAs:', err.message);
@@ -462,6 +500,7 @@ const LOG_CONFIG_KEYS = [
 module.exports = {
   sequelize,
   initDatabasePragmas,
+  ensureMessageLogColumns,
   Config,
   Warn,
   WarnAction,
