@@ -60,6 +60,17 @@
         {:else if currentTab === 'analytics'}
           <AnalyticsTab />
         {/if}
+
+        <footer class="app-footer">
+          <a
+            href="https://github.com/SkillFXX/pyro-discord-bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="footer-link"
+          >
+            Made by SkillFXX - PyroBot
+          </a>
+        </footer>
       </main>
     </div>
   </div>
@@ -122,6 +133,27 @@
     .content-area {
       padding: 1.25rem 1rem;
     }
+  }
+
+  .app-footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .footer-link {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    display: inline-block;
+  }
+
+  .footer-link:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
   }
 </style>
 

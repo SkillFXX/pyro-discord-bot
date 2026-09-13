@@ -63,6 +63,17 @@
         {/if}
       </button>
     </form>
+
+    <div class="login-footer">
+      <a
+        href="https://github.com/SkillFXX/pyro-discord-bot"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="footer-link"
+      >
+        Made by SkillFXX - PyroBot
+      </a>
+    </div>
   </div>
 </div>
 
@@ -122,5 +133,25 @@
     font-size: 0.85rem;
     margin-bottom: 1.25rem;
     text-align: left;
+  }
+
+  .login-footer {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .footer-link {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    display: inline-block;
+  }
+
+  .footer-link:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
   }
 </style>
