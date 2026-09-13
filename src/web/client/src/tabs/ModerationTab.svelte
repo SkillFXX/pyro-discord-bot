@@ -3,13 +3,21 @@
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';
   import { dashboardData, addWarnAction, deleteWarnAction } from '../stores/data';
+  import { showToast } from '../stores/toast';
 
   let warnsCount = '';
   let action = 'mute';
   let duration = 86400;
 
+  // Discord API restricts timeouts to 28 days max (2,419,200 seconds / 4 weeks)
+  const MAX_TIMEOUT_SECONDS = 2419200;
+
   function formatDuration(sec) {
     if (!sec) return 'Définitif';
+    if (sec >= 604800 && sec % 604800 === 0) {
+      const weeks = sec / 604800;
+      return `${weeks} semaine${weeks > 1 ? 's' : ''} (${sec / 86400}j)`;
+    }
     if (sec >= 86400) return `${sec / 86400} jour(s) (${sec}s)`;
     if (sec >= 3600) return `${sec / 3600} heure(s) (${sec}s)`;
     if (sec >= 60) return `${sec / 60} minute(s) (${sec}s)`;
@@ -18,6 +26,18 @@
 
   async function handleAdd() {
     if (!warnsCount || parseInt(warnsCount) < 1) return;
+    if (action === 'mute') {
+      const parsedDur = parseInt(duration);
+      if (isNaN(parsedDur) || parsedDur < 10) {
+        showToast('La durée minimale d\'exclusion est de 10 secondes', 'error');
+        return;
+      }
+      if (parsedDur > MAX_TIMEOUT_SECONDS) {
+        showToast('La durée maximale d\'exclusion Discord est de 28 jours (2 419 200s)', 'error');
+        return;
+      }
+    }
+
     await addWarnAction({
       warnsCount: parseInt(warnsCount),
       action,
@@ -63,21 +83,35 @@
 
         {#if action === 'mute'}
           <div class="form-group">
-            <label for="warn_duration">Durée du Mute (en secondes)</label>
+            <label for="warn_duration">
+              Durée du Mute (en secondes)
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400; margin-left:6px;">
+                (Max : 28 jours = 2 419 200s)
+              </span>
+            </label>
             <input
               id="warn_duration"
               type="number"
               bind:value={duration}
               min="10"
+              max="2419200"
               required
-              placeholder="Ex: 86400"
+              placeholder="Ex: 86400 (1 jour)"
             />
             <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 600)}>10 min (600s)</button>
               <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 3600)}>1 heure (3600s)</button>
               <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 86400)}>1 jour (86400s)</button>
               <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 604800)}>7 jours (604800s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 1209600)}>14 jours (1209600s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (duration = 2419200)}>28 jours Max (2419200s)</button>
             </div>
+            {#if duration > 2419200}
+              <p style="color: var(--danger); font-size: 0.8rem; margin-top: 0.4rem; display: flex; align-items: center; gap: 5px;">
+                <AlertTriangle size={14} />
+                L'API Discord limite strictement les exclusions temporaires (timeouts) à 28 jours maximum (2 419 200 secondes).
+              </p>
+            {/if}
           </div>
         {/if}
 

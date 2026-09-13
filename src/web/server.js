@@ -769,10 +769,35 @@ function startWebServer(client, rawPort) {
   async function handleWarnActionAdd(req, res) {
     const { warnsCount, action, duration } = req.body;
     if (warnsCount && action) {
+      const parsedCount = parseInt(warnsCount, 10);
+      if (isNaN(parsedCount) || parsedCount < 1) {
+        if (req.accepts('json') || req.path.startsWith('/api')) {
+          return res.status(400).json({ error: 'Le seuil d\'avertissements doit être un nombre positif supérieur à 0.' });
+        }
+        return res.status(400).send('Seuil d\'avertissements invalide');
+      }
+
+      let parsedDuration = null;
+      if (action === 'mute') {
+        const MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60; // 2419200s (28 jours max autorisé par Discord)
+        parsedDuration = parseInt(duration || 86400, 10);
+        if (isNaN(parsedDuration) || parsedDuration < 10) {
+          parsedDuration = 10;
+        }
+        if (parsedDuration > MAX_TIMEOUT_SECONDS) {
+          if (req.accepts('json') || req.path.startsWith('/api')) {
+            return res.status(400).json({ 
+              error: 'La durée maximale d\'exclusion temporaire autorisée par l\'API Discord est de 28 jours (2 419 200 secondes).' 
+            });
+          }
+          parsedDuration = MAX_TIMEOUT_SECONDS;
+        }
+      }
+
       await WarnAction.upsert({
-        warnsCount: parseInt(warnsCount),
+        warnsCount: parsedCount,
         action,
-        duration: action === 'mute' ? parseInt(duration || 86400) : null
+        duration: parsedDuration
       });
     }
     const warnActions = await fetchWarnActions();

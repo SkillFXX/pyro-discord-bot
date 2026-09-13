@@ -78,7 +78,10 @@ async function checkWarnThresholds(client, member, moderator, reason) {
     const botMember = member.guild.members.me;
 
     if (thresholdAction.action === 'mute') {
-      const durationMs = thresholdAction.duration * 1000;
+      // Discord native timeout max is 28 days (2419200 seconds / 2419200000 ms)
+      const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
+      const requestedMs = (thresholdAction.duration || 86400) * 1000;
+      const durationMs = Math.min(requestedMs, MAX_TIMEOUT_MS);
       
       // Native timeout (v14)
       if (!member.moderatable) {
@@ -86,12 +89,23 @@ async function checkWarnThresholds(client, member, moderator, reason) {
           action: '⚠️ Erreur Sanction Auto',
           target: member.user,
           moderator: botMember.user,
-          reason: `Impossible de mute ${member.user.username} (permissions insuffisantes) suite au warn #${warnCount}.`,
+          reason: `Impossible de mute ${member.user.username} (permissions insuffisantes ou rôle supérieur) suite au warn #${warnCount}.`,
         });
         return;
       }
 
-      await member.timeout(durationMs, `Sanction Automatique (${warnCount} avertissements) : ${reason}`);
+      try {
+        await member.timeout(durationMs, `Sanction Automatique (${warnCount} avertissements) : ${reason}`);
+      } catch (timeoutErr) {
+        console.error(`[Moderation] Erreur timeout Discord pour ${member.user.tag}:`, timeoutErr);
+        await logModerationAction(client, {
+          action: '⚠️ Erreur Timeout Discord',
+          target: member.user,
+          moderator: botMember.user,
+          reason: `Échec de l'exclusion temporaire pour ${member.user.username} (${timeoutErr.message}) suite au warn #${warnCount}.`,
+        });
+        return;
+      }
       
       // Create sanction entry
       await Sanction.create({

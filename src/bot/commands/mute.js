@@ -3,21 +3,34 @@ const { Sanction } = require('../../database');
 const embeds = require('../utils/embeds');
 const { sendDM, logModerationAction } = require('../utils/moderationHelper');
 
-// Helper to parse duration string (e.g. 10s, 30m, 2h, 1d)
+// Helper to parse duration string (e.g. 10s, 30m, 2h, 1d/1j, 1w/1sem)
 function parseDuration(durationStr) {
-  const regex = /^(\d+)([smhd])$/i;
-  const match = durationStr.match(regex);
+  if (!durationStr || typeof durationStr !== 'string') return null;
+  const regex = /^(\d+)\s*(s|sec|m|min|h|d|j|w|sem)$/i;
+  const match = durationStr.trim().match(regex);
   if (!match) return null;
 
-  const value = parseInt(match[1]);
+  const value = parseInt(match[1], 10);
+  if (isNaN(value) || value <= 0) return null;
   const unit = match[2].toLowerCase();
 
   switch (unit) {
-    case 's': return value * 1000;
-    case 'm': return value * 60 * 1000;
-    case 'h': return value * 60 * 60 * 1000;
-    case 'd': return value * 24 * 60 * 60 * 1000;
-    default: return null;
+    case 's':
+    case 'sec':
+      return value * 1000;
+    case 'm':
+    case 'min':
+      return value * 60 * 1000;
+    case 'h':
+      return value * 60 * 60 * 1000;
+    case 'd':
+    case 'j':
+      return value * 24 * 60 * 60 * 1000;
+    case 'w':
+    case 'sem':
+      return value * 7 * 24 * 60 * 60 * 1000;
+    default:
+      return null;
   }
 }
 
@@ -31,7 +44,7 @@ module.exports = {
         .setRequired(true))
     .addStringOption(option =>
       option.setName('duree')
-        .setDescription('Durée de l\'exclusion (ex: 30m, 2h, 1d) - Max: 28d')
+        .setDescription('Durée de l\'exclusion (ex: 30m, 2h, 1j, 1w) - Max: 28 jours (4 semaines)')
         .setRequired(true))
     .addStringOption(option =>
       option.setName('motif')
@@ -61,17 +74,18 @@ module.exports = {
 
     // Parse duration
     const durationMs = parseDuration(durationStr);
-    if (!durationMs) {
+    if (!durationMs || durationMs < 10000) {
       return interaction.reply({
-        embeds: [embeds.error('Format de durée invalide. Utilisez par exemple : `30m` (30 mins), `2h` (2 heures), `1d` (1 jour). Units autorisées : s, m, h, d.')],
+        embeds: [embeds.error('Format de durée invalide ou inférieur à 10 secondes. Utilisez par exemple : `30m`, `2h`, `1j` (ou `1d`), `1w` (ou `1sem`). Unités : s, m, h, j/d, w/sem.')],
         ephemeral: true
       });
     }
 
-    // Discord native timeout max is 28 days (2419200000 ms)
-    if (durationMs > 2419200000) {
+    // Discord native timeout max is 28 days (2419200000 ms = 4 weeks)
+    const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000; // 2419200000 ms
+    if (durationMs > MAX_TIMEOUT_MS) {
       return interaction.reply({
-        embeds: [embeds.error('La durée d\'exclusion maximale autorisée par Discord est de 28 jours (`28d`).')],
+        embeds: [embeds.error('La durée d\'exclusion maximale autorisée par l\'API Discord est de **28 jours** (soit 4 semaines maximum / `28d` ou `4w`).')],
         ephemeral: true
       });
     }
