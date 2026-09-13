@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pyro Bot Dashboard</title>
-  <link rel="icon" type="image/svg+xml" href="/public/logo.png">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="stylesheet" href="/partials/styles.css">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <!-- CSRF Token -->
@@ -23,7 +23,7 @@
   <header class="header-bar">
     <div class="container header-container">
       <div class="logo-container">
-        <img src="/public/logo.png" alt="Pyro Logo" class="logo-icon">
+        <img src="/icon.svg" alt="Pyro Logo" class="logo-icon">
         <div class="header-title">
           <h1>Pyro Dashboard</h1>
           <p>Serveur connecté : <strong><%= serverName %></strong> (<%= guildId %>)</p>
@@ -1058,7 +1058,7 @@
                   <!-- Bot Presence Preview Widget -->
                   <div style="background:#1e1f22;border-radius:8px;padding:0.9rem 1.2rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;border:1px solid rgba(255,255,255,0.05);">
                     <div style="position:relative;">
-                      <img src="/public/logo.png" alt="Pyro" style="width:42px;height:42px;border-radius:50%;display:block;">
+                      <img src="/icon.svg" alt="Pyro" style="width:42px;height:42px;border-radius:50%;display:block;">
                       <span id="preview-status-dot" style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;border:2px solid #1e1f22;background:#23a55a;"></span>
                     </div>
                     <div>
@@ -1081,7 +1081,7 @@
 
                     <!-- Embed Footer Preview -->
                     <div style="display:flex;align-items:center;gap:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(255,255,255,0.06);">
-                      <img id="preview-footer-icon" src="<%= config.embed_footer_icon_url || '/public/logo.png' %>" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover;">
+                      <img id="preview-footer-icon" src="<%= config.embed_footer_icon_url || '/icon.svg' %>" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover;">
                       <span id="preview-footer-text" style="font-size:0.78rem;color:#949ba4;"><%= config.embed_footer_text || 'Pyro Bot • Modération & Utilitaires' %></span>
                       <span style="font-size:0.75rem;color:#949ba4;opacity:0.6;">• Aujourd'hui à 12:00</span>
                     </div>
@@ -1492,7 +1492,7 @@
           <tr>
             <td><span class="rank-badge ${rankClass}">${idx + 1}</span></td>
             <td>
-              <img class="table-avatar" src="${m.avatarUrl || '/public/logo.png'}" onerror="this.src='/public/logo.png'">
+              <img class="table-avatar" src="${m.avatarUrl || '/icon.svg'}" onerror="this.src='/icon.svg'">
               <strong>${escapeHtml(m.displayName)}</strong>
               <small style="opacity:0.6;margin-left:4px;">@${escapeHtml(m.username)}</small>
             </td>
@@ -1632,7 +1632,7 @@
               </span>
             </td>
             <td>
-              <img class="table-avatar" src="${e.avatarUrl || '/public/logo.png'}" onerror="this.src='/public/logo.png'">
+              <img class="table-avatar" src="${e.avatarUrl || '/icon.svg'}" onerror="this.src='/icon.svg'">
               <strong>${escapeHtml(e.displayName)}</strong>
               <small style="opacity:0.6;">(@${escapeHtml(e.username)})</small>
             </td>

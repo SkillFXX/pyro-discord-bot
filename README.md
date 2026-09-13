@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/web/views/public/logo.png" alt="Pyro Bot Logo" width="100" style="border-radius: 16px;" />
+  <img src="src/web/client/public/icon.svg" alt="Pyro Bot Logo" width="100" />
   <h1>Pyro Discord Bot</h1>
   <p><strong>Bot Discord polyvalent tout-en-un avec Dashboard Web & Analytics en temps réel</strong></p>
 

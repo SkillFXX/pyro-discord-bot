@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const lusca = require('lusca');
@@ -134,6 +135,12 @@ function startWebServer(client, rawPort) {
   // Middleware
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
+
+  const distDir = path.join(__dirname, 'dist');
+  if (fs.existsSync(path.join(distDir, 'index.html'))) {
+    app.use(express.static(distDir));
+  }
+  app.use('/public', express.static(path.join(__dirname, 'views', 'public')));
   app.use(express.static(path.join(__dirname, 'views')));
 
   const sessionSecret = process.env.SESSION_SECRET || (() => {
@@ -169,8 +176,12 @@ function startWebServer(client, rawPort) {
     legacyHeaders: false,
     message: 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.',
     handler: (req, res) => {
+      const errMsg = 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.';
+      if (req.accepts('json') || req.path.startsWith('/api')) {
+        return res.status(429).json({ error: errMsg });
+      }
       res.status(429).render('login.html', { 
-        error: 'Trop de tentatives de connexion depuis cette adresse IP. Veuillez réessayer dans 15 minutes.',
+        error: errMsg,
         _csrf: res.locals._csrf || ''
       });
     }
@@ -190,6 +201,9 @@ function startWebServer(client, rawPort) {
   function isAuthenticated(req, res, next) {
     if (req.session && req.session.authenticated) {
       return next();
+    }
+    if (req.accepts('json') || req.path.startsWith('/api')) {
+      return res.status(401).json({ error: 'Non authentifié' });
     }
     res.redirect('/login');
   }
@@ -364,10 +378,53 @@ function startWebServer(client, rawPort) {
 
   // --- ROUTES ---
 
-  // Auth Routes
+  // SPA Auth Status API
+  app.get('/api/auth/status', (req, res) => {
+    res.json({
+      authenticated: Boolean(req.session && req.session.authenticated),
+      csrfToken: res.locals._csrf || ''
+    });
+  });
+
+  // SPA Login API
+  app.post('/api/login', loginLimiter, (req, res) => {
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+    const rateLimitError = checkLoginRateLimit(clientIp);
+    if (rateLimitError) {
+      return res.status(429).json({ error: rateLimitError });
+    }
+
+    const token = req.body.token;
+    const expectedToken = process.env.DISCORD_TOKEN;
+
+    if (expectedToken && safeCompareTokens(token, expectedToken)) {
+      loginAttempts.delete(clientIp);
+      req.session.authenticated = true;
+      return res.json({ 
+        success: true, 
+        csrfToken: res.locals._csrf || '' 
+      });
+    }
+
+    recordFailedLogin(clientIp);
+    res.status(401).json({ error: 'Token invalide. Veuillez réessayer.' });
+  });
+
+  // SPA Logout API
+  app.post('/api/logout', (req, res) => {
+    req.session.destroy(() => {
+      res.json({ success: true });
+    });
+  });
+
+  // Legacy Auth Routes
   app.get('/login', (req, res) => {
     if (req.session && req.session.authenticated) {
       return res.redirect('/dashboard');
+    }
+    const distIndexPath = path.join(__dirname, 'dist', 'index.html');
+    if (fs.existsSync(distIndexPath)) {
+      return res.sendFile(distIndexPath);
     }
     res.render('login.html', { error: null, _csrf: res.locals._csrf || '' });
   });
@@ -378,6 +435,7 @@ function startWebServer(client, rawPort) {
     // Check brute-force rate limit
     const rateLimitError = checkLoginRateLimit(clientIp);
     if (rateLimitError) {
+      if (req.accepts('json')) return res.status(429).json({ error: rateLimitError });
       return res.render('login.html', { error: rateLimitError, _csrf: res.locals._csrf || '' });
     }
 
@@ -388,10 +446,12 @@ function startWebServer(client, rawPort) {
     if (expectedToken && safeCompareTokens(token, expectedToken)) {
       loginAttempts.delete(clientIp);
       req.session.authenticated = true;
+      if (req.accepts('json')) return res.json({ success: true, csrfToken: res.locals._csrf || '' });
       return res.redirect('/dashboard');
     }
 
     recordFailedLogin(clientIp);
+    if (req.accepts('json')) return res.status(401).json({ error: 'Token invalide. Veuillez réessayer.' });
     res.render('login.html', { error: 'Token invalide. Veuillez réessayer.', _csrf: res.locals._csrf || '' });
   });
 
@@ -400,8 +460,60 @@ function startWebServer(client, rawPort) {
     res.redirect('/login');
   });
 
+  // SPA Dashboard Bootstrap JSON API
+  app.get('/api/dashboard/init', isAuthenticated, async (req, res) => {
+    try {
+      const guildContext = await getGuildContext();
+      const lists = await getDashboardLists(guildContext);
+
+      const logKeys = LOG_CONFIG_KEYS.map(k => k.key);
+      const configKeys = [
+        'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
+        'embed_footer_text', 'embed_footer_icon_url', 'embed_color',
+        'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
+        'voice_creator_channel_id', 'voice_creator_category_id',
+        'welcome_message_template', 'leave_message_template',
+        'member_counter_channel_id', 'member_counter_template',
+        'ticket_category_id', 'ticket_staff_role_id',
+        'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
+        ...logKeys
+      ];
+
+      const config = {};
+      for (const key of configKeys) {
+        config[key] = await ConfigHelper.get(key);
+      }
+
+      const bot = {
+        username: client.user ? (client.user.displayName || client.user.username) : 'Pyro',
+        avatarUrl: client.user ? (client.user.displayAvatarURL({ size: 128, extension: 'png' }) || '/icon.svg') : '/icon.svg',
+        id: client.user ? client.user.id : ''
+      };
+
+      res.json({
+        guildId: process.env.GUILD_ID,
+        serverName: guildContext.guildName,
+        bot,
+        channels: guildContext.channels,
+        roles: guildContext.roles,
+        members: guildContext.members,
+        config,
+        logConfigKeys: LOG_CONFIG_KEYS,
+        ...lists
+      });
+    } catch (error) {
+      console.error('[API Dashboard Init] Error:', error);
+      res.status(500).json({ error: 'Erreur lors du chargement des données' });
+    }
+  });
+
   // Dashboard Main protected route
   app.get('/dashboard', isAuthenticated, async (req, res) => {
+    const distIndexPath = path.join(__dirname, 'dist', 'index.html');
+    if (fs.existsSync(distIndexPath)) {
+      return res.sendFile(distIndexPath);
+    }
+
     const guildContext = await getGuildContext();
     const lists = await getDashboardLists(guildContext);
 
@@ -424,9 +536,16 @@ function startWebServer(client, rawPort) {
       config[key] = await ConfigHelper.get(key);
     }
 
+    const bot = {
+      username: client.user ? (client.user.displayName || client.user.username) : 'Pyro',
+      avatarUrl: client.user ? (client.user.displayAvatarURL({ size: 128, extension: 'png' }) || '/icon.svg') : '/icon.svg',
+      id: client.user ? client.user.id : ''
+    };
+
     res.render('dashboard.html', {
       guildId: process.env.GUILD_ID,
       serverName: guildContext.guildName,
+      bot,
       channels: guildContext.channels,
       roles: guildContext.roles,
       members: guildContext.members,
@@ -485,9 +604,80 @@ function startWebServer(client, rawPort) {
     }
   });
 
-  // --- API SETTINGS POSTS (AJAX / HTMX) ---
+  // --- API SETTINGS & CONFIG POSTS ---
 
-  // 1. General Config Save
+  // Unified Config Save API (covers general, logs, customization, tickets, xp)
+  app.post('/api/config/:section', isAuthenticated, async (req, res) => {
+    try {
+      const { section } = req.params;
+      const body = req.body;
+
+      if (section === 'general' || section === 'customization') {
+        const allowed = [
+          'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
+          'embed_footer_text', 'embed_footer_icon_url', 'embed_color',
+          'log_channel_id', 'welcome_channel_id', 'leave_channel_id',
+          'voice_creator_channel_id', 'voice_creator_category_id',
+          'welcome_message_template', 'leave_message_template',
+          'member_counter_channel_id', 'member_counter_template'
+        ];
+        for (const field of allowed) {
+          if (body[field] !== undefined) {
+            await ConfigHelper.set(field, body[field]);
+          }
+        }
+        await updateBotStatus(client);
+
+        if (body.member_counter_channel_id !== undefined || body.member_counter_template !== undefined) {
+          const guild = client.guilds.cache.get(process.env.GUILD_ID);
+          if (guild) {
+            const memberCounterService = require('../services/memberCounterService');
+            await memberCounterService.updateMemberCounter(guild, { force: true });
+          }
+        }
+      } else if (section === 'logs') {
+        if (body.log_channel_id !== undefined) {
+          await ConfigHelper.set('log_channel_id', body.log_channel_id || null);
+        }
+        for (const item of LOG_CONFIG_KEYS) {
+          if (body[item.key] !== undefined) {
+            const isEnabled = body[item.key] === true || body[item.key] === 'true' || body[item.key] === 'on';
+            await ConfigHelper.set(item.key, isEnabled);
+          }
+        }
+      } else if (section === 'tickets') {
+        if (body.ticket_category_id !== undefined) {
+          await ConfigHelper.set('ticket_category_id', body.ticket_category_id || '');
+        }
+        if (body.ticket_staff_role_id !== undefined) {
+          await ConfigHelper.set('ticket_staff_role_id', body.ticket_staff_role_id || '');
+        }
+      } else if (section === 'xp') {
+        if (body.xp_enabled !== undefined) {
+          await ConfigHelper.set('xp_enabled', body.xp_enabled === true || body.xp_enabled === 'true');
+        }
+        if (body.xp_min_gain !== undefined) {
+          await ConfigHelper.set('xp_min_gain', parseInt(body.xp_min_gain || 15));
+        }
+        if (body.xp_max_gain !== undefined) {
+          await ConfigHelper.set('xp_max_gain', parseInt(body.xp_max_gain || 25));
+        }
+        if (body.xp_cooldown_seconds !== undefined) {
+          await ConfigHelper.set('xp_cooldown_seconds', parseInt(body.xp_cooldown_seconds || 60));
+        }
+        if (body.xp_announcement_channel_id !== undefined) {
+          await ConfigHelper.set('xp_announcement_channel_id', body.xp_announcement_channel_id || '');
+        }
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('[API Config Save] Error:', err);
+      res.status(500).json({ error: 'Erreur lors de la sauvegarde de la configuration' });
+    }
+  });
+
+  // Legacy General Config Save
   app.post('/dashboard/general', isAuthenticated, async (req, res) => {
     const fields = [
       'bot_status_type', 'bot_status_text',
@@ -503,10 +693,8 @@ function startWebServer(client, rawPort) {
       }
     }
 
-    // Instantly update Bot Status presence
     await updateBotStatus(client);
 
-    // Instantly update Member Counter channel if modified
     if (req.body.member_counter_channel_id !== undefined || req.body.member_counter_template !== undefined) {
       const guild = client.guilds.cache.get(process.env.GUILD_ID);
       if (guild) {
@@ -518,62 +706,67 @@ function startWebServer(client, rawPort) {
     res.status(200).send();
   });
 
-  // Logs Config Save
+  // Legacy Logs Config Save
   app.post('/dashboard/logs', isAuthenticated, async (req, res) => {
-    // 1. Update log channel
     if (req.body.log_channel_id !== undefined) {
       await ConfigHelper.set('log_channel_id', req.body.log_channel_id || null);
     }
-
-    // 2. Update each log event toggle
     for (const item of LOG_CONFIG_KEYS) {
       const isEnabled = req.body[item.key] === 'true' || req.body[item.key] === 'on' || req.body[item.key] === true;
       await ConfigHelper.set(item.key, isEnabled);
     }
-
     res.status(200).send();
   });
 
-  // Customization Config Save (Status, Presences, Embed Footer & Color)
+  // Legacy Customization Config Save
   app.post('/dashboard/customization', isAuthenticated, async (req, res) => {
     const fields = [
       'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
       'embed_footer_text', 'embed_footer_icon_url', 'embed_color'
     ];
-
     for (const field of fields) {
       if (req.body[field] !== undefined) {
         await ConfigHelper.set(field, req.body[field]);
       }
     }
-
-    // Instantly update Bot Status presence
     await updateBotStatus(client);
-
     res.status(200).send();
   });
 
+  // Helper to send JSON or HTML table depending on request
+  function sendTableOrJson(req, res, template, data) {
+    if (req.accepts('json') || req.path.startsWith('/api')) {
+      return res.json(data);
+    }
+    return res.render(template, data);
+  }
+
   // 2. Auto-Role Routes
-  app.post('/dashboard/autorole', isAuthenticated, async (req, res) => {
+  async function handleAutoRoleAdd(req, res) {
     const roleId = req.body.roleId;
     if (roleId) {
       await AutoRole.findOrCreate({ where: { roleId } });
     }
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const autoRoles = await fetchAutoRoles(guild);
-    res.render('partials/autoroles_table.html', { autoRoles });
-  });
+    return sendTableOrJson(req, res, 'partials/autoroles_table.html', { autoRoles });
+  }
 
-  app.delete('/dashboard/autorole/:roleId', isAuthenticated, async (req, res) => {
+  async function handleAutoRoleDelete(req, res) {
     const roleId = req.params.roleId;
     await AutoRole.destroy({ where: { roleId } });
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const autoRoles = await fetchAutoRoles(guild);
-    res.render('partials/autoroles_table.html', { autoRoles });
-  });
+    return sendTableOrJson(req, res, 'partials/autoroles_table.html', { autoRoles });
+  }
+
+  app.post('/api/autorole', isAuthenticated, handleAutoRoleAdd);
+  app.post('/dashboard/autorole', isAuthenticated, handleAutoRoleAdd);
+  app.delete('/api/autorole/:roleId', isAuthenticated, handleAutoRoleDelete);
+  app.delete('/dashboard/autorole/:roleId', isAuthenticated, handleAutoRoleDelete);
 
   // 3. Warn Actions (Thresholds)
-  app.post('/dashboard/warnaction', isAuthenticated, async (req, res) => {
+  async function handleWarnActionAdd(req, res) {
     const { warnsCount, action, duration } = req.body;
     if (warnsCount && action) {
       await WarnAction.upsert({
@@ -583,17 +776,22 @@ function startWebServer(client, rawPort) {
       });
     }
     const warnActions = await fetchWarnActions();
-    res.render('partials/warnactions_table.html', { warnActions });
-  });
+    return sendTableOrJson(req, res, 'partials/warnactions_table.html', { warnActions });
+  }
 
-  app.delete('/dashboard/warnaction/:count', isAuthenticated, async (req, res) => {
+  async function handleWarnActionDelete(req, res) {
     const count = req.params.count;
     await WarnAction.destroy({ where: { warnsCount: count } });
     const warnActions = await fetchWarnActions();
-    res.render('partials/warnactions_table.html', { warnActions });
-  });
+    return sendTableOrJson(req, res, 'partials/warnactions_table.html', { warnActions });
+  }
 
-  // 4. Tickets Category Config
+  app.post('/api/warnaction', isAuthenticated, handleWarnActionAdd);
+  app.post('/dashboard/warnaction', isAuthenticated, handleWarnActionAdd);
+  app.delete('/api/warnaction/:count', isAuthenticated, handleWarnActionDelete);
+  app.delete('/dashboard/warnaction/:count', isAuthenticated, handleWarnActionDelete);
+
+  // 4. Tickets Category Config & Deploy
   app.post('/dashboard/tickets', isAuthenticated, async (req, res) => {
     const { ticket_category_id, ticket_staff_role_id } = req.body;
     await ConfigHelper.set('ticket_category_id', ticket_category_id || '');
@@ -601,7 +799,7 @@ function startWebServer(client, rawPort) {
     res.status(200).send();
   });
 
-  app.post('/dashboard/tickets/deploy', isAuthenticated, async (req, res) => {
+  async function handleTicketDeploy(req, res) {
     try {
       const channelId = req.body.channel_id;
       if (!channelId) return res.status(400).send('Salon requis');
@@ -635,51 +833,60 @@ function startWebServer(client, rawPort) {
       });
 
       console.log(`[Dashboard] Message d'ouverture de ticket déployé dans #${channel.name} (${channel.id})`);
+      if (req.accepts('json') || req.path.startsWith('/api')) {
+        return res.json({ success: true });
+      }
       res.status(200).send();
     } catch (error) {
       console.error('[Dashboard Tickets Deploy] Erreur :', error);
       res.status(500).send('Erreur lors de l\'envoi du message');
     }
-  });
+  }
+
+  app.post('/api/tickets/deploy', isAuthenticated, handleTicketDeploy);
+  app.post('/dashboard/tickets/deploy', isAuthenticated, handleTicketDeploy);
 
   // 5. XP General Config
   app.post('/dashboard/xp', isAuthenticated, async (req, res) => {
     const { xp_enabled, xp_min_gain, xp_max_gain, xp_cooldown_seconds, xp_announcement_channel_id } = req.body;
-    
     await ConfigHelper.set('xp_enabled', xp_enabled === 'true');
     await ConfigHelper.set('xp_min_gain', parseInt(xp_min_gain || 15));
     await ConfigHelper.set('xp_max_gain', parseInt(xp_max_gain || 25));
     await ConfigHelper.set('xp_cooldown_seconds', parseInt(xp_cooldown_seconds || 60));
     await ConfigHelper.set('xp_announcement_channel_id', xp_announcement_channel_id || '');
-    
     res.status(200).send();
   });
 
   // 6. Role Rewards Config
-  app.post('/dashboard/rolereward', isAuthenticated, async (req, res) => {
+  async function handleRoleRewardAdd(req, res) {
     const { level, roleId, replacePreviousRole } = req.body;
     if (level && roleId) {
       await RoleReward.upsert({
         level: parseInt(level),
         roleId,
-        replacePreviousRole: replacePreviousRole === 'true'
+        replacePreviousRole: replacePreviousRole === true || replacePreviousRole === 'true'
       });
     }
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const roleRewards = await fetchRoleRewards(guild);
-    res.render('partials/rolerewards_table.html', { roleRewards });
-  });
+    return sendTableOrJson(req, res, 'partials/rolerewards_table.html', { roleRewards });
+  }
 
-  app.delete('/dashboard/rolereward/:level', isAuthenticated, async (req, res) => {
+  async function handleRoleRewardDelete(req, res) {
     const level = req.params.level;
     await RoleReward.destroy({ where: { level } });
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const roleRewards = await fetchRoleRewards(guild);
-    res.render('partials/rolerewards_table.html', { roleRewards });
-  });
+    return sendTableOrJson(req, res, 'partials/rolerewards_table.html', { roleRewards });
+  }
+
+  app.post('/api/rolereward', isAuthenticated, handleRoleRewardAdd);
+  app.post('/dashboard/rolereward', isAuthenticated, handleRoleRewardAdd);
+  app.delete('/api/rolereward/:level', isAuthenticated, handleRoleRewardDelete);
+  app.delete('/dashboard/rolereward/:level', isAuthenticated, handleRoleRewardDelete);
 
   // 7. Automod Rules Config
-  app.post('/dashboard/automod', isAuthenticated, async (req, res) => {
+  async function handleAutomodAdd(req, res) {
     const { 
       channelId, ruleType, 
       spam_max, spam_interval, 
@@ -689,14 +896,13 @@ function startWebServer(client, rawPort) {
       scope, monitoredTypes, customReason 
     } = req.body;
     
-    // Parse multi-actions from checkbox inputs
     let actionsArray = [];
     if (Array.isArray(req.body.actions)) {
       actionsArray = req.body.actions;
     } else if (req.body.actions) {
       actionsArray = [req.body.actions];
     } else {
-      actionsArray = ['delete']; // Default fallback if nothing selected
+      actionsArray = ['delete'];
     }
     const actionsJson = JSON.stringify(actionsArray);
 
@@ -712,9 +918,9 @@ function startWebServer(client, rawPort) {
         intervalSeconds: parseInt(duplicate_interval || 15)
       });
     } else if (ruleType === 'words_blacklist' || ruleType === 'words_whitelist') {
-      const words = words_list 
-        ? words_list.split(',').map(w => w.trim()).filter(w => w.length > 0) 
-        : [];
+      const words = Array.isArray(words_list)
+        ? words_list
+        : (words_list ? words_list.split(',').map(w => w.trim()).filter(w => w.length > 0) : []);
       parameters = JSON.stringify(words);
     } else if (ruleType === 'min_length') {
       parameters = JSON.stringify({ minLength: parseInt(min_length || 0) });
@@ -736,19 +942,24 @@ function startWebServer(client, rawPort) {
 
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const automodRules = await fetchAutomodRules(guild);
-    res.render('partials/automod_table.html', { automodRules });
-  });
+    return sendTableOrJson(req, res, 'partials/automod_table.html', { automodRules });
+  }
 
-  app.delete('/dashboard/automod/:id', isAuthenticated, async (req, res) => {
+  async function handleAutomodDelete(req, res) {
     const id = req.params.id;
     await AutomodRule.destroy({ where: { id } });
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const automodRules = await fetchAutomodRules(guild);
-    res.render('partials/automod_table.html', { automodRules });
-  });
+    return sendTableOrJson(req, res, 'partials/automod_table.html', { automodRules });
+  }
+
+  app.post('/api/automod', isAuthenticated, handleAutomodAdd);
+  app.post('/dashboard/automod', isAuthenticated, handleAutomodAdd);
+  app.delete('/api/automod/:id', isAuthenticated, handleAutomodDelete);
+  app.delete('/dashboard/automod/:id', isAuthenticated, handleAutomodDelete);
 
   // 8. XP Multipliers Routes
-  app.post('/dashboard/xpmultiplier', isAuthenticated, async (req, res) => {
+  async function handleXpMultiplierAdd(req, res) {
     const { channelId, multiplier } = req.body;
     if (channelId && multiplier) {
       await XPMultiplier.upsert({
@@ -758,26 +969,51 @@ function startWebServer(client, rawPort) {
     }
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const xpMultipliers = await fetchXpMultipliers(guild);
-    res.render('partials/xpmultipliers_table.html', { xpMultipliers });
-  });
+    return sendTableOrJson(req, res, 'partials/xpmultipliers_table.html', { xpMultipliers });
+  }
 
-  app.delete('/dashboard/xpmultiplier/:channelId', isAuthenticated, async (req, res) => {
+  async function handleXpMultiplierDelete(req, res) {
     const channelId = req.params.channelId;
     await XPMultiplier.destroy({ where: { channelId } });
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const xpMultipliers = await fetchXpMultipliers(guild);
-    res.render('partials/xpmultipliers_table.html', { xpMultipliers });
-  });
+    return sendTableOrJson(req, res, 'partials/xpmultipliers_table.html', { xpMultipliers });
+  }
 
-  // Root redirect
-  app.get('/', (req, res) => {
-    res.redirect('/dashboard');
+  app.post('/api/xpmultiplier', isAuthenticated, handleXpMultiplierAdd);
+  app.post('/dashboard/xpmultiplier', isAuthenticated, handleXpMultiplierAdd);
+  app.delete('/api/xpmultiplier/:channelId', isAuthenticated, handleXpMultiplierDelete);
+  app.delete('/dashboard/xpmultiplier/:channelId', isAuthenticated, handleXpMultiplierDelete);
+
+  // SPA & Legacy Fallback Routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'Endpoint introuvable' });
+    }
+    if (req.path.includes('.')) {
+      return next();
+    }
+
+    const distIndexPath = path.join(__dirname, 'dist', 'index.html');
+    if (fs.existsSync(distIndexPath)) {
+      return res.sendFile(distIndexPath);
+    }
+
+    if (req.path === '/login') {
+      if (req.session && req.session.authenticated) return res.redirect('/dashboard');
+      return res.render('login.html', { error: null, _csrf: res.locals._csrf || '' });
+    }
+
+    return res.redirect('/dashboard');
   });
 
   // CSRF and Security Error Handler
   app.use((err, req, res, next) => {
     if (err && (err.code === 'EBADCSRFTOKEN' || (err.message && err.message.toLowerCase().includes('csrf')))) {
       console.warn(`[Security] Requête CSRF bloquée depuis l'IP ${req.ip} sur ${req.originalUrl}`);
+      if (req.accepts('json') || req.path.startsWith('/api')) {
+        return res.status(403).json({ error: 'Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.' });
+      }
       if (req.headers['hx-request']) {
         return res.status(403).send('<div style="color:#e74c3c;padding:1rem;background:#1a1115;border-radius:6px;font-weight:600;">⚠️ Session expirée ou jeton CSRF invalide. Veuillez rafraîchir la page.</div>');
       }

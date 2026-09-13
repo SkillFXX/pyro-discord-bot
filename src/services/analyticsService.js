@@ -461,7 +461,7 @@ const analyticsService = {
           userId: uid,
           username: snap.username || uid,
           displayName: snap.displayName || snap.username || uid,
-          avatarUrl: snap.avatarUrl || '/public/logo.png',
+          avatarUrl: snap.avatarUrl || '/icon.svg',
           roles: rolesArray,
         };
       }
@@ -469,7 +469,7 @@ const analyticsService = {
         userId: uid,
         username: `Utilisateur (${uid.slice(0, 6)}...)`,
         displayName: `Utilisateur (${uid.slice(0, 6)}...)`,
-        avatarUrl: '/public/logo.png',
+        avatarUrl: '/icon.svg',
         roles: [],
       };
     };
