@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { ConfigHelper } = require('../../database');
 const embeds = require('../utils/embeds');
 const { logModerationAction } = require('../utils/moderationHelper');
@@ -52,7 +52,7 @@ module.exports = {
       if (!isTicket) {
         return interaction.reply({
           embeds: [embeds.error('Cette commande doit être exécutée à l\'intérieur d\'un salon de ticket.')],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -136,7 +136,7 @@ module.exports = {
 
     // Subcommand: Open
     else if (subcommand === 'open') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const guild = interaction.guild;
       const subject = interaction.options.getString('sujet') || 'Ouverture manuelle par la modération';

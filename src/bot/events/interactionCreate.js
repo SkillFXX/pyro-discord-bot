@@ -1,3 +1,4 @@
+const { MessageFlags } = require('discord.js');
 const { showTicketModal, handleTicketModalSubmit, closeTicket, reopenTicket, deleteTicket } = require('../utils/ticketHelper');
 const embeds = require('../utils/embeds');
 
@@ -20,9 +21,9 @@ module.exports = {
         );
 
         if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ embeds: [errEmbed], ephemeral: true }).catch(() => {});
+          await interaction.followUp({ embeds: [errEmbed], flags: MessageFlags.Ephemeral }).catch(() => {});
         } else {
-          await interaction.reply({ embeds: [errEmbed], ephemeral: true }).catch(() => {});
+          await interaction.reply({ embeds: [errEmbed], flags: MessageFlags.Ephemeral }).catch(() => {});
         }
       }
       return;

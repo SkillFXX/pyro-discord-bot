@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { ConfigHelper } = require('../../database');
 const embeds = require('./embeds');
 const { logModerationAction } = require('./moderationHelper');
@@ -30,7 +30,7 @@ async function showTicketModal(interaction) {
  * Handles the ticket creation modal submission.
  */
 async function handleTicketModalSubmit(interaction, client) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const guild = interaction.guild;
   const user = interaction.user;
@@ -194,7 +194,7 @@ async function closeTicket(interaction, client) {
   if (!authorId) {
     return interaction.reply({
       embeds: [embeds.error('Impossible d\'identifier l\'auteur du ticket dans la description du salon.')],
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -210,7 +210,7 @@ async function closeTicket(interaction, client) {
   if (!isAuthor && !isStaffOrAdmin) {
     return interaction.reply({
       embeds: [embeds.error('Seul l\'auteur du ticket ou un membre du staff est autorisé à fermer ce ticket.')],
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -288,7 +288,7 @@ async function reopenTicket(interaction, client) {
   if (!authorId) {
     return interaction.reply({
       embeds: [embeds.error('Impossible d\'identifier l\'auteur du ticket.')],
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -302,7 +302,7 @@ async function reopenTicket(interaction, client) {
   if (!isStaffOrAdmin) {
     return interaction.reply({
       embeds: [embeds.error('Seul un membre du staff ou un administrateur peut réouvrir ce ticket.')],
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -379,7 +379,7 @@ async function deleteTicket(interaction, client) {
   if (!isStaffOrAdmin) {
     return interaction.reply({
       embeds: [embeds.error('Seul un membre du staff ou un administrateur est autorisé à supprimer ce ticket.')],
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 

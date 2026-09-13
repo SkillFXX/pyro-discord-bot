@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Warn, Sanction } = require('../../database');
 const embeds = require('../utils/embeds');
 
@@ -14,7 +14,7 @@ module.exports = {
 
   async execute(interaction, client) {
     const target = interaction.options.getUser('membre');
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       // Fetch Warns and Sanctions

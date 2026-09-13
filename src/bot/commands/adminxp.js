@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
 const { calculateLevelFromXP } = require('../utils/xpHelper');
@@ -45,11 +45,11 @@ module.exports = {
     if (target.bot) {
       return interaction.reply({
         embeds: [embeds.error('Les bots ne peuvent pas posséder d\'XP.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       // Find or create record

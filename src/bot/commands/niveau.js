@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
 const { getXPNeededForLevel, makeProgressBar } = require('../utils/xpHelper');
@@ -18,7 +18,7 @@ module.exports = {
     if (target.bot) {
       return interaction.reply({
         embeds: [embeds.error('Les bots n\'ont pas de système d\'XP.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 

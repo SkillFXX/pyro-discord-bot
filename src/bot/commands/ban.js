@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Sanction } = require('../../database');
 const embeds = require('../utils/embeds');
 const { sendDM, logModerationAction } = require('../utils/moderationHelper');
@@ -28,26 +28,26 @@ module.exports = {
       if (member.user.bot) {
         return interaction.reply({
           embeds: [embeds.error('Vous ne pouvez pas bannir un bot.')],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (member.roles.highest.position >= interaction.member.roles.highest.position && interaction.user.id !== interaction.guild.ownerId) {
         return interaction.reply({
           embeds: [embeds.error('Vous ne pouvez pas bannir un membre avec un rôle supérieur ou égal au vôtre.')],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (!member.bannable) {
         return interaction.reply({
           embeds: [embeds.error('Le bot ne possède pas les permissions nécessaires pour bannir ce membre.')],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       let dmSent = false;

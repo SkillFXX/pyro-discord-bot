@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Sanction } = require('../../database');
 const embeds = require('../utils/embeds');
 const { sendDM, logModerationAction } = require('../utils/moderationHelper');
@@ -61,14 +61,14 @@ module.exports = {
     if (!member) {
       return interaction.reply({
         embeds: [embeds.error('Ce membre est introuvable sur le serveur.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     if (member.user.bot) {
       return interaction.reply({
         embeds: [embeds.error('Vous ne pouvez pas exclure un bot.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -77,7 +77,7 @@ module.exports = {
     if (!durationMs || durationMs < 10000) {
       return interaction.reply({
         embeds: [embeds.error('Format de durée invalide ou inférieur à 10 secondes. Utilisez par exemple : `30m`, `2h`, `1j` (ou `1d`), `1w` (ou `1sem`). Unités : s, m, h, j/d, w/sem.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -86,7 +86,7 @@ module.exports = {
     if (durationMs > MAX_TIMEOUT_MS) {
       return interaction.reply({
         embeds: [embeds.error('La durée d\'exclusion maximale autorisée par l\'API Discord est de **28 jours** (soit 4 semaines maximum / `28d` ou `4w`).')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -94,18 +94,18 @@ module.exports = {
     if (member.roles.highest.position >= interaction.member.roles.highest.position && interaction.user.id !== interaction.guild.ownerId) {
       return interaction.reply({
         embeds: [embeds.error('Vous ne pouvez pas exclure un membre avec un rôle supérieur ou égal au vôtre.')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     if (!member.moderatable) {
       return interaction.reply({
         embeds: [embeds.error('Le bot ne possède pas les permissions nécessaires pour exclure ce membre (permissions insuffisantes ou rôle du membre supérieur).')],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       // Apply timeout

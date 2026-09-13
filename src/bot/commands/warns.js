@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Warn } = require('../../database');
 const embeds = require('../utils/embeds');
 const { logModerationAction } = require('../utils/moderationHelper');
@@ -38,7 +38,7 @@ module.exports = {
 
   async execute(interaction, client) {
     const subcommand = interaction.options.getSubcommand();
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     // 1. Subcommand List
     if (subcommand === 'list') {
