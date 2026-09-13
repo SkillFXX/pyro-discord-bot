@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import Chart from 'chart.js/auto';
   import {
-    BarChart2,
+    ChartNoAxesColumn,
     Calendar,
     Hash,
     Shield,
@@ -291,7 +291,7 @@
 <div class="tab-content-wrapper">
   <div class="page-title-row">
     <div>
-      <h2><BarChart2 size={24} class="title-icon" /> Analytics & Statistiques Avancées</h2>
+      <h2><ChartNoAxesColumn size={24} class="title-icon" /> Analytics & Statistiques Avancées</h2>
       <p class="section-desc">
         Suivi en temps réel des messages, salons vocaux, membres actifs, trafic forum et tendances du serveur.
       </p>

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, BarChart2 } from '@lucide/svelte';
+  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn } from '@lucide/svelte';
 
   export let currentTab = 'general';
   let activeSection = '';
@@ -79,7 +79,7 @@
     {
       id: 'analytics',
       label: 'Analytics',
-      icon: BarChart2,
+      icon: ChartNoAxesColumn,
       sections: [
         { id: 'analytics-filters', label: 'Période & Filtres' },
         { id: 'analytics-kpis', label: 'Métriques Clés (KPI)' },
