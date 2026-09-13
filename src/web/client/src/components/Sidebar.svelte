@@ -61,7 +61,9 @@
       icon: Ticket,
       sections: [
         { id: 'tickets-config', label: 'Configuration Salons' },
-        { id: 'tickets-deploy', label: "Panneau d'Ouverture" },
+        { id: 'tickets-panel', label: "Panneau d'Ouverture" },
+        { id: 'tickets-embed', label: 'Embed du Ticket' },
+        { id: 'tickets-deploy', label: 'Déploiement' },
       ],
     },
     {

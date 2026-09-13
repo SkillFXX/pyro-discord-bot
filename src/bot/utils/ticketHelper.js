@@ -107,12 +107,30 @@ async function handleTicketModalSubmit(interaction, client) {
     });
 
     // Send control panel in the ticket channel
-    const controlEmbed = embeds.custom(
-      `🎫 Ticket - ${user.username}`,
+    const embedTitleTemplate = (await ConfigHelper.get('ticket_embed_title')) || '🎫 Ticket - {username}';
+    const embedMessageTemplate = (await ConfigHelper.get('ticket_embed_message')) || 
       `Bienvenue dans votre ticket.\n\n` +
-      `**Sujet :** ${subject}\n\n` +
+      `**Sujet :** {subject}\n\n` +
       `Un membre du staff va s'occuper de vous. En attendant, veuillez détailler votre demande.\n` +
-      `Vous pouvez utiliser les boutons ci-dessous pour gérer ce ticket.`,
+      `Vous pouvez utiliser les boutons ci-dessous pour gérer ce ticket.`;
+
+    const formattedTitle = embedTitleTemplate
+      .replace(/{user}/g, user.username)
+      .replace(/{username}/g, user.username)
+      .replace(/{server}/g, guild.name)
+      .replace(/{subject}/g, subject)
+      .replace(/{authorId}/g, user.id);
+
+    const formattedMessage = embedMessageTemplate
+      .replace(/{user}/g, `${user}`)
+      .replace(/{username}/g, user.username)
+      .replace(/{server}/g, guild.name)
+      .replace(/{subject}/g, subject)
+      .replace(/{authorId}/g, user.id);
+
+    const controlEmbed = embeds.custom(
+      formattedTitle,
+      formattedMessage,
       embeds.COLORS.PRIMARY,
       null,
       null,

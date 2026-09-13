@@ -208,11 +208,32 @@ module.exports = {
           permissionOverwrites,
         });
 
+        const embedTitleTemplate = (await ConfigHelper.get('ticket_embed_title')) || '🎫 Ticket - {username}';
+        const customEmbedMessage = await ConfigHelper.get('ticket_embed_message');
+        const defaultStaffMessage = `Ce ticket a été ouvert par le modérateur **{moderator}** pour {user}.\n\n` +
+          `**Sujet :** {subject}\n\n` +
+          `Vous pouvez utiliser les boutons ci-dessous pour gérer ce ticket.`;
+        const embedMessageTemplate = customEmbedMessage || defaultStaffMessage;
+
+        const formattedTitle = embedTitleTemplate
+          .replace(/{user}/g, target.username)
+          .replace(/{username}/g, target.username)
+          .replace(/{server}/g, guild.name)
+          .replace(/{subject}/g, subject)
+          .replace(/{authorId}/g, target.id)
+          .replace(/{moderator}/g, interaction.user.username);
+
+        const formattedMessage = embedMessageTemplate
+          .replace(/{user}/g, `${target}`)
+          .replace(/{username}/g, target.username)
+          .replace(/{server}/g, guild.name)
+          .replace(/{subject}/g, subject)
+          .replace(/{authorId}/g, target.id)
+          .replace(/{moderator}/g, interaction.user.username);
+
         const controlEmbed = embeds.custom(
-          `🎫 Ticket - ${target.username}`,
-          `Ce ticket a été ouvert par le modérateur **${interaction.user.username}** pour ${target}.\n\n` +
-          `**Sujet :** ${subject}\n\n` +
-          `Vous pouvez utiliser les boutons ci-dessous pour gérer ce ticket.`,
+          formattedTitle,
+          formattedMessage,
           embeds.COLORS.PRIMARY,
           null,
           null,

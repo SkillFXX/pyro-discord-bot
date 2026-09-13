@@ -465,6 +465,8 @@ function startWebServer(client, rawPort) {
         'welcome_message_template', 'leave_message_template',
         'member_counter_channel_id', 'member_counter_template',
         'ticket_category_id', 'ticket_staff_role_id',
+        'ticket_panel_title', 'ticket_panel_message',
+        'ticket_embed_title', 'ticket_embed_message',
         'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
         ...logKeys
       ];
@@ -602,6 +604,18 @@ function startWebServer(client, rawPort) {
         }
         if (body.ticket_staff_role_id !== undefined) {
           await ConfigHelper.set('ticket_staff_role_id', body.ticket_staff_role_id || '');
+        }
+        if (body.ticket_panel_title !== undefined) {
+          await ConfigHelper.set('ticket_panel_title', body.ticket_panel_title || '');
+        }
+        if (body.ticket_panel_message !== undefined) {
+          await ConfigHelper.set('ticket_panel_message', body.ticket_panel_message || '');
+        }
+        if (body.ticket_embed_title !== undefined) {
+          await ConfigHelper.set('ticket_embed_title', body.ticket_embed_title || '');
+        }
+        if (body.ticket_embed_message !== undefined) {
+          await ConfigHelper.set('ticket_embed_message', body.ticket_embed_message || '');
         }
       } else if (section === 'xp') {
         if (body.xp_enabled !== undefined) {
@@ -766,9 +780,20 @@ function startWebServer(client, rawPort) {
 
   // 4. Tickets Category Config & Deploy
   app.post('/dashboard/tickets', isAuthenticated, async (req, res) => {
-    const { ticket_category_id, ticket_staff_role_id } = req.body;
+    const { 
+      ticket_category_id, 
+      ticket_staff_role_id,
+      ticket_panel_title,
+      ticket_panel_message,
+      ticket_embed_title,
+      ticket_embed_message 
+    } = req.body;
     await ConfigHelper.set('ticket_category_id', ticket_category_id || '');
     await ConfigHelper.set('ticket_staff_role_id', ticket_staff_role_id || '');
+    if (ticket_panel_title !== undefined) await ConfigHelper.set('ticket_panel_title', ticket_panel_title || '');
+    if (ticket_panel_message !== undefined) await ConfigHelper.set('ticket_panel_message', ticket_panel_message || '');
+    if (ticket_embed_title !== undefined) await ConfigHelper.set('ticket_embed_title', ticket_embed_title || '');
+    if (ticket_embed_message !== undefined) await ConfigHelper.set('ticket_embed_message', ticket_embed_message || '');
     res.status(200).send();
   });
 
@@ -786,10 +811,14 @@ function startWebServer(client, rawPort) {
       const embeds = require('../bot/utils/embeds');
       const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-      const ticketEmbed = embeds.custom(
-        '🎫 Support - Ouvrir un Ticket',
+      const panelTitle = (await ConfigHelper.get('ticket_panel_title')) || '🎫 Support - Ouvrir un Ticket';
+      const panelMessage = (await ConfigHelper.get('ticket_panel_message')) || 
         `Besoin d'aide ? Vous rencontrez un problème ?\n` +
-        `Cliquez sur le bouton ci-dessous pour ouvrir un ticket et entrer en contact avec notre équipe.`,
+        `Cliquez sur le bouton ci-dessous pour ouvrir un ticket et entrer en contact avec notre équipe.`;
+
+      const ticketEmbed = embeds.custom(
+        panelTitle,
+        panelMessage,
         embeds.COLORS.PRIMARY
       );
 
