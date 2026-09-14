@@ -1,12 +1,14 @@
 <div align="center">
-  <img src="src/web/client/public/icon.svg" alt="Pyro Bot Logo" width="100" />
+  <img src="docs/assets/logo.svg" alt="Pyro Bot Logo" width="60" />
   <h1>Pyro Discord Bot</h1>
-  <p><strong>Bot Discord polyvalent tout-en-un avec Dashboard Web & Analytics en temps réel</strong></p>
+  <p><strong>Bot Discord polyvalent tout-en-un avec Dashboard Web moderne en Svelte 5 & Analytics</strong></p>
 
   <p>
-    <a href="https://skillfxx.github.io/pyro-discord-bot/"><img src="https://img.shields.io/badge/Documentation-GitHub%20Pages-FF6B35?style=for-the-badge&logo=github" alt="Documentation" /></a>
-    <img src="https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js" alt="Node.js" />
+    <a href="https://skillfxx.github.io/pyro-discord-bot/"><img src="https://img.shields.io/badge/Documentation-GitHub%20Pages-EF490B?style=for-the-badge&logo=github" alt="Documentation" /></a>
+    <img src="https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js" alt="Node.js" />
     <img src="https://img.shields.io/badge/Discord.js-v14-5865F2?style=for-the-badge&logo=discord" alt="Discord.js" />
+    <img src="https://img.shields.io/badge/Dashboard-Svelte%205-FF3E00?style=for-the-badge&logo=svelte" alt="Svelte 5" />
+    <img src="https://img.shields.io/badge/Database-SQLite%20WAL-003B57?style=for-the-badge&logo=sqlite" alt="SQLite" />
   </p>
 </div>
 
@@ -14,75 +16,77 @@
 
 ## 🌟 Présentation
 
-**Pyro** est un bot Discord complet et moderne développé en **Node.js** et **Discord.js v14**, couplé à une base de données **SQLite** ultra-performante (mode WAL) et un **dashboard web interactif** (Express, HTMX, Chart.js).
+**Pyro** est un bot Discord complet et moderne développé en **Node.js** et **Discord.js v14**, associé à une base de données **SQLite** ultra-rapide (mode WAL) et à un **tableau de bord web réactif** conçu en **Svelte 5** et **Vite**.
 
-👉 **[Accéder au site de présentation complet (GitHub Pages)](https://skillfxx.github.io/pyro-discord-bot/)**
+Il centralise tous les besoins d'un serveur communautaire ou professionnel : modération assistée, automodération, système de niveaux (XP), gestion de tickets par boutons, salons vocaux temporaires automatiques et logs d'audit exhaustifs.
+
+👉 **[Consulter la documentation officielle en ligne](https://skillfxx.github.io/pyro-discord-bot/)**
 
 ---
 
 ## ✨ Fonctionnalités Principales
 
-- 🛡️ **Modération Complète & Sanctions Automatiques** : Avertissements (`/warn`), exclusions temporaires (`/mute`), expulsions (`/kick`), bannissements (`/ban`), escalade automatique configurable (ex: 3 warns = timeout, 5 = ban).
-- 🤖 **Automodération Modulaire** : Anti-spam fréquentiel, détection de doublons, blacklist/whitelist de mots, longueurs de messages, filtres Regex, compatible avec les forums.
-- 📋 **Système de Logs & Audit Sur-Mesure** : Salon de logs dédié avec sélection granulaire des événements à router via le dashboard :
-  - *Logs Pyro Bot* : Démarrage / Boot du bot (latence, stats système), Tickets (création/fermeture/membres), Sanctions & Warns, Vocaux temporaires Join-to-Create, Modération du Staff, XP & Level-up, Infractions Automod.
-  - *Logs Serveur Discord (Couverture Intégrale)* : Création/Suppression/Modification de Rôles et Salons, Création & Expiration de Liens d'Invitation, Paramètres du Serveur (nom, icône, bannière, AFK), Arrivées & Départs de membres, Ajout de Bots & Intégrations, Changements de pseudo, Modifications de rôles de membres, Kicks, Bans & Débans, Mutes (Timeouts), Activité vocale, Messages supprimés & édités, Threads & Posts Forum, Émojis & Autocollants, Événements Planifiés, Webhooks.
-- ⭐ **Système d'XP & Niveaux** : Gain d'XP paramétrable avec cooldown anti-spam, multiplicateurs par salon (ex: ×2 XP), attribution de rôles de récompenses avec cumul ou remplacement.
-- 🎫 **Support & Système de Tickets** : Panneaux interactifs avec boutons Discord (`/ticketsetup`), gestion des salons privés et permissions du rôle Staff (`/ticketmod`).
-- 🔊 **Salons Vocaux Temporaires (Join-to-Create)** : Création automatique de salon vocal lors de la connexion au canal créateur et suppression instantanée dès qu'il devient vide.
-- 📊 **Dashboard Web & Analytics en Direct** : Suivi des statistiques (messages, temps vocal, heures de pointe, flux de membres), export CSV, et réglage de la configuration à chaud sans redémarrage.
-- 🎨 **Personnalisation & Branding Complet** : Onglet dédié dans le Dashboard avec prévisualisation en direct : statut dynamique du bot (Joue à, Regarde, Écoute, Streame, Participe à), présence (En ligne, Inactif, DND), personnalisation intégrale des embeds (texte du footer, icône d'en-tête/pied de page, couleur d'accentuation principale).
-- 🔒 **Sécurité Renforcée (Conforme CodeQL)** : Protection anti-CSRF intégrale (`lusca`), limitation de débit anti-bruteforce (`express-rate-limit`), cookies de session durcis et support reverse proxy (`trust proxy`).
+- 🛡️ **Modération & Sanctions Automatiques** : Avertissements (`/warn`), mutes temporaires (`/mute`), expulsions (`/kick`), bannissements (`/ban`) et escalade automatique configurable (ex: 3 warns = timeout, 5 = ban).
+- 🤖 **Automodération Intelligente** : Détection anti-spam fréquentiel, doublons, blacklist/whitelist de mots et motifs Regex en temps réel sur les salons textuels et forums.
+- 📋 **Logs & Audit Granulaire** : Routeur de logs permettant d'activer/désactiver sélectivement le traçage des événements Discord (rôles, salons, invitations, départs/arrivées, vocaux, messages édités/supprimés) et des actions du bot (tickets, sanctions, vocaux, boot).
+- ⭐ **Système d'XP & Niveaux** : Gain d'XP paramétrable avec cooldown anti-spam, multiplicateurs par salon (ex: ×2 XP) et attribution de rôles récompenses (cumul ou remplacement).
+- 🎫 **Support & Système de Tickets** : Salons de support privés créés via boutons interactifs avec gestion et modération pour l'équipe staff (`/ticketmod`).
+- 🔊 **Vocaux Temporaires (Join-to-Create)** : Création automatique d'un salon vocal privé à la connexion et suppression instantanée dès qu'il est libéré.
+- 🎨 **Dashboard Svelte & Personnalisation** : Interface web réactive en Svelte 5 (analytics Chart.js, prévisualisation en direct du statut du bot et branding des embeds Discord, persistance des sessions en SQLite).
+- 🔒 **Sécurité Renforcée (Conforme CodeQL)** : Protection anti-CSRF (`lusca`), rate-limiting anti-bruteforce (`express-rate-limit`), sessions SQLite durcies et compatibilité reverse proxy (`trust proxy`).
 
 ---
 
-## 🚀 Démarrage Rapide
+## 🚀 Guide de Démarrage
 
 ### 1. Prérequis
-- [Node.js](https://nodejs.org/) v18 ou version ultérieure
-- Une application configurée sur le [Discord Developer Portal](https://discord.com/developers/applications) avec les **Privileged Gateway Intents** activés :
+- [Node.js](https://nodejs.org/) v20 ou version ultérieure (Recommandé : LTS v20 / v22)
+- Une application sur le [Discord Developer Portal](https://discord.com/developers/applications) avec les **Privileged Gateway Intents** activés :
   - *Server Members Intent*
   - *Message Content Intent*
 
-### 2. Installation
+### 2. Installation & Compilation
 
 ```bash
-# Cloner le dépôt
+# 1. Cloner le dépôt
 git clone https://github.com/SkillFXX/pyro-discord-bot.git
 cd pyro-discord-bot
 
-# Installer les dépendances
+# 2. Installer les dépendances
 npm install
 
-# Compiler le tableau de bord web (Svelte / Vite)
+# 3. Compiler l'interface web (Svelte 5 / Vite)
 npm run build
 ```
 
 ### 3. Configuration (.env)
 
-Copiez le fichier `.env.example` et remplissez vos identifiants :
+Copiez le fichier d'exemple et renseignez vos informations :
 
 ```bash
 cp .env.example .env
 ```
 
 ```env
-DISCORD_TOKEN=votre_bot_token_ici
-CLIENT_ID=votre_bot_client_id_ici
-GUILD_ID=votre_serveur_guild_id_ici
+DISCORD_TOKEN=votre_token_bot_discord
+CLIENT_ID=votre_client_id_application
+GUILD_ID=votre_id_serveur_discord
 PORT=3000
-SESSION_SECRET=cle_secrete_aleatoire_pour_le_dashboard
+SESSION_SECRET=cle_secrete_aleatoire_dashboard
 COOKIE_SECURE=false
-NODE_ENV=development
+NODE_ENV=production
 ```
+
+> [!NOTE]
+> Sur un hébergement **Pelican / Pterodactyl**, la variable `SERVER_PORT` est automatiquement détectée et utilisée si `PORT` n'est pas spécifié.
 
 ### 4. Lancement
 
 ```bash
-# Mode production
+# Lancement standard (Production)
 npm start
 
-# Mode développement (avec rechargement automatique)
+# Mode développement avec rechargement à chaud
 npm run dev
 ```
 
@@ -90,44 +94,41 @@ Accédez au tableau de bord web sur : `http://localhost:3000` *(connectez-vous a
 
 ---
 
-## 💻 Commandes Principales
+## 💻 Commandes Slash Principales
 
-| Commande | Description | Permission |
-| :--- | :--- | :--- |
-| `/niveau` | Affiche votre niveau et progression en XP | Tous |
-| `/topniveau` | Classement des membres les plus actifs | Tous |
-| `/adminxp` | Gérer manuellement l'XP d'un membre | Admin |
-| `/warn` | Avertit un membre avec un motif | Modérateur |
-| `/warns` | Liste ou réinitialise les avertissements d'un membre | Modérateur |
-| `/mute` | Exclusion temporaire (Timeout) d'un utilisateur | Modérateur |
-| `/kick` | Expulse un utilisateur du serveur | Modérateur |
-| `/ban` | Bannit un utilisateur du serveur | Modérateur |
-| `/sanctions` | Historique complet des sanctions d'un utilisateur | Modérateur |
-| `/ticketsetup`| Déploie le panneau interactif pour ouvrir des tickets | Admin |
-| `/ticketmod` | Gérer un ticket ouvert (fermer, ajouter un membre) | Staff |
-| `/analytics` | Résumé des statistiques du serveur dans Discord | Admin |
+| Commande | Catégorie | Description | Permission |
+| :--- | :--- | :--- | :--- |
+| `/niveau` | XP | Affiche votre niveau et progression en XP | Tous |
+| `/topniveau` | XP | Classement des membres les plus actifs | Tous |
+| `/adminxp` | XP | Gérer manuellement l'XP d'un membre | Administrateur |
+| `/warn` | Modération | Avertit un utilisateur avec un motif | Modérateur |
+| `/warns` | Modération | Historique des avertissements d'un membre | Modérateur |
+| `/mute` | Modération | Exclusion temporaire (Timeout) personnalisée | Modérateur |
+| `/kick` | Modération | Expulse un utilisateur du serveur | Modérateur |
+| `/ban` | Modération | Bannit un utilisateur du serveur | Modérateur |
+| `/sanctions` | Modération | Historique complet des sanctions d'un membre | Modérateur |
+| `/ticketmod` | Support | Gérer les tickets (ajouter/retirer un membre ou ouvrir un ticket) | Rôle Staff |
 
 ---
 
 ## ☁️ Hébergement Recommandé : FlowHost
 
-Pour maintenir Pyro en ligne 24h/24 sans interruption avec une faible latence, une haute disponibilité et des performances optimales, nous recommandons **FlowHost** :
+Pour maintenir votre bot Pyro en ligne 24h/24 sans interruption avec une excellente connectivité et des performances constantes, nous recommandons les offres cloud de **FlowHost** :
 
-👉 **[Héberger simplement sur FlowHost (flowhost.dev)](https://flowhost.dev)**
+👉 **[Découvrir FlowHost (flowhost.dev)](https://flowhost.dev)**
 
 ---
 
 ## 📬 Contact & Support
 
-Besoin d'aide, d'une assistance pour configurer Pyro ou d'un développement sur-mesure ?
+Pour toute question, assistance ou demande de développement sur-mesure :
 
 - ✉️ **Email** : [skillfx.dev@gmail.com](mailto:skillfx.dev@gmail.com)
 - 💬 **Discord** : `@flowskill`
-- 🌐 **Documentation en ligne** : [https://skillfxx.github.io/pyro-discord-bot/](https://skillfxx.github.io/pyro-discord-bot/)
+- 🌐 **Site & Documentation** : [https://skillfxx.github.io/pyro-discord-bot/](https://skillfxx.github.io/pyro-discord-bot/)
 
 ---
 
 <div align="center">
-  <sub>Développé avec ❤️ par <strong>SkillFX</strong>.</sub>
+  <sub>Développé avec passion par <strong>SkillFX</strong>.</sub>
 </div>
-

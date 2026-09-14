@@ -9,6 +9,9 @@
     "build": "vite build --config src/web/client/vite.config.js",
     "dev:web": "vite src/web/client --config src/web/client/vite.config.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "body-parser": "^1.20.6",
     "discord.js": "^14.15.3",
