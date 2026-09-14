@@ -48,9 +48,10 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 150, // 150 requests per minute
+  max: 300, // 300 requests per minute
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  message: 'Trop de requêtes depuis cette adresse IP. Veuillez patienter un instant.'
 });
 
 module.exports = {

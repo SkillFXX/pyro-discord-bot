@@ -2,6 +2,7 @@ const express = require('express');
 const { ConfigHelper, LOG_CONFIG_KEYS } = require('../../database');
 const { updateBotStatus } = require('../../bot/events/ready');
 const { isAuthenticated } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 async function handleConfigSave(section, body, client) {
   if (section === 'general' || section === 'customization') {
@@ -69,6 +70,9 @@ async function handleConfigSave(section, body, client) {
 
 function createConfigRouter(client) {
   const router = express.Router();
+
+  // Apply rate limiter to all configuration routes
+  router.use(apiLimiter);
 
   // Unified Config Save API
   router.post('/api/config/:section', isAuthenticated, async (req, res) => {

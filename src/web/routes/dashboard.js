@@ -2,14 +2,18 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { isAuthenticated } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 const { getGuildContext, getDashboardLists } = require('../services/guildService');
 const { ConfigHelper, LOG_CONFIG_KEYS } = require('../../database');
 
 function createDashboardRouter(client, distDir) {
   const router = express.Router();
 
+  // Apply rate limiter to all dashboard routes
+  router.use(apiLimiter);
+
   // SPA Dashboard Bootstrap JSON API
-  router.get('/api/dashboard/init', isAuthenticated, async (req, res) => {
+  router.get('/api/dashboard/init', apiLimiter, isAuthenticated, async (req, res) => {
     try {
       const guildContext = await getGuildContext(client);
       const lists = await getDashboardLists(client);
@@ -57,8 +61,8 @@ function createDashboardRouter(client, distDir) {
     }
   });
 
-  // Dashboard SPA Main route (serves the SPA; authentication state is handled by App.svelte & /api/dashboard/init)
-  router.get('/dashboard', (req, res) => {
+  // Dashboard SPA Main route (serves the SPA, rate limited)
+  router.get('/dashboard', apiLimiter, (req, res) => {
     const distIndexPath = path.join(distDir, 'index.html');
     if (fs.existsSync(distIndexPath)) {
       return res.sendFile(distIndexPath);

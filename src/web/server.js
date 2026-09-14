@@ -39,6 +39,9 @@ function startWebServer(client, rawPort) {
   // Trust first proxy for correct client IP detection behind reverse proxies (Nginx, Traefik, Cloudflare)
   app.set('trust proxy', 1);
 
+  // Global Rate Limiting across all incoming requests (DoS protection & CodeQL js/missing-rate-limiting)
+  app.use(apiLimiter);
+
   // Body Parsing Middleware
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
@@ -92,10 +95,6 @@ function startWebServer(client, rawPort) {
   // CSRF Protection
   app.use(lusca.csrf());
 
-  // Global Rate Limiting for sensitive routes
-  app.use('/dashboard', apiLimiter);
-  app.use('/api', apiLimiter);
-
   // Mount Modular Routes
   app.use(createAuthRouter(distDir));
   app.use(createDashboardRouter(client, distDir));
@@ -103,8 +102,8 @@ function startWebServer(client, rawPort) {
   app.use(createFeaturesRouter(client));
   app.use(createAnalyticsRouter(client));
 
-  // SPA Wildcard & Fallback Handler
-  app.get('*', (req, res, next) => {
+  // SPA Wildcard & Fallback Handler (rate limited)
+  app.get('*', apiLimiter, (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'Endpoint introuvable' });
     }

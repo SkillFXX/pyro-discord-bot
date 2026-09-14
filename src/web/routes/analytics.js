@@ -1,9 +1,13 @@
 const express = require('express');
 const { isAuthenticated } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 const analyticsService = require('../../services/analyticsService');
 
 function createAnalyticsRouter(client) {
   const router = express.Router();
+
+  // Apply rate limiter to all analytics routes
+  router.use(apiLimiter);
 
   router.get('/api/analytics', isAuthenticated, async (req, res) => {
     try {

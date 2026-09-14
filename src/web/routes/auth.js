@@ -6,11 +6,15 @@ const {
   checkLoginRateLimit, 
   recordFailedLogin, 
   clearLoginAttempts, 
-  loginLimiter 
+  loginLimiter,
+  apiLimiter 
 } = require('../middleware/rateLimiter');
 
 function createAuthRouter(distDir) {
   const router = express.Router();
+
+  // Apply rate limiter to all auth routes
+  router.use(apiLimiter);
 
   // SPA Auth Status API
   router.get('/api/auth/status', (req, res) => {
@@ -51,8 +55,8 @@ function createAuthRouter(distDir) {
     });
   });
 
-  // Login View (serves SPA)
-  router.get('/login', (req, res) => {
+  // Login View (serves SPA, rate limited)
+  router.get('/login', apiLimiter, (req, res) => {
     const distIndexPath = path.join(distDir, 'index.html');
     if (fs.existsSync(distIndexPath)) {
       return res.sendFile(distIndexPath);

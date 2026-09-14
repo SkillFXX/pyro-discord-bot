@@ -16,10 +16,14 @@ const {
   fetchXpMultipliers 
 } = require('../services/guildService');
 const { isAuthenticated } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 const embeds = require('../../bot/utils/embeds');
 
 function createFeaturesRouter(client) {
   const router = express.Router();
+
+  // Apply rate limiter to all feature routes
+  router.use(apiLimiter);
 
   // 1. Auto-Role Handlers
   async function handleAutoRoleAdd(req, res) {
