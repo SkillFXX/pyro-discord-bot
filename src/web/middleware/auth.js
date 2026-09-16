@@ -1,20 +1,8 @@
-const crypto = require('crypto');
-
-/**
- * Constant-time string comparison preventing timing attacks.
- */
-function safeCompareTokens(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const hashA = crypto.createHash('sha256').update(a).digest();
-  const hashB = crypto.createHash('sha256').update(b).digest();
-  return crypto.timingSafeEqual(hashA, hashB);
-}
-
 /**
  * Middleware ensuring the request is authenticated via session.
  */
 function isAuthenticated(req, res, next) {
-  if (req.session && req.session.authenticated) {
+  if (req.session && req.session.authenticated && req.session.permissions) {
     return next();
   }
   // Only return JSON error for API calls or explicit AJAX/JSON clients
@@ -22,6 +10,42 @@ function isAuthenticated(req, res, next) {
     return res.status(401).json({ error: 'Non authentifié' });
   }
   res.redirect('/login');
+}
+
+/**
+ * Middleware ensuring the authenticated user has ADMINISTRATOR permissions.
+ */
+function requireAdmin(req, res, next) {
+  if (!req.session || !req.session.authenticated) {
+    if (req.path.startsWith('/api') || (!req.accepts('html') && req.accepts('json'))) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+    return res.redirect('/login');
+  }
+
+  if (req.session.permissions && req.session.permissions.isAdmin) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Accès interdit : permission Administrateur requise.' });
+}
+
+/**
+ * Middleware ensuring the authenticated user has at least VIEW_AUDIT_LOG or ADMINISTRATOR permissions.
+ */
+function requireViewAuditLog(req, res, next) {
+  if (!req.session || !req.session.authenticated) {
+    if (req.path.startsWith('/api') || (!req.accepts('html') && req.accepts('json'))) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+    return res.redirect('/login');
+  }
+
+  if (req.session.permissions && (req.session.permissions.isAdmin || req.session.permissions.canViewAuditLog)) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Accès interdit : permission "Voir les logs du serveur" requise.' });
 }
 
 /**
@@ -36,8 +60,8 @@ function csrfErrorHandler(err, req, res, next) {
 }
 
 module.exports = {
-  safeCompareTokens,
   isAuthenticated,
+  requireAdmin,
+  requireViewAuditLog,
   csrfErrorHandler
 };
-

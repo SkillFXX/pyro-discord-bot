@@ -50,7 +50,7 @@ export async function loadDashboardData() {
         logConfigKeys: data.logConfigKeys || [],
       });
     } else if (res.status === 401) {
-      auth.set({ authenticated: false, loading: false, csrfToken: '' });
+      auth.set({ authenticated: false, loading: false, csrfToken: '', user: null, permissions: null, discordConfigured: false });
       dashboardData.update((d) => ({ ...d, loading: false }));
     } else {
       showToast('Erreur serveur lors de la synchronisation', 'error');

@@ -18,6 +18,8 @@ function createDashboardRouter(client, distDir) {
       const guildContext = await getGuildContext(client);
       const lists = await getDashboardLists(client);
 
+      const isAdmin = Boolean(req.session?.permissions?.isAdmin);
+
       const logKeys = LOG_CONFIG_KEYS.map(k => k.key);
       const configKeys = [
         'bot_status_type', 'bot_status_text', 'bot_status_state', 'bot_status_url',
@@ -34,8 +36,10 @@ function createDashboardRouter(client, distDir) {
       ];
 
       const config = {};
-      for (const key of configKeys) {
-        config[key] = await ConfigHelper.get(key);
+      if (isAdmin) {
+        for (const key of configKeys) {
+          config[key] = await ConfigHelper.get(key);
+        }
       }
 
       const bot = {
@@ -51,9 +55,11 @@ function createDashboardRouter(client, distDir) {
         channels: guildContext.channels,
         roles: guildContext.roles,
         members: guildContext.members,
-        config,
-        logConfigKeys: LOG_CONFIG_KEYS,
-        ...lists
+        user: req.session.user || null,
+        permissions: req.session.permissions || null,
+        config: isAdmin ? config : {},
+        logConfigKeys: isAdmin ? LOG_CONFIG_KEYS : [],
+        ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [] })
       });
     } catch (error) {
       console.error('[API Dashboard Init] Error:', error);

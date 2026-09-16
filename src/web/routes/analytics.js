@@ -1,5 +1,5 @@
 const express = require('express');
-const { isAuthenticated } = require('../middleware/auth');
+const { requireViewAuditLog } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const analyticsService = require('../../services/analyticsService');
 
@@ -9,7 +9,7 @@ function createAnalyticsRouter(client) {
   // Apply rate limiter to all analytics routes
   router.use(apiLimiter);
 
-  router.get('/api/analytics', isAuthenticated, async (req, res) => {
+  router.get('/api/analytics', requireViewAuditLog, async (req, res) => {
     try {
       const guildId = process.env.GUILD_ID;
       const guild = client.guilds.cache.get(guildId);
@@ -32,7 +32,7 @@ function createAnalyticsRouter(client) {
     }
   });
 
-  router.get('/api/analytics/export', isAuthenticated, async (req, res) => {
+  router.get('/api/analytics/export', requireViewAuditLog, async (req, res) => {
     try {
       const guildId = process.env.GUILD_ID;
       const guild = client.guilds.cache.get(guildId);

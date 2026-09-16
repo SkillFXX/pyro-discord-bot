@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn } from '@lucide/svelte';
+  import { auth } from '../stores/auth';
 
   export let currentTab = 'general';
   let activeSection = '';
@@ -90,12 +91,18 @@
     },
   ];
 
+  $: visibleTabs = tabs.filter((t) => {
+    if ($auth.permissions?.isAdmin) return true;
+    if (t.id === 'analytics' && $auth.permissions?.canViewAuditLog) return true;
+    return false;
+  });
+
   let rafId = null;
   let isManualScroll = false;
   let manualScrollTimeout = null;
 
   function updateActiveSectionDefault() {
-    const currentTabObj = tabs.find((t) => t.id === currentTab);
+    const currentTabObj = visibleTabs.find((t) => t.id === currentTab);
     if (currentTabObj?.sections?.length) {
       if (!currentTabObj.sections.some((s) => s.id === activeSection)) {
         activeSection = currentTabObj.sections[0].id;
@@ -113,7 +120,7 @@
 
   function checkActiveSection() {
     if (isManualScroll) return;
-    const currentTabObj = tabs.find((t) => t.id === currentTab);
+    const currentTabObj = visibleTabs.find((t) => t.id === currentTab);
     if (!currentTabObj || !currentTabObj.sections?.length) return;
 
     const sections = currentTabObj.sections;
@@ -229,7 +236,7 @@
 
 <aside class="sidebar">
   <ul class="sidebar-menu">
-    {#each tabs as tab}
+    {#each visibleTabs as tab (tab.id)}
       <li class="sidebar-item">
         <button
           type="button"

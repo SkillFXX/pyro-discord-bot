@@ -21,6 +21,12 @@
 
   let currentTab = 'general';
 
+  $: if ($auth.permissions && !$auth.permissions.isAdmin && $auth.permissions.canViewAuditLog) {
+    if (currentTab !== 'analytics') {
+      currentTab = 'analytics';
+    }
+  }
+
   onMount(() => {
     bootstrapApplication();
   });
@@ -33,7 +39,7 @@
     <video class="loader-media" src="/loader.webm" autoplay loop muted playsinline aria-label="Chargement"></video>
     <p class="loader-text">Chargement...</p>
   </div>
-{:else if !$auth.authenticated}
+{:else if !$auth.authenticated || !$auth.permissions || (!$auth.permissions.isAdmin && !$auth.permissions.canViewAuditLog)}
   <Login />
 {:else}
   <div class="app-layout">
@@ -43,21 +49,21 @@
       <Sidebar bind:currentTab />
 
       <main class="content-area">
-        {#if currentTab === 'general'}
+        {#if currentTab === 'general' && $auth.permissions?.isAdmin}
           <GeneralTab />
-        {:else if currentTab === 'customization'}
+        {:else if currentTab === 'customization' && $auth.permissions?.isAdmin}
           <CustomizationTab />
-        {:else if currentTab === 'moderation'}
+        {:else if currentTab === 'moderation' && $auth.permissions?.isAdmin}
           <ModerationTab />
-        {:else if currentTab === 'automod'}
+        {:else if currentTab === 'automod' && $auth.permissions?.isAdmin}
           <AutomodTab />
-        {:else if currentTab === 'levels'}
+        {:else if currentTab === 'levels' && $auth.permissions?.isAdmin}
           <LevelsTab />
-        {:else if currentTab === 'tickets'}
+        {:else if currentTab === 'tickets' && $auth.permissions?.isAdmin}
           <TicketsTab />
-        {:else if currentTab === 'logs'}
+        {:else if currentTab === 'logs' && $auth.permissions?.isAdmin}
           <LogsTab />
-        {:else if currentTab === 'analytics'}
+        {:else if currentTab === 'analytics' && ($auth.permissions?.isAdmin || $auth.permissions?.canViewAuditLog)}
           <AnalyticsTab />
         {/if}
 

@@ -15,7 +15,7 @@ const {
   fetchAutomodRules, 
   fetchXpMultipliers 
 } = require('../services/guildService');
-const { isAuthenticated } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const embeds = require('../../bot/utils/embeds');
 
@@ -44,8 +44,8 @@ function createFeaturesRouter(client) {
     return res.json({ autoRoles });
   }
 
-  router.post(['/api/autorole', '/dashboard/autorole'], isAuthenticated, handleAutoRoleAdd);
-  router.delete(['/api/autorole/:roleId', '/dashboard/autorole/:roleId'], isAuthenticated, handleAutoRoleDelete);
+  router.post(['/api/autorole', '/dashboard/autorole'], requireAdmin, handleAutoRoleAdd);
+  router.delete(['/api/autorole/:roleId', '/dashboard/autorole/:roleId'], requireAdmin, handleAutoRoleDelete);
 
   // 2. Warn Actions Handlers
   async function handleWarnActionAdd(req, res) {
@@ -87,8 +87,8 @@ function createFeaturesRouter(client) {
     return res.json({ warnActions });
   }
 
-  router.post(['/api/warnaction', '/dashboard/warnaction'], isAuthenticated, handleWarnActionAdd);
-  router.delete(['/api/warnaction/:count', '/dashboard/warnaction/:count'], isAuthenticated, handleWarnActionDelete);
+  router.post(['/api/warnaction', '/dashboard/warnaction'], requireAdmin, handleWarnActionAdd);
+  router.delete(['/api/warnaction/:count', '/dashboard/warnaction/:count'], requireAdmin, handleWarnActionDelete);
 
   // 3. Tickets Deploy Handler
   async function handleTicketDeploy(req, res) {
@@ -133,7 +133,7 @@ function createFeaturesRouter(client) {
     }
   }
 
-  router.post(['/api/tickets/deploy', '/dashboard/tickets/deploy'], isAuthenticated, handleTicketDeploy);
+  router.post(['/api/tickets/deploy', '/dashboard/tickets/deploy'], requireAdmin, handleTicketDeploy);
 
   // 4. Role Rewards Handlers
   async function handleRoleRewardAdd(req, res) {
@@ -158,8 +158,8 @@ function createFeaturesRouter(client) {
     return res.json({ roleRewards });
   }
 
-  router.post(['/api/rolereward', '/dashboard/rolereward'], isAuthenticated, handleRoleRewardAdd);
-  router.delete(['/api/rolereward/:level', '/dashboard/rolereward/:level'], isAuthenticated, handleRoleRewardDelete);
+  router.post(['/api/rolereward', '/dashboard/rolereward'], requireAdmin, handleRoleRewardAdd);
+  router.delete(['/api/rolereward/:level', '/dashboard/rolereward/:level'], requireAdmin, handleRoleRewardDelete);
 
   // 5. Automod Rules Handlers
   async function handleAutomodAdd(req, res) {
@@ -229,8 +229,8 @@ function createFeaturesRouter(client) {
     return res.json({ automodRules });
   }
 
-  router.post(['/api/automod', '/dashboard/automod'], isAuthenticated, handleAutomodAdd);
-  router.delete(['/api/automod/:id', '/dashboard/automod/:id'], isAuthenticated, handleAutomodDelete);
+  router.post(['/api/automod', '/dashboard/automod'], requireAdmin, handleAutomodAdd);
+  router.delete(['/api/automod/:id', '/dashboard/automod/:id'], requireAdmin, handleAutomodDelete);
 
   // 6. XP Multipliers Handlers
   async function handleXpMultiplierAdd(req, res) {
@@ -254,8 +254,8 @@ function createFeaturesRouter(client) {
     return res.json({ xpMultipliers });
   }
 
-  router.post(['/api/xpmultiplier', '/dashboard/xpmultiplier'], isAuthenticated, handleXpMultiplierAdd);
-  router.delete(['/api/xpmultiplier/:channelId', '/dashboard/xpmultiplier/:channelId'], isAuthenticated, handleXpMultiplierDelete);
+  router.post(['/api/xpmultiplier', '/dashboard/xpmultiplier'], requireAdmin, handleXpMultiplierAdd);
+  router.delete(['/api/xpmultiplier/:channelId', '/dashboard/xpmultiplier/:channelId'], requireAdmin, handleXpMultiplierDelete);
 
   return router;
 }

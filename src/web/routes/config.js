@@ -1,7 +1,7 @@
 const express = require('express');
 const { ConfigHelper, LOG_CONFIG_KEYS } = require('../../database');
 const { updateBotStatus } = require('../../bot/events/ready');
-const { isAuthenticated } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 
 async function handleConfigSave(section, body, client) {
@@ -74,8 +74,8 @@ function createConfigRouter(client) {
   // Apply rate limiter to all configuration routes
   router.use(apiLimiter);
 
-  // Unified Config Save API
-  router.post('/api/config/:section', isAuthenticated, async (req, res) => {
+  // Unified Config Save API (requires ADMINISTRATOR)
+  router.post('/api/config/:section', requireAdmin, async (req, res) => {
     try {
       await handleConfigSave(req.params.section, req.body, client);
       res.json({ success: true });
@@ -88,7 +88,7 @@ function createConfigRouter(client) {
   // Legacy route aliases for full backwards compatibility
   const legacySections = ['general', 'logs', 'customization', 'tickets', 'xp'];
   for (const sec of legacySections) {
-    router.post(`/dashboard/${sec}`, isAuthenticated, async (req, res) => {
+    router.post(`/dashboard/${sec}`, requireAdmin, async (req, res) => {
       try {
         await handleConfigSave(sec, req.body, client);
         res.status(200).send();

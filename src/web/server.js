@@ -96,7 +96,7 @@ function startWebServer(client, rawPort) {
   app.use(lusca.csrf());
 
   // Mount Modular Routes
-  app.use(createAuthRouter(distDir));
+  app.use(createAuthRouter(client, distDir));
   app.use(createDashboardRouter(client, distDir));
   app.use(createConfigRouter(client));
   app.use(createFeaturesRouter(client));
