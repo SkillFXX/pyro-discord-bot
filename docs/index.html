@@ -229,12 +229,14 @@
           </div>
           <h3>Dashboard Svelte &amp; Branding</h3>
           <p>
-            Interface web réactive en Svelte 5 pour configurer le bot à chaud, visualiser les statistiques d'activité et prévisualiser les embeds et le statut Discord.
+            Interface web réactive en Svelte 5 pour configurer le bot à chaud, visualiser les statistiques d'activité avec Chart.js, prévisualiser les embeds et le statut Discord en direct, avec authentification Discord OAuth2 (RBAC).
           </p>
           <div class="feature-tags">
             <span class="feature-tag">Svelte 5</span>
             <span class="feature-tag">Chart.js</span>
             <span class="feature-tag">Session SQLite</span>
+            <span class="feature-tag">Discord OAuth2</span>
+            <span class="feature-tag">Live Preview</span>
           </div>
         </div>
       </div>
@@ -257,11 +259,11 @@
             <span class="step-number">1</span>
             <h3>Prérequis Système &amp; Discord</h3>
           </div>
-          <p>Environnement Node.js v20+ requis. Créez une application sur le Discord Developer Portal et activez les Privileged Intents :</p>
+          <p>Environnement Node.js v20+ requis. Sur le Discord Developer Portal, activez les Privileged Intents et ajoutez la Redirect URI OAuth2 (<code>http://localhost:3000/api/auth/discord/callback</code>) :</p>
           <div class="feature-tags" style="margin-top:auto;">
             <span class="feature-tag">Node.js 20+</span>
             <span class="feature-tag">Server Members</span>
-            <span class="feature-tag">Message Content</span>
+            <span class="feature-tag">OAuth2 Redirect</span>
           </div>
         </div>
 
@@ -302,6 +304,8 @@ npm run build</code></pre>
               <button class="copy-btn" data-copy="DISCORD_TOKEN=votre_bot_token
 CLIENT_ID=votre_client_id
 GUILD_ID=votre_guild_id
+DISCORD_CLIENT_SECRET=votre_client_secret
+DISCORD_REDIRECT_URI=http://localhost:3000/api/auth/discord/callback
 PORT=3000
 SESSION_SECRET=cle_secrete_aleatoire
 COOKIE_SECURE=false
@@ -312,6 +316,8 @@ NODE_ENV=production" data-label="Variables .env">
             <pre><code>DISCORD_TOKEN=votre_bot_token
 CLIENT_ID=votre_client_id
 GUILD_ID=votre_guild_id
+DISCORD_CLIENT_SECRET=votre_client_secret
+DISCORD_REDIRECT_URI=http://localhost:3000/api/auth/discord/callback
 PORT=3000
 SESSION_SECRET=cle_secrete_aleatoire
 COOKIE_SECURE=false
@@ -336,7 +342,7 @@ NODE_ENV=production</code></pre>
             <pre><code>npm start</code></pre>
           </div>
           <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.75rem;margin-bottom:0;">
-            Le dashboard est accessible sur <code>http://localhost:3000</code>. Connectez-vous avec votre <code>DISCORD_TOKEN</code>.
+            Le dashboard est accessible sur <code>http://localhost:3000</code>. Connectez-vous en un clic avec votre compte <strong>Discord</strong> (accès Administrateur ou Voir les logs).
           </p>
         </div>
       </div>

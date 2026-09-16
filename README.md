@@ -32,7 +32,10 @@ Il centralise tous les besoins d'un serveur communautaire ou professionnel : mod
 - ⭐ **Système d'XP & Niveaux** : Gain d'XP paramétrable avec cooldown anti-spam, multiplicateurs par salon (ex: ×2 XP) et attribution de rôles récompenses (cumul ou remplacement).
 - 🎫 **Support & Système de Tickets** : Salons de support privés créés via boutons interactifs avec gestion et modération pour l'équipe staff (`/ticketmod`).
 - 🔊 **Vocaux Temporaires (Join-to-Create)** : Création automatique d'un salon vocal privé à la connexion et suppression instantanée dès qu'il est libéré.
-- 🎨 **Dashboard Svelte & Personnalisation** : Interface web réactive en Svelte 5 (analytics Chart.js, prévisualisation en direct du statut du bot et branding des embeds Discord, persistance des sessions en SQLite).
+- 🎨 **Dashboard Svelte & Personnalisation** : Interface web réactive en Svelte 5 pour configurer le bot à chaud, visualiser les statistiques d'activité (KPI & graphiques Chart.js), prévisualiser les embeds et le statut Discord en direct, avec persistance des sessions en SQLite.
+- 🔑 **Authentification Discord OAuth2 & Permissions (RBAC)** : Connexion sécurisée en un clic via Discord. Gestion granulaire des droits :
+  - **Administrateur** (`ADMINISTRATOR` ou Propriétaire) : Accès complet à tous les modules et paramètres.
+  - **Auditeur** (`VIEW_AUDIT_LOG`) : Accès restreint en lecture au module Analytics (KPI, graphiques et export CSV).
 - 🔒 **Sécurité Renforcée (Conforme CodeQL)** : Protection anti-CSRF (`lusca`), rate-limiting anti-bruteforce (`express-rate-limit`), sessions SQLite durcies et compatibilité reverse proxy (`trust proxy`).
 
 ---
@@ -41,9 +44,11 @@ Il centralise tous les besoins d'un serveur communautaire ou professionnel : mod
 
 ### 1. Prérequis
 - [Node.js](https://nodejs.org/) v20 ou version ultérieure (Recommandé : LTS v20 / v22)
-- Une application sur le [Discord Developer Portal](https://discord.com/developers/applications) avec les **Privileged Gateway Intents** activés :
-  - *Server Members Intent*
-  - *Message Content Intent*
+- Une application sur le [Discord Developer Portal](https://discord.com/developers/applications) avec :
+  - Les **Privileged Gateway Intents** activés (*Bot* > *Server Members Intent* et *Message Content Intent*).
+  - Une **Redirect URI** OAuth2 configurée (*OAuth2* > *General* > *Redirects*) :
+    `http://localhost:3000/api/auth/discord/callback` (ou votre URL de domaine en production).
+  - Le **Client Secret** généré (*OAuth2* > *General* > *Client Secret*).
 
 ### 2. Installation & Compilation
 
@@ -71,8 +76,14 @@ cp .env.example .env
 DISCORD_TOKEN=votre_token_bot_discord
 CLIENT_ID=votre_client_id_application
 GUILD_ID=votre_id_serveur_discord
+
+# Authentification Discord OAuth2
+DISCORD_CLIENT_SECRET=votre_client_secret_application
+DISCORD_REDIRECT_URI=http://localhost:3000/api/auth/discord/callback
+
 PORT=3000
 SESSION_SECRET=cle_secrete_aleatoire_dashboard
+# false en HTTP local, true en HTTPS de production
 COOKIE_SECURE=false
 NODE_ENV=production
 ```
@@ -90,7 +101,7 @@ npm start
 npm run dev
 ```
 
-Accédez au tableau de bord web sur : `http://localhost:3000` *(connectez-vous avec votre `DISCORD_TOKEN`)*.
+Accédez au tableau de bord web sur : `http://localhost:3000` *(authentification sécurisée en un clic via votre compte Discord)*.
 
 ---
 
