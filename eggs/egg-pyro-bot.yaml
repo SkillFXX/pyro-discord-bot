@@ -63,13 +63,15 @@ scripts:
       npm run build
 
       echo "[Pyro Install] Génération du fichier .env initial..."
-      cat << 'ENVEOF' > .env
+      cat << ENVEOF > .env
       DISCORD_TOKEN=${DISCORD_TOKEN}
       CLIENT_ID=${CLIENT_ID}
       GUILD_ID=${GUILD_ID}
+      DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
       PORT=${SERVER_PORT}
-      SESSION_SECRET=${SESSION_SECRET:-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)}
-      COOKIE_SECURE=false
+      SESSION_SECRET=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
+      COOKIE_SECURE=${COOKIE_SECURE:-false}
       NODE_ENV=production
       ENVEOF
 
@@ -78,42 +80,9 @@ scripts:
     entrypoint: bash
 variables:
   -
-    sort: 4
-    name: 'Mise à jour automatique (Git)'
-    description: ''
-    env_variable: AUTO_UPDATE
-    default_value: 0
-    user_viewable: true
-    user_editable: true
-    rules:
-      - required
-      - boolean
-  -
-    sort: 6
-    name: 'Branche Git'
-    description: ''
-    env_variable: BRANCH
-    default_value: main
-    user_viewable: true
-    user_editable: true
-    rules:
-      - required
-      - string
-  -
-    sort: 2
-    name: 'Client ID (Application ID)'
-    description: ''
-    env_variable: CLIENT_ID
-    default_value: ''
-    user_viewable: true
-    user_editable: true
-    rules:
-      - required
-      - string
-  -
     sort: 1
     name: 'Token Discord du Bot'
-    description: ''
+    description: "Token d'authentification du bot Discord (Developer Portal > Applications > Bot > Token)."
     env_variable: DISCORD_TOKEN
     default_value: ''
     user_viewable: true
@@ -122,11 +91,11 @@ variables:
       - required
       - string
   -
-    sort: 5
-    name: 'Dépôt Git'
-    description: ''
-    env_variable: GIT_ADDRESS
-    default_value: 'https://github.com/SkillFXX/pyro-discord-bot.git'
+    sort: 2
+    name: 'Client ID (Application ID)'
+    description: "Identifiant client de l'application Discord (Developer Portal > Applications > General Information)."
+    env_variable: CLIENT_ID
+    default_value: ''
     user_viewable: true
     user_editable: true
     rules:
@@ -135,9 +104,75 @@ variables:
   -
     sort: 3
     name: 'ID du Serveur Discord (Guild ID)'
-    description: ''
+    description: "Identifiant unique du serveur Discord sur lequel le bot est actif."
     env_variable: GUILD_ID
     default_value: ''
+    user_viewable: true
+    user_editable: true
+    rules:
+      - required
+      - string
+  -
+    sort: 4
+    name: 'Client Secret Discord (OAuth2)'
+    description: "Secret client OAuth2 pour la connexion au dashboard web (Developer Portal > Applications > OAuth2 > General)."
+    env_variable: DISCORD_CLIENT_SECRET
+    default_value: ''
+    user_viewable: true
+    user_editable: true
+    rules:
+      - nullable
+      - string
+  -
+    sort: 5
+    name: 'URL de Redirection Discord OAuth2'
+    description: "URL de redirection de callback OAuth2 (ex: http://IP:PORT/api/auth/discord/callback ou https://domaine.fr/api/auth/discord/callback)."
+    env_variable: DISCORD_REDIRECT_URI
+    default_value: ''
+    user_viewable: true
+    user_editable: true
+    rules:
+      - nullable
+      - string
+  -
+    sort: 6
+    name: 'Sécurité des cookies (COOKIE_SECURE)'
+    description: "false si le dashboard est accédé en HTTP direct (IP:PORT), true si vous utilisez un reverse proxy HTTPS avec certificat SSL."
+    env_variable: COOKIE_SECURE
+    default_value: "false"
+    user_viewable: true
+    user_editable: true
+    rules:
+      - required
+      - boolean
+  -
+    sort: 7
+    name: 'Mise à jour automatique (Git)'
+    description: "Si activé (1), met à jour le bot et recompile le dashboard à chaque redémarrage du serveur."
+    env_variable: AUTO_UPDATE
+    default_value: 0
+    user_viewable: true
+    user_editable: true
+    rules:
+      - required
+      - boolean
+  -
+    sort: 8
+    name: 'Dépôt Git'
+    description: "URL du dépôt Git pour le clonage et les mises à jour automatiques."
+    env_variable: GIT_ADDRESS
+    default_value: 'https://github.com/SkillFXX/pyro-discord-bot.git'
+    user_viewable: true
+    user_editable: true
+    rules:
+      - required
+      - string
+  -
+    sort: 9
+    name: 'Branche Git'
+    description: "Branche Git à utiliser pour les mises à jour (ex: main)."
+    env_variable: BRANCH
+    default_value: main
     user_viewable: true
     user_editable: true
     rules:

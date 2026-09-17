@@ -76,7 +76,7 @@ function startWebServer(client, rawPort) {
   })();
 
   const isProduction = process.env.NODE_ENV === 'production';
-  const isSecureCookie = process.env.COOKIE_SECURE === 'true' || isProduction;
+  const isSecureCookie = process.env.COOKIE_SECURE === 'true' || (isProduction && process.env.COOKIE_SECURE !== 'false');
 
   app.use(session({
     store: new SequelizeSessionStore(),

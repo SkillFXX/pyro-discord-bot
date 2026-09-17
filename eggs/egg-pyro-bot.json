@@ -32,55 +32,16 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\n# Installation automatique de Pyro Bot pour Pelican / FlowHost\napt update\napt install -y git curl jq ca-certificates\n\ncd /mnt/server\n\nGIT_ADDRESS=${GIT_ADDRESS:-\"https://github.com/SkillFXX/pyro-discord-bot.git\"}\nBRANCH=${BRANCH:-\"main\"}\n\necho \"[Pyro Install] Clonage du d\u00e9p\u00f4t Git (${GIT_ADDRESS}, branche: ${BRANCH})...\"\nif [ ! -d .git ]; then\n    git clone --branch ${BRANCH} ${GIT_ADDRESS} .\nelse\n    git fetch origin\n    git checkout ${BRANCH}\n    git pull\nfi\n\n# Installation de Node.js 20 si absent du conteneur\nif ! command -v node &> /dev/null; then\n    echo \"[Pyro Install] Installation de Node.js 20...\"\n    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n    apt install -y nodejs\nfi\n\necho \"[Pyro Install] Installation des d\u00e9pendances npm...\"\nnpm install\n\necho \"[Pyro Install] Compilation du Dashboard Web...\"\nnpm run build\n\necho \"[Pyro Install] G\u00e9n\u00e9ration du fichier .env initial...\"\ncat << 'ENVEOF' > .env\nDISCORD_TOKEN=${DISCORD_TOKEN}\nCLIENT_ID=${CLIENT_ID}\nGUILD_ID=${GUILD_ID}\nPORT=${SERVER_PORT}\nSESSION_SECRET=${SESSION_SECRET:-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)}\nCOOKIE_SECURE=false\nNODE_ENV=production\nENVEOF\n\necho \"[Pyro Install] Installation termin\u00e9e avec succ\u00e8s !\"",
+            "script": "#!/bin/bash\n# Installation automatique de Pyro Bot pour Pelican / FlowHost\napt update\napt install -y git curl jq ca-certificates\n\ncd /mnt/server\n\nGIT_ADDRESS=${GIT_ADDRESS:-\"https://github.com/SkillFXX/pyro-discord-bot.git\"}\nBRANCH=${BRANCH:-\"main\"}\n\necho \"[Pyro Install] Clonage du d\u00e9p\u00f4t Git (${GIT_ADDRESS}, branche: ${BRANCH})...\"\nif [ ! -d .git ]; then\n    git clone --branch ${BRANCH} ${GIT_ADDRESS} .\nelse\n    git fetch origin\n    git checkout ${BRANCH}\n    git pull\nfi\n\n# Installation de Node.js 20 si absent du conteneur\nif ! command -v node &> /dev/null; then\n    echo \"[Pyro Install] Installation de Node.js 20...\"\n    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n    apt install -y nodejs\nfi\n\necho \"[Pyro Install] Installation des d\u00e9pendances npm...\"\nnpm install\n\necho \"[Pyro Install] Compilation du Dashboard Web...\"\nnpm run build\n\necho \"[Pyro Install] G\u00e9n\u00e9ration du fichier .env initial...\"\ncat << ENVEOF > .env\nDISCORD_TOKEN=${DISCORD_TOKEN}\nCLIENT_ID=${CLIENT_ID}\nGUILD_ID=${GUILD_ID}\nDISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}\nDISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}\nPORT=${SERVER_PORT}\nSESSION_SECRET=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)\nCOOKIE_SECURE=${COOKIE_SECURE:-false}\nNODE_ENV=production\nENVEOF\n\necho \"[Pyro Install] Installation termin\u00e9e avec succ\u00e8s !\"",
             "container": "ghcr.io/pelican-eggs/installers:debian",
             "entrypoint": "bash"
         }
     },
     "variables": [
         {
-            "sort": 4,
-            "name": "Mise \u00e0 jour automatique (Git)",
-            "description": "",
-            "env_variable": "AUTO_UPDATE",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": [
-                "required",
-                "boolean"
-            ]
-        },
-        {
-            "sort": 6,
-            "name": "Branche Git",
-            "description": "",
-            "env_variable": "BRANCH",
-            "default_value": "main",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": [
-                "required",
-                "string"
-            ]
-        },
-        {
-            "sort": 2,
-            "name": "Client ID (Application ID)",
-            "description": "",
-            "env_variable": "CLIENT_ID",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": [
-                "required",
-                "string"
-            ]
-        },
-        {
             "sort": 1,
             "name": "Token Discord du Bot",
-            "description": "",
+            "description": "Token d'authentification du bot Discord (Developer Portal > Applications > Bot > Token).",
             "env_variable": "DISCORD_TOKEN",
             "default_value": "",
             "user_viewable": true,
@@ -91,11 +52,11 @@
             ]
         },
         {
-            "sort": 5,
-            "name": "D\u00e9p\u00f4t Git",
-            "description": "",
-            "env_variable": "GIT_ADDRESS",
-            "default_value": "https://github.com/SkillFXX/pyro-discord-bot.git",
+            "sort": 2,
+            "name": "Client ID (Application ID)",
+            "description": "Identifiant client de l'application Discord (Developer Portal > Applications > General Information).",
+            "env_variable": "CLIENT_ID",
+            "default_value": "",
             "user_viewable": true,
             "user_editable": true,
             "rules": [
@@ -106,9 +67,87 @@
         {
             "sort": 3,
             "name": "ID du Serveur Discord (Guild ID)",
-            "description": "",
+            "description": "Identifiant unique du serveur Discord sur lequel le bot est actif.",
             "env_variable": "GUILD_ID",
             "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 4,
+            "name": "Client Secret Discord (OAuth2)",
+            "description": "Secret client OAuth2 pour la connexion au dashboard web (Developer Portal > Applications > OAuth2 > General).",
+            "env_variable": "DISCORD_CLIENT_SECRET",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string"
+            ]
+        },
+        {
+            "sort": 5,
+            "name": "URL de Redirection Discord OAuth2",
+            "description": "URL de redirection de callback OAuth2 (ex: http://IP:PORT/api/auth/discord/callback ou https://domaine.fr/api/auth/discord/callback).",
+            "env_variable": "DISCORD_REDIRECT_URI",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string"
+            ]
+        },
+        {
+            "sort": 6,
+            "name": "S\u00e9curit\u00e9 des cookies (COOKIE_SECURE)",
+            "description": "false si le dashboard est acc\u00e9d\u00e9 en HTTP direct (IP:PORT), true si vous utilisez un reverse proxy HTTPS avec certificat SSL.",
+            "env_variable": "COOKIE_SECURE",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "boolean"
+            ]
+        },
+        {
+            "sort": 7,
+            "name": "Mise \u00e0 jour automatique (Git)",
+            "description": "Si activ\u00e9 (1), met \u00e0 jour le bot et recompile le dashboard \u00e0 chaque red\u00e9marrage du serveur.",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "boolean"
+            ]
+        },
+        {
+            "sort": 8,
+            "name": "D\u00e9p\u00f4t Git",
+            "description": "URL du d\u00e9p\u00f4t Git pour le clonage et les mises \u00e0 jour automatiques.",
+            "env_variable": "GIT_ADDRESS",
+            "default_value": "https://github.com/SkillFXX/pyro-discord-bot.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string"
+            ]
+        },
+        {
+            "sort": 9,
+            "name": "Branche Git",
+            "description": "Branche Git \u00e0 utiliser pour les mises \u00e0 jour (ex: main).",
+            "env_variable": "BRANCH",
+            "default_value": "main",
             "user_viewable": true,
             "user_editable": true,
             "rules": [
