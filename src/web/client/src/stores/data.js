@@ -140,6 +140,29 @@ export async function addWarnAction({ warnsCount, action, duration }) {
   }
 }
 
+export async function updateWarnAction(oldCount, { warnsCount, action, duration }) {
+  try {
+    const res = await fetch(`/api/warnaction/${oldCount}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ warnsCount, action, duration }),
+    });
+    if (res.ok) {
+      const { warnActions } = await res.json();
+      dashboardData.update((d) => ({ ...d, warnActions }));
+      showToast('Seuil d\'avertissement mis à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification', 'error');
+    return false;
+  }
+}
+
 export async function deleteWarnAction(count) {
   try {
     const res = await fetch(`/api/warnaction/${count}`, {
@@ -171,6 +194,29 @@ export async function addRoleReward({ level, roleId, replacePreviousRole }) {
     }
   } catch (e) {
     showToast('Erreur lors de l\'enregistrement', 'error');
+  }
+}
+
+export async function updateRoleReward(oldLevel, { level, roleId, replacePreviousRole }) {
+  try {
+    const res = await fetch(`/api/rolereward/${oldLevel}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ level, roleId, replacePreviousRole }),
+    });
+    if (res.ok) {
+      const { roleRewards } = await res.json();
+      dashboardData.update((d) => ({ ...d, roleRewards }));
+      showToast('Récompense de niveau mise à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification', 'error');
+    return false;
   }
 }
 
@@ -206,6 +252,29 @@ export async function addAutomodRule(ruleData) {
     }
   } catch (e) {
     showToast('Erreur lors de la création de la règle', 'error');
+    return false;
+  }
+}
+
+export async function updateAutomodRule(id, ruleData) {
+  try {
+    const res = await fetch(`/api/automod/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(ruleData),
+    });
+    if (res.ok) {
+      const { automodRules } = await res.json();
+      dashboardData.update((d) => ({ ...d, automodRules }));
+      showToast('Règle d\'automodération mise à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification de la règle', 'error');
     return false;
   }
 }

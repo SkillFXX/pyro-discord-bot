@@ -1,18 +1,21 @@
 <script>
-  import { Award, Zap, Shield, UserPlus, Trash2, Plus, Save } from '@lucide/svelte';
+  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import Toggle from '../components/Toggle.svelte';
   import DataTable from '../components/DataTable.svelte';
+  import Modal from '../components/Modal.svelte';
   import {
     dashboardData,
     saveConfig,
     addXpMultiplier,
     deleteXpMultiplier,
     addRoleReward,
+    updateRoleReward,
     deleteRoleReward,
     addAutoRole,
     deleteAutoRole,
   } from '../stores/data';
+  import { showToast } from '../stores/toast';
 
   // Local form states
   let savingXp = false;
@@ -25,6 +28,13 @@
   let rewardLevel = '';
   let rewardRoleId = '';
   let replacePrevious = 'false';
+
+  // Edit Role Reward State
+  let showEditRewardModal = false;
+  let originalRewardLevel = null;
+  let editRewardLevel = '';
+  let editRewardRoleId = '';
+  let editReplacePrevious = 'false';
 
   // New Auto Role
   let autoRoleId = '';
@@ -59,6 +69,33 @@
     });
     rewardLevel = '';
     rewardRoleId = '';
+  }
+
+  function openEditRewardModal(item) {
+    originalRewardLevel = item.level;
+    editRewardLevel = item.level;
+    editRewardRoleId = item.roleId;
+    editReplacePrevious = item.replacePreviousRole ? 'true' : 'false';
+    showEditRewardModal = true;
+  }
+
+  async function handleEditReward() {
+    if (!editRewardLevel || !editRewardRoleId) return;
+    const parsed = parseInt(editRewardLevel);
+    if (isNaN(parsed) || parsed < 1) {
+      showToast('Le niveau requis doit être un entier positif', 'error');
+      return;
+    }
+
+    const success = await updateRoleReward(originalRewardLevel, {
+      level: parsed,
+      roleId: editRewardRoleId,
+      replacePreviousRole: editReplacePrevious === 'true',
+    });
+
+    if (success) {
+      showEditRewardModal = false;
+    }
   }
 
   async function handleAddAutoRole() {
@@ -241,7 +278,7 @@
       </form>
 
       <DataTable
-        headers={['Niveau', 'Rôle Attribué', 'Comportement', 'Action']}
+        headers={['Niveau', 'Rôle Attribué', 'Comportement', 'Actions']}
         items={$dashboardData.roleRewards}
         emptyMessage="Aucune récompense de rôle configurée."
       >
@@ -255,7 +292,15 @@
               <span class="badge badge-success">Cumulable</span>
             {/if}
           </td>
-          <td style="text-align: right;">
+          <td style="text-align: right; white-space: nowrap;">
+            <button
+              class="btn btn-secondary"
+              style="padding: 0.35rem 0.6rem; font-size: 0.8rem; margin-right: 6px;"
+              on:click={() => openEditRewardModal(item)}
+              title="Modifier"
+            >
+              <Pencil size={14} />
+            </button>
             <button
               class="btn btn-danger"
               style="padding: 0.35rem 0.6rem; font-size: 0.8rem;"
@@ -316,5 +361,45 @@
       </DataTable>
     </Card>
   </div>
+
+  <!-- Modal: Modifier une Récompense de Rôle -->
+  <Modal bind:open={showEditRewardModal} title="Modifier la Récompense de Niveau">
+    <form on:submit|preventDefault={handleEditReward}>
+      <div class="form-group">
+        <label for="edit_rew_level">Niveau requis</label>
+        <input
+          id="edit_rew_level"
+          type="number"
+          bind:value={editRewardLevel}
+          min="1"
+          required
+          placeholder="Ex: 5"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="edit_rew_role">Rôle accordé</label>
+        <select id="edit_rew_role" bind:value={editRewardRoleId} required>
+          <option value="">-- Choisir un rôle --</option>
+          {#each $dashboardData.roles as r}
+            <option value={r.id}>@{r.name}</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="edit_rew_replace">Comportement</label>
+        <select id="edit_rew_replace" bind:value={editReplacePrevious}>
+          <option value="false">Cumuler le rôle</option>
+          <option value="true">Retirer les rôles inférieurs</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" on:click={() => (showEditRewardModal = false)}>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </Modal>
 </div>
 

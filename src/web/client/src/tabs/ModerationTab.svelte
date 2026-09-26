@@ -1,13 +1,21 @@
 <script>
-  import { Shield, AlertTriangle, Trash2, Plus } from '@lucide/svelte';
+  import { Shield, AlertTriangle, Trash2, Pencil, Plus } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';
-  import { dashboardData, addWarnAction, deleteWarnAction } from '../stores/data';
+  import Modal from '../components/Modal.svelte';
+  import { dashboardData, addWarnAction, updateWarnAction, deleteWarnAction } from '../stores/data';
   import { showToast } from '../stores/toast';
 
   let warnsCount = '';
   let action = 'mute';
   let duration = 86400;
+
+  // Edit Modal State
+  let showEditModal = false;
+  let originalWarnsCount = null;
+  let editWarnsCount = 1;
+  let editAction = 'mute';
+  let editDuration = 86400;
 
   // Discord API restricts timeouts to 28 days max (2,419,200 seconds / 4 weeks)
   const MAX_TIMEOUT_SECONDS = 2419200;
@@ -44,6 +52,39 @@
       duration: action === 'mute' ? parseInt(duration) : null,
     });
     warnsCount = '';
+  }
+
+  function openEditModal(item) {
+    originalWarnsCount = item.warnsCount;
+    editWarnsCount = item.warnsCount;
+    editAction = item.action;
+    editDuration = item.duration || 86400;
+    showEditModal = true;
+  }
+
+  async function handleEdit() {
+    if (!editWarnsCount || parseInt(editWarnsCount) < 1) return;
+    if (editAction === 'mute') {
+      const parsedDur = parseInt(editDuration);
+      if (isNaN(parsedDur) || parsedDur < 10) {
+        showToast('La durée minimale d\'exclusion est de 10 secondes', 'error');
+        return;
+      }
+      if (parsedDur > MAX_TIMEOUT_SECONDS) {
+        showToast('La durée maximale d\'exclusion Discord est de 28 jours (2 419 200s)', 'error');
+        return;
+      }
+    }
+
+    const success = await updateWarnAction(originalWarnsCount, {
+      warnsCount: parseInt(editWarnsCount),
+      action: editAction,
+      duration: editAction === 'mute' ? parseInt(editDuration) : null,
+    });
+
+    if (success) {
+      showEditModal = false;
+    }
   }
 </script>
 
@@ -162,7 +203,16 @@
           <td>
             <span class="num-shape">{formatDuration(item.duration)}</span>
           </td>
-          <td style="text-align: right;">
+          <td style="text-align: right; white-space: nowrap;">
+            <button
+              class="btn btn-secondary"
+              style="padding: 0.35rem 0.6rem; font-size: 0.8rem; margin-right: 6px;"
+              on:click={() => openEditModal(item)}
+              title="Modifier ce seuil"
+            >
+              <Pencil size={14} style="vertical-align: middle; margin-right: 4px;" />
+              Modifier
+            </button>
             <button
               class="btn btn-danger"
               style="padding: 0.35rem 0.6rem; font-size: 0.8rem;"
@@ -177,5 +227,68 @@
       </DataTable>
     </Card>
   </div>
+
+  <!-- Modal: Modifier un Seuil d'Avertissement -->
+  <Modal bind:open={showEditModal} title="Modifier le Seuil d'Avertissement">
+    <form on:submit|preventDefault={handleEdit}>
+      <div class="form-group">
+        <label for="edit_warns_count">Seuil d'avertissements (Nombre de warns)</label>
+        <input
+          id="edit_warns_count"
+          type="number"
+          bind:value={editWarnsCount}
+          min="1"
+          max="50"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="edit_warn_action">Sanction automatique à appliquer</label>
+        <select id="edit_warn_action" bind:value={editAction}>
+          <option value="mute">Exclusion temporaire (Mute / Timeout)</option>
+          <option value="kick">Expulsion du serveur (Kick)</option>
+          <option value="ban">Bannissement définitif</option>
+        </select>
+      </div>
+
+      {#if editAction === 'mute'}
+        <div class="form-group">
+          <label for="edit_warn_duration">
+            Durée du Mute (en secondes)
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400; margin-left:6px;">
+              (Max : 28 jours = 2 419 200s)
+            </span>
+          </label>
+          <input
+            id="edit_warn_duration"
+            type="number"
+            bind:value={editDuration}
+            min="10"
+            max="2419200"
+            required
+          />
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (editDuration = 600)}>10 min</button>
+            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (editDuration = 3600)}>1 heure</button>
+            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (editDuration = 86400)}>1 jour</button>
+            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (editDuration = 604800)}>7 jours</button>
+            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (editDuration = 2419200)}>28 jours Max</button>
+          </div>
+          {#if editDuration > 2419200}
+            <p style="color: var(--danger); font-size: 0.8rem; margin-top: 0.4rem; display: flex; align-items: center; gap: 5px;">
+              <AlertTriangle size={14} />
+              L'API Discord limite strictement les exclusions temporaires à 28 jours maximum.
+            </p>
+          {/if}
+        </div>
+      {/if}
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" on:click={() => (showEditModal = false)}>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </Modal>
 </div>
 

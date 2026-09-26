@@ -1,11 +1,13 @@
 <script>
-  import { Bot, Plus, Trash2, ShieldAlert, CheckSquare, Settings } from '@lucide/svelte';
+  import { Bot, Plus, Trash2, Pencil, ShieldAlert, CheckSquare, Settings } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Modal from '../components/Modal.svelte';
-  import { dashboardData, addAutomodRule, deleteAutomodRule } from '../stores/data';
+  import { dashboardData, addAutomodRule, updateAutomodRule, deleteAutomodRule } from '../stores/data';
 
   let showModal = false;
+  let isEditing = false;
+  let editingRuleId = null;
 
   let channelId = 'global';
   let ruleType = 'spam';
@@ -55,6 +57,64 @@
     }
   }
 
+  function openCreateModal() {
+    isEditing = false;
+    editingRuleId = null;
+    channelId = 'global';
+    ruleType = 'spam';
+    scope = 'all_messages';
+    monitoredTypes = 'all';
+    customReason = '';
+    actionDelete = true;
+    actionWarn = false;
+    actionMute = false;
+    actionBan = false;
+    spamMax = 5;
+    spamInterval = 5;
+    duplicateMax = 3;
+    duplicateInterval = 15;
+    wordsList = '';
+    minLength = 50;
+    maxLength = 500;
+    regexPattern = '';
+    showModal = true;
+  }
+
+  function openEditModal(rule) {
+    isEditing = true;
+    editingRuleId = rule.id;
+    channelId = rule.channelId || 'global';
+    ruleType = rule.ruleType;
+    scope = rule.scope || 'all_messages';
+    monitoredTypes = rule.monitoredTypes || 'all';
+    customReason = rule.customReason || '';
+
+    const actions = parseActions(rule);
+    actionDelete = actions.includes('delete');
+    actionWarn = actions.includes('warn');
+    actionMute = actions.includes('mute');
+    actionBan = actions.includes('ban');
+
+    const p = parseParams(rule);
+    if (rule.ruleType === 'spam') {
+      spamMax = p.maxMessages || 5;
+      spamInterval = p.intervalSeconds || 5;
+    } else if (rule.ruleType === 'duplicate') {
+      duplicateMax = p.maxDuplicates || 3;
+      duplicateInterval = p.intervalSeconds || 15;
+    } else if (rule.ruleType === 'words_blacklist' || rule.ruleType === 'words_whitelist') {
+      wordsList = Array.isArray(p) ? p.join(', ') : '';
+    } else if (rule.ruleType === 'min_length') {
+      minLength = p.minLength || 50;
+    } else if (rule.ruleType === 'max_length') {
+      maxLength = p.maxLength || 500;
+    } else if (rule.ruleType === 'regex') {
+      regexPattern = p.pattern || '';
+    }
+
+    showModal = true;
+  }
+
   async function handleSubmit() {
     const actions = [];
     if (actionDelete) actions.push('delete');
@@ -63,7 +123,7 @@
     if (actionBan) actions.push('ban');
     if (actions.length === 0) actions.push('delete');
 
-    const success = await addAutomodRule({
+    const payload = {
       channelId,
       ruleType,
       scope,
@@ -78,15 +138,19 @@
       min_length: minLength,
       max_length: maxLength,
       regex_pattern: regexPattern,
-    });
+    };
+
+    let success = false;
+    if (isEditing && editingRuleId) {
+      success = await updateAutomodRule(editingRuleId, payload);
+    } else {
+      success = await addAutomodRule(payload);
+    }
 
     if (success) {
       showModal = false;
-      // Reset form defaults
-      ruleType = 'spam';
-      customReason = '';
-      wordsList = '';
-      regexPattern = '';
+      isEditing = false;
+      editingRuleId = null;
     }
   }
 </script>
@@ -99,7 +163,7 @@
         Détectez et sanctionnez automatiquement les abus par salon ou globalement sur le serveur.
       </p>
     </div>
-    <button class="btn btn-primary" on:click={() => (showModal = true)}>
+    <button class="btn btn-primary" on:click={openCreateModal}>
       <Plus size={16} style="vertical-align: middle; margin-right: 6px;" />
       Nouvelle Règle
     </button>
@@ -107,7 +171,7 @@
 
   <Card id="automod-rules" icon={ShieldAlert} title="Règles d'Automod Configurées" subtitle="Toutes les règles actives surveillées par le bot">
     <DataTable
-      headers={['Salon Ciblé', 'Type de Règle', 'Paramètres', 'Actions & Portée', 'Suppr.']}
+      headers={['Salon Ciblé', 'Type de Règle', 'Paramètres', 'Actions & Portée', 'Actions']}
       items={$dashboardData.automodRules}
       emptyMessage="Aucune règle d'automodération configurée pour le moment."
     >
@@ -175,7 +239,15 @@
             </div>
           {/each}
         </td>
-        <td style="text-align: right;">
+        <td style="text-align: right; white-space: nowrap;">
+          <button
+            class="btn btn-secondary"
+            style="padding: 0.35rem 0.6rem; font-size: 0.8rem; margin-right: 6px;"
+            on:click={() => openEditModal(item)}
+            title="Modifier cette règle"
+          >
+            <Pencil size={14} />
+          </button>
           <button
             class="btn btn-danger"
             style="padding: 0.35rem 0.6rem; font-size: 0.8rem;"
@@ -189,8 +261,8 @@
     </DataTable>
   </Card>
 
-  <!-- Modal: Créer une Règle -->
-  <Modal bind:open={showModal} title="Créer une Règle d'Automodération">
+  <!-- Modal: Créer ou Modifier une Règle -->
+  <Modal bind:open={showModal} title={isEditing ? "Modifier la Règle d'Automodération" : "Créer une Règle d'Automodération"}>
     <form on:submit|preventDefault={handleSubmit}>
       <div class="grid-2">
         <div class="form-group">
@@ -325,7 +397,9 @@
 
       <div style="display:flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
         <button type="button" class="btn btn-secondary" on:click={() => (showModal = false)}>Annuler</button>
-        <button type="submit" class="btn btn-primary">Enregistrer la règle</button>
+        <button type="submit" class="btn btn-primary">
+          {isEditing ? "Enregistrer les modifications" : "Enregistrer la règle"}
+        </button>
       </div>
     </form>
   </Modal>

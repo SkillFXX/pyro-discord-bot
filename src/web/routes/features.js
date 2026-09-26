@@ -87,7 +87,58 @@ function createFeaturesRouter(client) {
     return res.json({ warnActions });
   }
 
+  async function handleWarnActionUpdate(req, res) {
+    const oldCount = parseInt(req.params.count, 10);
+    const { warnsCount, action, duration } = req.body;
+
+    const parsedCount = parseInt(warnsCount, 10);
+    if (isNaN(parsedCount) || parsedCount < 1) {
+      return res.status(400).json({ error: 'Le seuil d\'avertissements doit être un nombre positif supérieur à 0.' });
+    }
+
+    let parsedDuration = null;
+    if (action === 'mute') {
+      const MAX_TIMEOUT_SECONDS = 28 * 24 * 60 * 60;
+      parsedDuration = parseInt(duration || 86400, 10);
+      if (isNaN(parsedDuration) || parsedDuration < 10) {
+        parsedDuration = 10;
+      }
+      if (parsedDuration > MAX_TIMEOUT_SECONDS) {
+        return res.status(400).json({ 
+          error: 'La durée maximale d\'exclusion temporaire autorisée par l\'API Discord est de 28 jours (2 419 200 secondes).' 
+        });
+      }
+    }
+
+    const existing = await WarnAction.findByPk(oldCount);
+    if (!existing) {
+      return res.status(404).json({ error: 'Seuil introuvable' });
+    }
+
+    if (parsedCount !== oldCount) {
+      const collision = await WarnAction.findByPk(parsedCount);
+      if (collision) {
+        return res.status(400).json({ error: `Un seuil d'avertissement existe déjà pour ${parsedCount} avertissement(s).` });
+      }
+      await WarnAction.destroy({ where: { warnsCount: oldCount } });
+      await WarnAction.create({
+        warnsCount: parsedCount,
+        action,
+        duration: parsedDuration
+      });
+    } else {
+      await existing.update({
+        action,
+        duration: parsedDuration
+      });
+    }
+
+    const warnActions = await fetchWarnActions();
+    return res.json({ warnActions });
+  }
+
   router.post(['/api/warnaction', '/dashboard/warnaction'], requireAdmin, handleWarnActionAdd);
+  router.put(['/api/warnaction/:count', '/dashboard/warnaction/:count'], requireAdmin, handleWarnActionUpdate);
   router.delete(['/api/warnaction/:count', '/dashboard/warnaction/:count'], requireAdmin, handleWarnActionDelete);
 
   // 3. Tickets Deploy Handler
@@ -158,11 +209,54 @@ function createFeaturesRouter(client) {
     return res.json({ roleRewards });
   }
 
+  async function handleRoleRewardUpdate(req, res) {
+    const oldLevel = parseInt(req.params.level, 10);
+    const { level, roleId, replacePreviousRole } = req.body;
+
+    const parsedLevel = parseInt(level, 10);
+    if (isNaN(parsedLevel) || parsedLevel < 1) {
+      return res.status(400).json({ error: 'Le niveau requis doit être un nombre positif supérieur à 0.' });
+    }
+    if (!roleId) {
+      return res.status(400).json({ error: 'Rôle requis' });
+    }
+
+    const existing = await RoleReward.findByPk(oldLevel);
+    if (!existing) {
+      return res.status(404).json({ error: 'Récompense introuvable' });
+    }
+
+    const replaceBool = replacePreviousRole === true || replacePreviousRole === 'true';
+
+    if (parsedLevel !== oldLevel) {
+      const collision = await RoleReward.findByPk(parsedLevel);
+      if (collision) {
+        return res.status(400).json({ error: `Une récompense existe déjà pour le niveau ${parsedLevel}.` });
+      }
+      await RoleReward.destroy({ where: { level: oldLevel } });
+      await RoleReward.create({
+        level: parsedLevel,
+        roleId,
+        replacePreviousRole: replaceBool
+      });
+    } else {
+      await existing.update({
+        roleId,
+        replacePreviousRole: replaceBool
+      });
+    }
+
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleRewards = await fetchRoleRewards(guild);
+    return res.json({ roleRewards });
+  }
+
   router.post(['/api/rolereward', '/dashboard/rolereward'], requireAdmin, handleRoleRewardAdd);
+  router.put(['/api/rolereward/:level', '/dashboard/rolereward/:level'], requireAdmin, handleRoleRewardUpdate);
   router.delete(['/api/rolereward/:level', '/dashboard/rolereward/:level'], requireAdmin, handleRoleRewardDelete);
 
   // 5. Automod Rules Handlers
-  async function handleAutomodAdd(req, res) {
+  function buildAutomodData(body) {
     const { 
       channelId, ruleType, 
       spam_max, spam_interval, 
@@ -170,13 +264,13 @@ function createFeaturesRouter(client) {
       words_list, 
       min_length, max_length, regex_pattern,
       scope, monitoredTypes, customReason 
-    } = req.body;
+    } = body;
     
     let actionsArray = [];
-    if (Array.isArray(req.body.actions)) {
-      actionsArray = req.body.actions;
-    } else if (req.body.actions) {
-      actionsArray = [req.body.actions];
+    if (Array.isArray(body.actions)) {
+      actionsArray = body.actions;
+    } else if (body.actions) {
+      actionsArray = [body.actions];
     } else {
       actionsArray = ['delete'];
     }
@@ -185,13 +279,13 @@ function createFeaturesRouter(client) {
     let parameters = '{}';
     if (ruleType === 'spam') {
       parameters = JSON.stringify({
-        maxMessages: parseInt(spam_max || 5),
-        intervalSeconds: parseInt(spam_interval || 5)
+        maxMessages: parseInt(spam_max || 5, 10),
+        intervalSeconds: parseInt(spam_interval || 5, 10)
       });
     } else if (ruleType === 'duplicate') {
       parameters = JSON.stringify({
-        maxDuplicates: parseInt(duplicate_max || 3),
-        intervalSeconds: parseInt(duplicate_interval || 15)
+        maxDuplicates: parseInt(duplicate_max || 3, 10),
+        intervalSeconds: parseInt(duplicate_interval || 15, 10)
       });
     } else if (ruleType === 'words_blacklist' || ruleType === 'words_whitelist') {
       const words = Array.isArray(words_list)
@@ -199,22 +293,42 @@ function createFeaturesRouter(client) {
         : (words_list ? words_list.split(',').map(w => w.trim()).filter(w => w.length > 0) : []);
       parameters = JSON.stringify(words);
     } else if (ruleType === 'min_length') {
-      parameters = JSON.stringify({ minLength: parseInt(min_length || 0) });
+      parameters = JSON.stringify({ minLength: parseInt(min_length || 0, 10) });
     } else if (ruleType === 'max_length') {
-      parameters = JSON.stringify({ maxLength: parseInt(max_length || 2000) });
+      parameters = JSON.stringify({ maxLength: parseInt(max_length || 2000, 10) });
     } else if (ruleType === 'regex') {
       parameters = JSON.stringify({ pattern: regex_pattern || '' });
     }
 
-    await AutomodRule.create({
-      channelId,
+    return {
+      channelId: channelId || 'global',
       ruleType,
       parameters,
       actions: actionsJson,
       scope: scope || 'all_messages',
       monitoredTypes: monitoredTypes || 'all',
       customReason: customReason || null
-    });
+    };
+  }
+
+  async function handleAutomodAdd(req, res) {
+    const ruleData = buildAutomodData(req.body);
+    await AutomodRule.create(ruleData);
+
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const automodRules = await fetchAutomodRules(guild);
+    return res.json({ automodRules });
+  }
+
+  async function handleAutomodUpdate(req, res) {
+    const id = req.params.id;
+    const rule = await AutomodRule.findByPk(id);
+    if (!rule) {
+      return res.status(404).json({ error: 'Règle introuvable' });
+    }
+
+    const ruleData = buildAutomodData(req.body);
+    await rule.update(ruleData);
 
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
     const automodRules = await fetchAutomodRules(guild);
@@ -230,6 +344,7 @@ function createFeaturesRouter(client) {
   }
 
   router.post(['/api/automod', '/dashboard/automod'], requireAdmin, handleAutomodAdd);
+  router.put(['/api/automod/:id', '/dashboard/automod/:id'], requireAdmin, handleAutomodUpdate);
   router.delete(['/api/automod/:id', '/dashboard/automod/:id'], requireAdmin, handleAutomodDelete);
 
   // 6. XP Multipliers Handlers
