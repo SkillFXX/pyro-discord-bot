@@ -1,7 +1,7 @@
-const { UserXP, RoleReward, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
+const { UserXP, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
-const { calculateLevelFromXP, getXPNeededForLevel } = require('../utils/xpHelper');
+const { calculateLevelFromXP, getXPNeededForLevel, handleRoleRewards } = require('../utils/xpHelper');
 const analyticsService = require('../../services/analyticsService');
 
 // Memory caches to avoid DB spam
@@ -141,70 +141,6 @@ async function handleXP(message, client) {
 
   } catch (error) {
     console.error('[XP System] Erreur lors de la gestion de l\'XP :', error);
-  }
-}
-
-/**
- * Handles role rewards when leveling up
- */
-async function handleRoleRewards(member, newLevel) {
-  try {
-    const guild = member.guild;
-    const botMember = guild.members.me;
-
-    // Get all rewards up to the new level
-    const rewards = await RoleReward.findAll({
-      order: [['level', 'ASC']],
-    });
-
-    if (rewards.length === 0) return;
-
-    const rolesToAdd = [];
-    const rolesToRemove = [];
-
-    // Separate active rewards and previous rewards that should be replaced
-    for (const reward of rewards) {
-      const role = guild.roles.cache.get(reward.roleId);
-      if (!role) continue;
-
-      // Check if role is assignable
-      if (role.position >= botMember.roles.highest.position) {
-        console.warn(`[XP Rewards] Cannot manage role ${role.name} - higher than bot highest role.`);
-        continue;
-      }
-
-      if (reward.level <= newLevel) {
-        // User is eligible for this role
-        if (!member.roles.cache.has(reward.roleId)) {
-          rolesToAdd.push(role);
-        }
-
-        // If this level reward replaces previous level rewards
-        if (reward.replacePreviousRole && reward.level === newLevel) {
-          // Find lower rewards
-          const lowerRewards = rewards.filter(r => r.level < newLevel);
-          for (const lr of lowerRewards) {
-            const lowerRole = guild.roles.cache.get(lr.roleId);
-            if (lowerRole && member.roles.cache.has(lr.roleId)) {
-              rolesToRemove.push(lowerRole);
-            }
-          }
-        }
-      }
-    }
-
-    // Apply changes
-    if (rolesToRemove.length > 0) {
-      await member.roles.remove(rolesToRemove, `XP Remplacement Rôles (Niveau ${newLevel})`);
-      console.log(`[XP Rewards] Retrait de ${rolesToRemove.length} rôles à ${member.user.tag}`);
-    }
-    if (rolesToAdd.length > 0) {
-      await member.roles.add(rolesToAdd, `XP Récompense Niveau ${newLevel}`);
-      console.log(`[XP Rewards] Attribution de ${rolesToAdd.length} rôles à ${member.user.tag}`);
-    }
-
-  } catch (error) {
-    console.error('[XP Rewards] Erreur lors de la distribution des rôles :', error);
   }
 }
 

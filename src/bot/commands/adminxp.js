@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
-const { calculateLevelFromXP } = require('../utils/xpHelper');
+const { calculateLevelFromXP, handleRoleRewards } = require('../utils/xpHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -74,6 +74,12 @@ module.exports = {
       record.xp = newXP;
       record.level = newLevel;
       await record.save();
+
+      // Synchronize role rewards for target member
+      const targetMember = interaction.guild ? await interaction.guild.members.fetch(target.id).catch(() => null) : null;
+      if (targetMember) {
+        await handleRoleRewards(targetMember, newLevel);
+      }
 
       const successEmbed = embeds.success(
         `L'XP de ${target} a été modifiée avec succès.\n\n` +
