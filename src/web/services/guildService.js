@@ -5,6 +5,7 @@ const {
   RoleReward, 
   AutomodRule, 
   XPMultiplier, 
+  RoleXPMultiplier,
   UserSnapshot 
 } = require('../../database');
 
@@ -169,19 +170,41 @@ async function fetchXpMultipliers(guild) {
   });
 }
 
+async function fetchRoleXpMultipliers(guild) {
+  const dbRoleMultipliers = await RoleXPMultiplier.findAll();
+  return dbRoleMultipliers.map(m => {
+    let roleName = 'Inconnu';
+    let roleColor = null;
+    if (guild) {
+      const r = guild.roles.cache.get(m.roleId);
+      if (r) {
+        roleName = r.name;
+        roleColor = r.hexColor !== '#000000' ? r.hexColor : null;
+      }
+    }
+    return {
+      roleId: m.roleId,
+      roleName,
+      roleColor,
+      multiplier: m.multiplier
+    };
+  });
+}
+
 async function getDashboardLists(client) {
   const guildId = process.env.GUILD_ID;
   const guild = client.guilds.cache.get(guildId);
 
-  const [autoRoles, warnActions, roleRewards, automodRules, xpMultipliers] = await Promise.all([
+  const [autoRoles, warnActions, roleRewards, automodRules, xpMultipliers, roleXpMultipliers] = await Promise.all([
     fetchAutoRoles(guild),
     fetchWarnActions(),
     fetchRoleRewards(guild),
     fetchAutomodRules(guild),
     fetchXpMultipliers(guild),
+    fetchRoleXpMultipliers(guild),
   ]);
 
-  return { autoRoles, warnActions, roleRewards, automodRules, xpMultipliers };
+  return { autoRoles, warnActions, roleRewards, automodRules, xpMultipliers, roleXpMultipliers };
 }
 
 module.exports = {
@@ -192,6 +215,7 @@ module.exports = {
   fetchRoleRewards,
   fetchAutomodRules,
   fetchXpMultipliers,
+  fetchRoleXpMultipliers,
   getDashboardLists
 };
 

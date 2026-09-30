@@ -176,6 +176,18 @@ const XPMultiplier = sequelize.define('XPMultiplier', {
   },
 });
 
+// 9b. RoleXPMultiplier: Custom XP multiplier per role
+const RoleXPMultiplier = sequelize.define('RoleXPMultiplier', {
+  roleId: {
+    type: DataTypes.STRING,
+    primaryKey: true,
+  },
+  multiplier: {
+    type: DataTypes.FLOAT,
+    defaultValue: 1.0,
+  },
+});
+
 // 10. MessageLog: Tracks messages for analytics
 const MessageLog = sequelize.define('MessageLog', {
   id: {
@@ -510,6 +522,7 @@ module.exports = {
   AutomodRule,
   AutoRole,
   XPMultiplier,
+  RoleXPMultiplier,
   MessageLog,
   VoiceLog,
   MemberLog,

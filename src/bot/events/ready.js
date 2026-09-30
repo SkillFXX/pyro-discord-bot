@@ -42,6 +42,10 @@ module.exports = {
       memberCounterService.updateMemberCounter(guild, { force: false });
     }, 10 * 60 * 1000).unref();
 
+    // Initialize Voice XP Service
+    const voiceXpService = require('../../services/voiceXpService');
+    voiceXpService.start(client);
+
     // Send Boot / Startup Log
     try {
       const loggerService = require('../../services/loggerService');

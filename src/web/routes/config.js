@@ -65,6 +65,24 @@ async function handleConfigSave(section, body, client) {
     if (body.xp_announcement_channel_id !== undefined) {
       await ConfigHelper.set('xp_announcement_channel_id', body.xp_announcement_channel_id || '');
     }
+    if (body.xp_voice_enabled !== undefined) {
+      await ConfigHelper.set('xp_voice_enabled', body.xp_voice_enabled === true || body.xp_voice_enabled === 'true');
+    }
+    if (body.xp_voice_gain !== undefined) {
+      await ConfigHelper.set('xp_voice_gain', parseInt(body.xp_voice_gain || 10, 10));
+    }
+    if (body.xp_voice_interval_seconds !== undefined) {
+      await ConfigHelper.set('xp_voice_interval_seconds', Math.max(10, parseInt(body.xp_voice_interval_seconds || 60, 10)));
+    }
+    if (body.xp_voice_min_members !== undefined) {
+      await ConfigHelper.set('xp_voice_min_members', Math.max(1, parseInt(body.xp_voice_min_members || 2, 10)));
+    }
+    if (body.xp_voice_ignore_muted !== undefined) {
+      await ConfigHelper.set('xp_voice_ignore_muted', body.xp_voice_ignore_muted === true || body.xp_voice_ignore_muted === 'true');
+    }
+    if (body.xp_voice_ignore_deafened !== undefined) {
+      await ConfigHelper.set('xp_voice_ignore_deafened', body.xp_voice_ignore_deafened === true || body.xp_voice_ignore_deafened === 'true');
+    }
   }
 }
 

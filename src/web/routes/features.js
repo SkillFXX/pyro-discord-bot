@@ -6,6 +6,7 @@ const {
   RoleReward, 
   AutomodRule, 
   XPMultiplier, 
+  RoleXPMultiplier,
   ConfigHelper 
 } = require('../../database');
 const { 
@@ -13,7 +14,8 @@ const {
   fetchWarnActions, 
   fetchRoleRewards, 
   fetchAutomodRules, 
-  fetchXpMultipliers 
+  fetchXpMultipliers,
+  fetchRoleXpMultipliers
 } = require('../services/guildService');
 const { requireAdmin } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
@@ -361,6 +363,19 @@ function createFeaturesRouter(client) {
     return res.json({ xpMultipliers });
   }
 
+  async function handleXpMultiplierUpdate(req, res) {
+    const channelId = req.params.channelId;
+    const { multiplier } = req.body;
+    const existing = await XPMultiplier.findByPk(channelId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Multiplicateur introuvable' });
+    }
+    await existing.update({ multiplier: parseFloat(multiplier) });
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const xpMultipliers = await fetchXpMultipliers(guild);
+    return res.json({ xpMultipliers });
+  }
+
   async function handleXpMultiplierDelete(req, res) {
     const channelId = req.params.channelId;
     await XPMultiplier.destroy({ where: { channelId } });
@@ -370,7 +385,47 @@ function createFeaturesRouter(client) {
   }
 
   router.post(['/api/xpmultiplier', '/dashboard/xpmultiplier'], requireAdmin, handleXpMultiplierAdd);
+  router.put(['/api/xpmultiplier/:channelId', '/dashboard/xpmultiplier/:channelId'], requireAdmin, handleXpMultiplierUpdate);
   router.delete(['/api/xpmultiplier/:channelId', '/dashboard/xpmultiplier/:channelId'], requireAdmin, handleXpMultiplierDelete);
+
+  // 7. Role XP Multipliers Handlers
+  async function handleRoleXpMultiplierAdd(req, res) {
+    const { roleId, multiplier } = req.body;
+    if (roleId && multiplier) {
+      await RoleXPMultiplier.upsert({
+        roleId,
+        multiplier: parseFloat(multiplier)
+      });
+    }
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleXpMultipliers = await fetchRoleXpMultipliers(guild);
+    return res.json({ roleXpMultipliers });
+  }
+
+  async function handleRoleXpMultiplierUpdate(req, res) {
+    const roleId = req.params.roleId;
+    const { multiplier } = req.body;
+    const existing = await RoleXPMultiplier.findByPk(roleId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Multiplicateur de rôle introuvable' });
+    }
+    await existing.update({ multiplier: parseFloat(multiplier) });
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleXpMultipliers = await fetchRoleXpMultipliers(guild);
+    return res.json({ roleXpMultipliers });
+  }
+
+  async function handleRoleXpMultiplierDelete(req, res) {
+    const roleId = req.params.roleId;
+    await RoleXPMultiplier.destroy({ where: { roleId } });
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    const roleXpMultipliers = await fetchRoleXpMultipliers(guild);
+    return res.json({ roleXpMultipliers });
+  }
+
+  router.post(['/api/rolexpmultiplier', '/dashboard/rolexpmultiplier'], requireAdmin, handleRoleXpMultiplierAdd);
+  router.put(['/api/rolexpmultiplier/:roleId', '/dashboard/rolexpmultiplier/:roleId'], requireAdmin, handleRoleXpMultiplierUpdate);
+  router.delete(['/api/rolexpmultiplier/:roleId', '/dashboard/rolexpmultiplier/:roleId'], requireAdmin, handleRoleXpMultiplierDelete);
 
   return router;
 }

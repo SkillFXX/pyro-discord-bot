@@ -16,6 +16,7 @@ export const dashboardData = writable({
   roleRewards: [],
   automodRules: [],
   xpMultipliers: [],
+  roleXpMultipliers: [],
   logConfigKeys: [],
 });
 
@@ -47,6 +48,7 @@ export async function loadDashboardData() {
         roleRewards: data.roleRewards || [],
         automodRules: data.automodRules || [],
         xpMultipliers: data.xpMultipliers || [],
+        roleXpMultipliers: data.roleXpMultipliers || [],
         logConfigKeys: data.logConfigKeys || [],
       });
     } else if (res.status === 401) {
@@ -313,6 +315,29 @@ export async function addXpMultiplier({ channelId, multiplier }) {
   }
 }
 
+export async function updateXpMultiplier(channelId, { multiplier }) {
+  try {
+    const res = await fetch(`/api/xpmultiplier/${channelId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ multiplier }),
+    });
+    if (res.ok) {
+      const { xpMultipliers } = await res.json();
+      dashboardData.update((d) => ({ ...d, xpMultipliers }));
+      showToast('Multiplicateur mis à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification', 'error');
+    return false;
+  }
+}
+
 export async function deleteXpMultiplier(channelId) {
   try {
     const res = await fetch(`/api/xpmultiplier/${channelId}`, {
@@ -323,6 +348,65 @@ export async function deleteXpMultiplier(channelId) {
       const { xpMultipliers } = await res.json();
       dashboardData.update((d) => ({ ...d, xpMultipliers }));
       showToast('Multiplicateur retiré !');
+    }
+  } catch (e) {
+    showToast('Erreur lors de la suppression', 'error');
+  }
+}
+
+// Role XP Multipliers
+export async function addRoleXpMultiplier({ roleId, multiplier }) {
+  try {
+    const res = await fetch('/api/rolexpmultiplier', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ roleId, multiplier }),
+    });
+    if (res.ok) {
+      const { roleXpMultipliers } = await res.json();
+      dashboardData.update((d) => ({ ...d, roleXpMultipliers }));
+      showToast('Multiplicateur de rôle enregistré !');
+      return true;
+    }
+  } catch (e) {
+    showToast('Erreur lors de l\'enregistrement', 'error');
+    return false;
+  }
+}
+
+export async function updateRoleXpMultiplier(roleId, { multiplier }) {
+  try {
+    const res = await fetch(`/api/rolexpmultiplier/${roleId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ multiplier }),
+    });
+    if (res.ok) {
+      const { roleXpMultipliers } = await res.json();
+      dashboardData.update((d) => ({ ...d, roleXpMultipliers }));
+      showToast('Multiplicateur de rôle mis à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification', 'error');
+    return false;
+  }
+}
+
+export async function deleteRoleXpMultiplier(roleId) {
+  try {
+    const res = await fetch(`/api/rolexpmultiplier/${roleId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const { roleXpMultipliers } = await res.json();
+      dashboardData.update((d) => ({ ...d, roleXpMultipliers }));
+      showToast('Multiplicateur de rôle retiré !');
     }
   } catch (e) {
     showToast('Erreur lors de la suppression', 'error');

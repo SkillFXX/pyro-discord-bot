@@ -1,7 +1,7 @@
 const { UserXP, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
-const { calculateLevelFromXP, getXPNeededForLevel, handleRoleRewards } = require('../utils/xpHelper');
+const { calculateLevelFromXP, getXPNeededForLevel, handleRoleRewards, getMemberRoleMultiplier, awardUserXP } = require('../utils/xpHelper');
 const analyticsService = require('../../services/analyticsService');
 
 // Memory caches to avoid DB spam
@@ -71,12 +71,6 @@ async function handleXP(message, client) {
   xpCooldowns.set(userId, now);
 
   try {
-    // Find or create User XP record
-    let [userRecord, created] = await UserXP.findOrCreate({
-      where: { userId },
-      defaults: { xp: 0, level: 0 },
-    });
-
     // Random XP gain (default: 15-25 XP)
     const minXP = await ConfigHelper.get('xp_min_gain', 15);
     const maxXP = await ConfigHelper.get('xp_max_gain', 25);
@@ -84,60 +78,22 @@ async function handleXP(message, client) {
     // Resolve channel ID for multiplier check (handles threads/forum posts parent channel)
     const xpChannelIdToCheck = message.channel.isThread() ? message.channel.parentId : message.channel.id;
     const multiplierRecord = await XPMultiplier.findByPk(xpChannelIdToCheck);
-    const xpMultiplier = multiplierRecord ? multiplierRecord.multiplier : 1.0;
+    const channelMultiplier = multiplierRecord ? multiplierRecord.multiplier : 1.0;
     
-    let xpGained = Math.floor(Math.random() * (maxXP - minXP + 1)) + minXP;
-    if (xpMultiplier !== 1.0) {
-      xpGained = Math.floor(xpGained * xpMultiplier);
-    }
+    // Resolve role multiplier
+    const roleMultiplier = await getMemberRoleMultiplier(message.member);
+    
+    const totalMultiplier = channelMultiplier * roleMultiplier;
+    let baseGain = Math.floor(Math.random() * (maxXP - minXP + 1)) + minXP;
+    let xpGained = Math.max(1, Math.floor(baseGain * totalMultiplier));
 
-    const newXP = userRecord.xp + xpGained;
-    const oldLevel = userRecord.level;
-    const newLevel = calculateLevelFromXP(newXP);
-    const levelUp = newLevel > oldLevel;
-
-    // Save user state
-    userRecord.xp = newXP;
-    userRecord.level = newLevel;
-    userRecord.lastMessageTimestamp = new Date(now);
-    await userRecord.save();
-
-    if (levelUp) {
-      // 1. Announce Level Up
-      const levelChannelId = await ConfigHelper.get('xp_announcement_channel_id');
-      if (levelChannelId) {
-        const channel = await message.guild.channels.fetch(levelChannelId).catch(() => null);
-        if (channel) {
-          const levelEmbed = embeds.custom(
-            '🎉 Passage de Niveau !',
-            `Félicitations ${message.author}, tu viens de passer au **Niveau ${newLevel}** ! 🚀`,
-            embeds.COLORS.SUCCESS,
-            null,
-            message.author.displayAvatarURL({ dynamic: true })
-          );
-          await channel.send({ embeds: [levelEmbed] });
-        }
-      }
-
-      // 2. Log in centralized logger
-      const loggerService = require('../../services/loggerService');
-      await loggerService.log(client, 'log_bot_xp', {
-        title: '⭐ Montée de Niveau (Level Up)',
-        description: `**${message.author.tag}** a progressé jusqu'au **Niveau ${newLevel}** !`,
-        color: '#F1C40F',
-        thumbnail: message.author.displayAvatarURL({ dynamic: true }),
-        fields: [
-          { name: '👤 Membre', value: `${message.author} (\`${message.author.id}\`)`, inline: true },
-          { name: 'Niveau Précédent', value: `${oldLevel}`, inline: true },
-          { name: 'Nouveau Niveau', value: `${newLevel}`, inline: true },
-          { name: 'XP Totale', value: `${newXP} XP`, inline: true },
-        ],
-        footer: { text: 'Pyro Niveaux & XP' },
-      });
-
-      // 3. Distribute Role Rewards
-      await handleRoleRewards(message.member, newLevel);
-    }
+    await awardUserXP({
+      client,
+      member: message.member,
+      xpAmount: xpGained,
+      source: 'message',
+      textChannel: message.channel,
+    });
 
   } catch (error) {
     console.error('[XP System] Erreur lors de la gestion de l\'XP :', error);

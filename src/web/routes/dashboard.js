@@ -32,6 +32,7 @@ function createDashboardRouter(client, distDir) {
         'ticket_panel_title', 'ticket_panel_message',
         'ticket_embed_title', 'ticket_embed_message',
         'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
+        'xp_voice_enabled', 'xp_voice_gain', 'xp_voice_interval_seconds', 'xp_voice_min_members', 'xp_voice_ignore_muted', 'xp_voice_ignore_deafened',
         ...logKeys
       ];
 
@@ -59,7 +60,7 @@ function createDashboardRouter(client, distDir) {
         permissions: req.session.permissions || null,
         config: isAdmin ? config : {},
         logConfigKeys: isAdmin ? LOG_CONFIG_KEYS : [],
-        ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [] })
+        ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [], roleXpMultipliers: [] })
       });
     } catch (error) {
       console.error('[API Dashboard Init] Error:', error);

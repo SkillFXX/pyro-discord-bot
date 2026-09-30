@@ -1,4 +1,4 @@
-const { RoleReward } = require('../../database');
+const { RoleReward, RoleXPMultiplier, UserXP, ConfigHelper } = require('../../database');
 
 /**
  * XP & Level Calculation Helper
@@ -153,10 +153,117 @@ async function handleRoleRewards(member, currentLevel) {
   }
 }
 
+/**
+ * Resolves the highest XP multiplier applicable to a member based on their Discord roles.
+ * @param {import('discord.js').GuildMember} member 
+ * @returns {Promise<number>} Multiplier (minimum 1.0)
+ */
+async function getMemberRoleMultiplier(member) {
+  if (!member || !member.roles || !member.roles.cache) return 1.0;
+  try {
+    const roleMultipliers = await RoleXPMultiplier.findAll();
+    if (!roleMultipliers || roleMultipliers.length === 0) return 1.0;
+
+    let highestMultiplier = 1.0;
+    for (const rm of roleMultipliers) {
+      if (member.roles.cache.has(rm.roleId)) {
+        if (rm.multiplier > highestMultiplier) {
+          highestMultiplier = rm.multiplier;
+        }
+      }
+    }
+    return highestMultiplier;
+  } catch (error) {
+    console.error('[XP Multiplier] Erreur lors de la récupération du multiplicateur de rôle :', error);
+    return 1.0;
+  }
+}
+
+/**
+ * Awards XP to a member, updates their record, handles level ups, sends announcements and assigns role rewards.
+ * @param {Object} params
+ * @param {import('discord.js').Client} params.client
+ * @param {import('discord.js').GuildMember} params.member
+ * @param {number} params.xpAmount
+ * @param {'message'|'voice'|'admin'} [params.source='message']
+ * @param {import('discord.js').TextChannel} [params.textChannel=null]
+ * @returns {Promise<{ oldXP: number, newXP: number, oldLevel: number, newLevel: number, levelUp: boolean, xpGained: number }|null>}
+ */
+async function awardUserXP({ client, member, xpAmount, source = 'message', textChannel = null }) {
+  if (!member || !member.user || member.user.bot) return null;
+  const userId = member.user.id;
+  const guild = member.guild;
+
+  const [userRecord] = await UserXP.findOrCreate({
+    where: { userId },
+    defaults: { xp: 0, level: 0 },
+  });
+
+  const oldXP = userRecord.xp;
+  const oldLevel = userRecord.level;
+  const newXP = oldXP + xpAmount;
+  const newLevel = calculateLevelFromXP(newXP);
+  const levelUp = newLevel > oldLevel;
+
+  userRecord.xp = newXP;
+  userRecord.level = newLevel;
+  if (source === 'message') {
+    userRecord.lastMessageTimestamp = new Date();
+  }
+  await userRecord.save();
+
+  if (levelUp) {
+    // 1. Announce Level Up
+    const levelChannelId = await ConfigHelper.get('xp_announcement_channel_id');
+    let channelToAnnounce = null;
+    if (levelChannelId) {
+      channelToAnnounce = await guild.channels.fetch(levelChannelId).catch(() => null);
+    } else if (textChannel) {
+      channelToAnnounce = textChannel;
+    }
+
+    if (channelToAnnounce) {
+      const embeds = require('./embeds');
+      const levelEmbed = embeds.custom(
+        '🎉 Passage de Niveau !',
+        `Félicitations ${member}, tu viens de passer au **Niveau ${newLevel}** ! 🚀`,
+        embeds.COLORS.SUCCESS,
+        null,
+        member.user.displayAvatarURL({ dynamic: true })
+      );
+      await channelToAnnounce.send({ embeds: [levelEmbed] }).catch(() => null);
+    }
+
+    // 2. Centralized Logger
+    const loggerService = require('../../services/loggerService');
+    await loggerService.log(client, 'log_bot_xp', {
+      title: '⭐ Montée de Niveau (Level Up)',
+      description: `**${member.user.tag}** a progressé jusqu'au **Niveau ${newLevel}** ! (${source === 'voice' ? 'Vocal' : 'Texte'})`,
+      color: '#F1C40F',
+      thumbnail: member.user.displayAvatarURL({ dynamic: true }),
+      fields: [
+        { name: '👤 Membre', value: `${member} (\`${member.id}\`)`, inline: true },
+        { name: 'Niveau Précédent', value: `${oldLevel}`, inline: true },
+        { name: 'Nouveau Niveau', value: `${newLevel}`, inline: true },
+        { name: 'XP Totale', value: `${newXP} XP`, inline: true },
+        { name: 'Source', value: `${source === 'voice' ? '🎙️ Salon Vocal' : '💬 Salon Textuel'}`, inline: true },
+      ],
+      footer: { text: 'Pyro Niveaux & XP' },
+    });
+
+    // 3. Distribute / adjust Role Rewards
+    await handleRoleRewards(member, newLevel);
+  }
+
+  return { oldXP, newXP, oldLevel, newLevel, levelUp, xpGained: xpAmount };
+}
+
 module.exports = {
   getXPNeededForLevel,
   calculateLevelFromXP,
   makeProgressBar,
   getExpectedRoleIds,
   handleRoleRewards,
+  getMemberRoleMultiplier,
+  awardUserXP,
 };

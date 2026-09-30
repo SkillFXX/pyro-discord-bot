@@ -1,5 +1,5 @@
 <script>
-  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save } from '@lucide/svelte';
+  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save, Mic, Users, VolumeX, MicOff } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import Toggle from '../components/Toggle.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -8,7 +8,11 @@
     dashboardData,
     saveConfig,
     addXpMultiplier,
+    updateXpMultiplier,
     deleteXpMultiplier,
+    addRoleXpMultiplier,
+    updateRoleXpMultiplier,
+    deleteRoleXpMultiplier,
     addRoleReward,
     updateRoleReward,
     deleteRoleReward,
@@ -19,10 +23,27 @@
 
   // Local form states
   let savingXp = false;
+  let savingVoiceXp = false;
 
-  // New XP Multiplier
+  // New Channel XP Multiplier
   let multChannelId = '';
   let multValue = 2.0;
+
+  // Edit Channel Multiplier Modal
+  let showEditChannelMultModal = false;
+  let editChannelId = '';
+  let editChannelName = '';
+  let editChannelValue = 2.0;
+
+  // New Role XP Multiplier
+  let roleMultId = '';
+  let roleMultValue = 2.0;
+
+  // Edit Role Multiplier Modal
+  let showEditRoleMultModal = false;
+  let editRoleId = '';
+  let editRoleName = '';
+  let editRoleValue = 2.0;
 
   // New Role Reward
   let rewardLevel = '';
@@ -51,6 +72,19 @@
     savingXp = false;
   }
 
+  async function handleSaveVoiceXpConfig() {
+    savingVoiceXp = true;
+    await saveConfig('xp', {
+      xp_voice_enabled: $dashboardData.config.xp_voice_enabled,
+      xp_voice_gain: parseInt($dashboardData.config.xp_voice_gain ?? 10),
+      xp_voice_interval_seconds: parseInt($dashboardData.config.xp_voice_interval_seconds ?? 60),
+      xp_voice_min_members: parseInt($dashboardData.config.xp_voice_min_members ?? 2),
+      xp_voice_ignore_muted: $dashboardData.config.xp_voice_ignore_muted ?? true,
+      xp_voice_ignore_deafened: $dashboardData.config.xp_voice_ignore_deafened ?? true,
+    });
+    savingVoiceXp = false;
+  }
+
   async function handleAddMultiplier() {
     if (!multChannelId) return;
     await addXpMultiplier({
@@ -58,6 +92,55 @@
       multiplier: parseFloat(multValue),
     });
     multChannelId = '';
+  }
+
+  function openEditChannelMultModal(item) {
+    editChannelId = item.channelId;
+    editChannelName = item.channelName || item.channelId;
+    editChannelValue = item.multiplier;
+    showEditChannelMultModal = true;
+  }
+
+  async function handleEditChannelMultiplier() {
+    if (!editChannelId) return;
+    const parsed = parseFloat(editChannelValue);
+    if (isNaN(parsed) || parsed <= 0) {
+      showToast('Le multiplicateur doit être un nombre positif', 'error');
+      return;
+    }
+    const success = await updateXpMultiplier(editChannelId, { multiplier: parsed });
+    if (success) {
+      showEditChannelMultModal = false;
+    }
+  }
+
+  async function handleAddRoleMultiplier() {
+    if (!roleMultId) return;
+    await addRoleXpMultiplier({
+      roleId: roleMultId,
+      multiplier: parseFloat(roleMultValue),
+    });
+    roleMultId = '';
+  }
+
+  function openEditRoleMultModal(item) {
+    editRoleId = item.roleId;
+    editRoleName = item.roleName || item.roleId;
+    editRoleValue = item.multiplier;
+    showEditRoleMultModal = true;
+  }
+
+  async function handleEditRoleMultiplier() {
+    if (!editRoleId) return;
+    const parsed = parseFloat(editRoleValue);
+    if (isNaN(parsed) || parsed <= 0) {
+      showToast('Le multiplicateur doit être un nombre positif', 'error');
+      return;
+    }
+    const success = await updateRoleXpMultiplier(editRoleId, { multiplier: parsed });
+    if (success) {
+      showEditRoleMultModal = false;
+    }
   }
 
   async function handleAddReward() {
@@ -110,19 +193,19 @@
     <div>
       <h2><Award size={24} class="title-icon" /> Niveaux, Récompenses & Auto-Rôles</h2>
       <p class="section-desc">
-        Configurez le système de progression par XP, les multiplicateurs par salon, les rôles de niveaux et les rôles d'arrivée.
+        Configurez le système de progression par XP (messages et vocal), les multiplicateurs par salon et par rôle, les rôles de niveaux et les rôles d'arrivée.
       </p>
     </div>
   </div>
 
-  <!-- SECTION 1: XP Core Config -->
-  <Card id="levels-xp" icon={Zap} title="Système de Niveaux & XP" subtitle="Gains d'XP par message et canal d'annonce">
+  <!-- SECTION 1: XP Core Config (Text Messages) -->
+  <Card id="levels-xp" icon={Zap} title="Système de Niveaux & XP (Textuel)" subtitle="Gains d'XP par message écrit et canal d'annonce">
     <form on:submit|preventDefault={handleSaveXpConfig}>
       <Toggle
         id="xp_enabled"
         bind:checked={$dashboardData.config.xp_enabled}
-        label="Activer le système de gain d'XP et niveaux"
-        description="Permet aux membres de gagner de l'XP en envoyant des messages sur le serveur."
+        label="Activer le système de gain d'XP par message"
+        description="Permet aux membres de gagner de l'XP en envoyant des messages textuels sur le serveur."
       />
 
       <div class="grid-2" style="margin-top: 1.5rem;">
@@ -180,9 +263,87 @@
     </form>
   </Card>
 
-  <!-- SECTION 2: Multiplicateurs d'XP par Salon -->
+  <!-- SECTION 2: Voice XP System -->
   <div style="margin-top: 1.5rem;">
-    <Card id="levels-multipliers" icon={Zap} title="Multiplicateurs d'XP par Salon" subtitle="Bonus d'XP accordés dans certains salons spécifiques">
+    <Card id="levels-voice-xp" icon={Mic} title="Système de Gain d'XP Vocal" subtitle="Attribution périodique d'XP aux membres actifs dans les salons vocaux">
+      <form on:submit|preventDefault={handleSaveVoiceXpConfig}>
+        <Toggle
+          id="xp_voice_enabled"
+          bind:checked={$dashboardData.config.xp_voice_enabled}
+          label="Activer le gain d'XP en vocal"
+          description="Permet aux membres de progresser en participant aux salons vocaux du serveur."
+        />
+
+        <div class="grid-3" style="margin-top: 1.5rem;">
+          <div class="form-group">
+            <label for="xp_voice_gain">Gain d'XP par cycle</label>
+            <input
+              id="xp_voice_gain"
+              type="number"
+              bind:value={$dashboardData.config.xp_voice_gain}
+              min="1"
+              required
+              placeholder="Ex: 10"
+            />
+            <small style="color:var(--text-muted); font-size: 0.75rem;">Montant d'XP brut attribué à chaque membre éligible.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="xp_voice_interval">Intervalle (en secondes)</label>
+            <input
+              id="xp_voice_interval"
+              type="number"
+              bind:value={$dashboardData.config.xp_voice_interval_seconds}
+              min="10"
+              step="5"
+              required
+              placeholder="Ex: 60"
+            />
+            <small style="color:var(--text-muted); font-size: 0.75rem;">Temps d'activité requis pour recevoir le gain (ex: 60s pour 1 minute).</small>
+          </div>
+
+          <div class="form-group">
+            <label for="xp_voice_min_members">Minimum de personnes dans le salon</label>
+            <input
+              id="xp_voice_min_members"
+              type="number"
+              bind:value={$dashboardData.config.xp_voice_min_members}
+              min="1"
+              max="50"
+              required
+              placeholder="Ex: 2"
+            />
+            <small style="color:var(--text-muted); font-size: 0.75rem;">Condition anti-solitaire (ex: au moins 2 personnes réelles pour que le vocal compte).</small>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 1rem;">
+          <Toggle
+            id="xp_voice_ignore_muted"
+            bind:checked={$dashboardData.config.xp_voice_ignore_muted}
+            label="Ignorer les membres muets (micro coupé)"
+            description="Exclut du gain d'XP les membres avec leur micro coupé (anti-AFK micro)."
+          />
+
+          <Toggle
+            id="xp_voice_ignore_deafened"
+            bind:checked={$dashboardData.config.xp_voice_ignore_deafened}
+            label="Ignorer les membres en sourdine (casque coupé)"
+            description="Exclut du gain d'XP les membres avec le son désactivé (anti-AFK casque)."
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary" disabled={savingVoiceXp} style="margin-top: 1rem; width: 240px;">
+          <Save size={16} style="vertical-align: middle; margin-right: 6px;" />
+          {savingVoiceXp ? 'Enregistrement...' : 'Enregistrer le vocal'}
+        </button>
+      </form>
+    </Card>
+  </div>
+
+  <!-- SECTION 3: Multiplicateurs d'XP par Salon -->
+  <div style="margin-top: 1.5rem;">
+    <Card id="levels-multipliers" icon={Zap} title="Multiplicateurs d'XP par Salon" subtitle="Bonus d'XP accordés dans certains salons textuels spécifiques">
       <form on:submit|preventDefault={handleAddMultiplier}>
         <div class="inline-form-row" style="grid-template-columns: 1fr 1fr auto;">
           <div class="form-group">
@@ -218,14 +379,22 @@
       </form>
 
       <DataTable
-        headers={['Salon', 'Multiplicateur', 'Action']}
+        headers={['Salon', 'Multiplicateur', 'Actions']}
         items={$dashboardData.xpMultipliers}
-        emptyMessage="Aucun multiplicateur d'XP configuré."
+        emptyMessage="Aucun multiplicateur d'XP par salon configuré."
       >
         <tr slot="row" let:item>
           <td><strong>#{item.channelName || item.channelId}</strong></td>
           <td><span class="num-shape num-shape-accent">× {item.multiplier}</span></td>
-          <td style="text-align: right;">
+          <td style="text-align: right; white-space: nowrap;">
+            <button
+              class="btn btn-secondary"
+              style="padding: 0.35rem 0.6rem; font-size: 0.8rem; margin-right: 6px;"
+              on:click={() => openEditChannelMultModal(item)}
+              title="Modifier"
+            >
+              <Pencil size={14} />
+            </button>
             <button
               class="btn btn-danger"
               style="padding: 0.35rem 0.6rem; font-size: 0.8rem;"
@@ -240,7 +409,77 @@
     </Card>
   </div>
 
-  <!-- SECTION 3: Rôles Récompenses par Niveau -->
+  <!-- SECTION 4: Multiplicateurs d'XP par Rôle -->
+  <div style="margin-top: 1.5rem;">
+    <Card id="levels-role-multipliers" icon={Award} title="Multiplicateurs d'XP par Rôle" subtitle="Bonus d'XP accordés selon les rôles du membre (VIP, Boosters, Donateurs...)">
+      <form on:submit|preventDefault={handleAddRoleMultiplier}>
+        <div class="inline-form-row" style="grid-template-columns: 1fr 1fr auto;">
+          <div class="form-group">
+            <label for="mult_role">Rôle concerné</label>
+            <select id="mult_role" bind:value={roleMultId} required>
+              <option value="">-- Choisir un rôle --</option>
+              {#each $dashboardData.roles as r}
+                <option value={r.id}>@{r.name}</option>
+              {/each}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="role_mult_val">Multiplicateur (ex: 1.5 pour ×1.5)</label>
+            <input
+              id="role_mult_val"
+              type="number"
+              bind:value={roleMultValue}
+              min="0.1"
+              max="10"
+              step="0.1"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <button type="submit" class="btn btn-primary inline-form-btn">
+              <Plus size={16} />
+              Ajouter
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <DataTable
+        headers={['Rôle', 'Multiplicateur', 'Actions']}
+        items={$dashboardData.roleXpMultipliers}
+        emptyMessage="Aucun multiplicateur d'XP par rôle configuré."
+      >
+        <tr slot="row" let:item>
+          <td>
+            <strong style="color: {item.roleColor || 'inherit'}">@{item.roleName}</strong>
+          </td>
+          <td><span class="num-shape num-shape-accent">× {item.multiplier}</span></td>
+          <td style="text-align: right; white-space: nowrap;">
+            <button
+              class="btn btn-secondary"
+              style="padding: 0.35rem 0.6rem; font-size: 0.8rem; margin-right: 6px;"
+              on:click={() => openEditRoleMultModal(item)}
+              title="Modifier"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              class="btn btn-danger"
+              style="padding: 0.35rem 0.6rem; font-size: 0.8rem;"
+              on:click={() => deleteRoleXpMultiplier(item.roleId)}
+              title="Supprimer"
+            >
+              <Trash2 size={14} />
+            </button>
+          </td>
+        </tr>
+      </DataTable>
+    </Card>
+  </div>
+
+  <!-- SECTION 5: Rôles Récompenses par Niveau -->
   <div style="margin-top: 1.5rem;">
     <Card id="levels-rewards" icon={Award} title="Rôles Récompenses (Niveaux)" subtitle="Rôles attribués automatiquement quand un membre franchit un niveau">
       <form on:submit|preventDefault={handleAddReward}>
@@ -315,7 +554,7 @@
     </Card>
   </div>
 
-  <!-- SECTION 4: Auto-Rôles à l'Arrivée -->
+  <!-- SECTION 6: Auto-Rôles à l'Arrivée -->
   <div style="margin-top: 1.5rem;">
     <Card id="levels-autoroles" icon={UserPlus} title="Rôles Automatiques (Auto-Roles)" subtitle="Attribués immédiatement aux nouveaux arrivants sur le serveur">
       <form on:submit|preventDefault={handleAddAutoRole}>
@@ -401,5 +640,60 @@
       </div>
     </form>
   </Modal>
-</div>
 
+  <!-- Modal: Modifier un Multiplicateur de Salon -->
+  <Modal bind:open={showEditChannelMultModal} title="Modifier le Multiplicateur de Salon">
+    <form on:submit|preventDefault={handleEditChannelMultiplier}>
+      <div class="form-group">
+        <label for="edit_channel_label">Salon concerné</label>
+        <input id="edit_channel_label" type="text" value={`#${editChannelName}`} disabled />
+      </div>
+
+      <div class="form-group">
+        <label for="edit_channel_mult_val">Multiplicateur d'XP (ex: 2.0 pour ×2)</label>
+        <input
+          id="edit_channel_mult_val"
+          type="number"
+          bind:value={editChannelValue}
+          min="0.1"
+          max="10"
+          step="0.1"
+          required
+        />
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" on:click={() => (showEditChannelMultModal = false)}>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </Modal>
+
+  <!-- Modal: Modifier un Multiplicateur de Rôle -->
+  <Modal bind:open={showEditRoleMultModal} title="Modifier le Multiplicateur de Rôle">
+    <form on:submit|preventDefault={handleEditRoleMultiplier}>
+      <div class="form-group">
+        <label for="edit_role_label">Rôle concerné</label>
+        <input id="edit_role_label" type="text" value={`@${editRoleName}`} disabled />
+      </div>
+
+      <div class="form-group">
+        <label for="edit_role_mult_val">Multiplicateur d'XP (ex: 1.5 pour ×1.5)</label>
+        <input
+          id="edit_role_mult_val"
+          type="number"
+          bind:value={editRoleValue}
+          min="0.1"
+          max="10"
+          step="0.1"
+          required
+        />
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" on:click={() => (showEditRoleMultModal = false)}>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </Modal>
+</div>
