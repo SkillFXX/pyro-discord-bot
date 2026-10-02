@@ -435,3 +435,102 @@ export async function deployTicketMessage(channelId) {
   }
 }
 
+// Brawl Stars Role Rewards
+export async function addBrawlStarsReward({ type, threshold, roleId, replacePreviousRole }) {
+  try {
+    const res = await fetch('/api/brawlstars/rewards', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ type, threshold, roleId, replacePreviousRole }),
+    });
+    if (res.ok) {
+      const { brawlStarsRewards } = await res.json();
+      dashboardData.update((d) => ({ ...d, brawlStarsRewards }));
+      showToast('Palier Brawl Stars enregistré !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de l\'enregistrement', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de l\'enregistrement', 'error');
+    return false;
+  }
+}
+
+export async function updateBrawlStarsReward(id, { type, threshold, roleId, replacePreviousRole }) {
+  try {
+    const res = await fetch(`/api/brawlstars/rewards/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ type, threshold, roleId, replacePreviousRole }),
+    });
+    if (res.ok) {
+      const { brawlStarsRewards } = await res.json();
+      dashboardData.update((d) => ({ ...d, brawlStarsRewards }));
+      showToast('Palier Brawl Stars mis à jour !');
+      return true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la modification', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la modification', 'error');
+    return false;
+  }
+}
+
+export async function deleteBrawlStarsReward(id) {
+  try {
+    const res = await fetch(`/api/brawlstars/rewards/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const { brawlStarsRewards } = await res.json();
+      dashboardData.update((d) => ({ ...d, brawlStarsRewards }));
+      showToast('Palier Brawl Stars supprimé !');
+      return true;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la suppression', 'error');
+  }
+}
+
+export async function syncBrawlStarsRoles() {
+  try {
+    const res = await fetch('/api/brawlstars/sync', {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`Synchronisation terminée : ${data.syncedCount} membre(s) synchronisé(s) !`, 'success');
+      return data;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la synchronisation', 'error');
+      return null;
+    }
+  } catch (e) {
+    showToast('Erreur réseau lors de la synchronisation', 'error');
+    return null;
+  }
+}
+
+export async function testBrawlStarsKey(apiKey) {
+  try {
+    const res = await fetch('/api/brawlstars/test-key', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ apiKey }),
+    });
+    return await res.json();
+  } catch (e) {
+    return { valid: false, error: e.message };
+  }
+}
+
+

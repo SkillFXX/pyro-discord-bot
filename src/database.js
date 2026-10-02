@@ -360,6 +360,102 @@ const Session = sequelize.define('Session', {
   ],
 });
 
+// 15. BrawlStarsRoleReward: Brawl Stars automated tier roles (trophies or ranked)
+const BrawlStarsRoleReward = sequelize.define('BrawlStarsRoleReward', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  type: {
+    type: DataTypes.STRING, // 'trophies' | 'ranked'
+    allowNull: false,
+    defaultValue: 'trophies',
+  },
+  threshold: {
+    type: DataTypes.INTEGER, // Number of trophies (e.g. 20000) OR ranked tier index (1=Bronze I ... 19=Masters)
+    allowNull: false,
+  },
+  roleId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  replacePreviousRole: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+}, {
+  indexes: [
+    { fields: ['type', 'threshold'] },
+  ],
+});
+
+// 16. BrawlStarsUser: Link Discord users to their Brawl Stars player tag
+const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
+  userId: {
+    type: DataTypes.STRING,
+    primaryKey: true,
+  },
+  playerTag: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  playerName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  lastTrophies: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  highestTrophies: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  lastRankedRank: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  lastCheckedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+}, {
+  indexes: [
+    { fields: ['playerTag'] },
+  ],
+});
+
+// 17. BrawlStarsTrophyLog: Historical trophy records for graph tracking
+const BrawlStarsTrophyLog = sequelize.define('BrawlStarsTrophyLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  playerTag: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  trophies: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  recordedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+}, {
+  indexes: [
+    { fields: ['userId', 'recordedAt'] },
+    { fields: ['playerTag', 'recordedAt'] },
+  ],
+});
+
 // In-memory cache for fast and synchronous access
 const configMemoryCache = new Map();
 
@@ -528,6 +624,9 @@ module.exports = {
   MemberLog,
   UserSnapshot,
   Session,
+  BrawlStarsRoleReward,
+  BrawlStarsUser,
+  BrawlStarsTrophyLog,
   ConfigHelper,
   LOG_CONFIG_KEYS,
 };

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn } from '@lucide/svelte';
+  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn, Gamepad2 } from '@lucide/svelte';
   import { auth } from '../stores/auth';
 
   export let currentTab = 'general';
@@ -54,6 +54,16 @@
         { id: 'levels-multipliers', label: "Multiplicateurs d'XP" },
         { id: 'levels-rewards', label: 'Rôles Récompenses' },
         { id: 'levels-autoroles', label: 'Auto-Rôles Arrivée' },
+      ],
+    },
+    {
+      id: 'gaming',
+      label: 'Gaming',
+      icon: Gamepad2,
+      sections: [
+        { id: 'brawlstars-api', label: 'Clé API Brawl Stars' },
+        { id: 'brawlstars-trophies', label: 'Paliers Trophées' },
+        { id: 'brawlstars-ranked', label: 'Paliers Ranked' },
       ],
     },
     {

@@ -83,6 +83,10 @@ async function handleConfigSave(section, body, client) {
     if (body.xp_voice_ignore_deafened !== undefined) {
       await ConfigHelper.set('xp_voice_ignore_deafened', body.xp_voice_ignore_deafened === true || body.xp_voice_ignore_deafened === 'true');
     }
+  } else if (section === 'gaming') {
+    if (body.brawlstars_api_key !== undefined) {
+      await ConfigHelper.set('brawlstars_api_key', (body.brawlstars_api_key || '').trim());
+    }
   }
 }
 
@@ -104,7 +108,7 @@ function createConfigRouter(client) {
   });
 
   // Legacy route aliases for full backwards compatibility
-  const legacySections = ['general', 'logs', 'customization', 'tickets', 'xp'];
+  const legacySections = ['general', 'logs', 'customization', 'tickets', 'xp', 'gaming'];
   for (const sec of legacySections) {
     router.post(`/dashboard/${sec}`, requireAdmin, async (req, res) => {
       try {

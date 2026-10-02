@@ -6,8 +6,10 @@ const {
   AutomodRule, 
   XPMultiplier, 
   RoleXPMultiplier,
-  UserSnapshot 
+  UserSnapshot,
+  BrawlStarsRoleReward,
 } = require('../../database');
+const { RANKED_TIERS } = require('../../services/brawlStarsService');
 
 let cachedGuildContext = null;
 let cachedGuildContextTime = 0;
@@ -191,20 +193,57 @@ async function fetchRoleXpMultipliers(guild) {
   });
 }
 
+async function fetchBrawlStarsRewards(guild) {
+  const dbRewards = await BrawlStarsRoleReward.findAll({ order: [['threshold', 'ASC']] });
+  return dbRewards.map(r => {
+    let thresholdLabel = `${Number(r.threshold).toLocaleString('fr-FR')} Trophées`;
+    if (r.type === 'ranked') {
+      const tier = RANKED_TIERS.find(t => t.id === r.threshold);
+      thresholdLabel = tier ? tier.name : `Rang ${r.threshold}`;
+    }
+    return {
+      id: r.id,
+      type: r.type,
+      threshold: r.threshold,
+      thresholdLabel,
+      roleId: r.roleId,
+      roleName: guild ? (guild.roles.cache.get(r.roleId)?.name || 'Rôle Inconnu') : 'Rôle Inconnu',
+      replacePreviousRole: r.replacePreviousRole
+    };
+  });
+}
+
 async function getDashboardLists(client) {
   const guildId = process.env.GUILD_ID;
   const guild = client.guilds.cache.get(guildId);
 
-  const [autoRoles, warnActions, roleRewards, automodRules, xpMultipliers, roleXpMultipliers] = await Promise.all([
+  const [
+    autoRoles, 
+    warnActions, 
+    roleRewards, 
+    automodRules, 
+    xpMultipliers, 
+    roleXpMultipliers,
+    brawlStarsRewards,
+  ] = await Promise.all([
     fetchAutoRoles(guild),
     fetchWarnActions(),
     fetchRoleRewards(guild),
     fetchAutomodRules(guild),
     fetchXpMultipliers(guild),
     fetchRoleXpMultipliers(guild),
+    fetchBrawlStarsRewards(guild),
   ]);
 
-  return { autoRoles, warnActions, roleRewards, automodRules, xpMultipliers, roleXpMultipliers };
+  return { 
+    autoRoles, 
+    warnActions, 
+    roleRewards, 
+    automodRules, 
+    xpMultipliers, 
+    roleXpMultipliers,
+    brawlStarsRewards,
+  };
 }
 
 module.exports = {
@@ -216,6 +255,7 @@ module.exports = {
   fetchAutomodRules,
   fetchXpMultipliers,
   fetchRoleXpMultipliers,
+  fetchBrawlStarsRewards,
   getDashboardLists
 };
 

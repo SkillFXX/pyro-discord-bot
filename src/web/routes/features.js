@@ -7,6 +7,8 @@ const {
   AutomodRule, 
   XPMultiplier, 
   RoleXPMultiplier,
+  BrawlStarsRoleReward,
+  BrawlStarsUser,
   ConfigHelper 
 } = require('../../database');
 const { 
@@ -15,8 +17,10 @@ const {
   fetchRoleRewards, 
   fetchAutomodRules, 
   fetchXpMultipliers,
-  fetchRoleXpMultipliers
+  fetchRoleXpMultipliers,
+  fetchBrawlStarsRewards
 } = require('../services/guildService');
+const brawlStarsService = require('../../services/brawlStarsService');
 const { requireAdmin } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const embeds = require('../../bot/utils/embeds');
@@ -426,6 +430,148 @@ function createFeaturesRouter(client) {
   router.post(['/api/rolexpmultiplier', '/dashboard/rolexpmultiplier'], requireAdmin, handleRoleXpMultiplierAdd);
   router.put(['/api/rolexpmultiplier/:roleId', '/dashboard/rolexpmultiplier/:roleId'], requireAdmin, handleRoleXpMultiplierUpdate);
   router.delete(['/api/rolexpmultiplier/:roleId', '/dashboard/rolexpmultiplier/:roleId'], requireAdmin, handleRoleXpMultiplierDelete);
+
+  // 8. Brawl Stars Rewards & Config Handlers
+  async function handleBrawlStarsRewardAdd(req, res) {
+    try {
+      const { type, threshold, roleId, replacePreviousRole } = req.body;
+      if (!type || threshold === undefined || !roleId) {
+        return res.status(400).json({ error: 'Champs requis manquants (type, seuil, rôle).' });
+      }
+
+      const parsedThreshold = parseInt(threshold, 10);
+      if (isNaN(parsedThreshold) || parsedThreshold < 1) {
+        return res.status(400).json({ error: 'Le seuil doit être un nombre supérieur ou égal à 1.' });
+      }
+
+      await BrawlStarsRoleReward.create({
+        type: type === 'ranked' ? 'ranked' : 'trophies',
+        threshold: parsedThreshold,
+        roleId,
+        replacePreviousRole: Boolean(replacePreviousRole),
+      });
+
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      const brawlStarsRewards = await fetchBrawlStarsRewards(guild);
+      return res.json({ brawlStarsRewards });
+    } catch (err) {
+      console.error('[Features] Erreur ajout reward Brawl Stars :', err);
+      return res.status(500).json({ error: 'Erreur serveur lors de l\'ajout du palier Brawl Stars.' });
+    }
+  }
+
+  async function handleBrawlStarsRewardUpdate(req, res) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { type, threshold, roleId, replacePreviousRole } = req.body;
+
+      const reward = await BrawlStarsRoleReward.findByPk(id);
+      if (!reward) {
+        return res.status(404).json({ error: 'Palier Brawl Stars introuvable.' });
+      }
+
+      const updateData = {};
+      if (type) updateData.type = type === 'ranked' ? 'ranked' : 'trophies';
+      if (threshold !== undefined) {
+        const parsed = parseInt(threshold, 10);
+        if (!isNaN(parsed) && parsed >= 1) updateData.threshold = parsed;
+      }
+      if (roleId) updateData.roleId = roleId;
+      if (replacePreviousRole !== undefined) updateData.replacePreviousRole = Boolean(replacePreviousRole);
+
+      await reward.update(updateData);
+
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      const brawlStarsRewards = await fetchBrawlStarsRewards(guild);
+      return res.json({ brawlStarsRewards });
+    } catch (err) {
+      console.error('[Features] Erreur modification reward Brawl Stars :', err);
+      return res.status(500).json({ error: 'Erreur serveur lors de la modification du palier.' });
+    }
+  }
+
+  async function handleBrawlStarsRewardDelete(req, res) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await BrawlStarsRoleReward.destroy({ where: { id } });
+
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      const brawlStarsRewards = await fetchBrawlStarsRewards(guild);
+      return res.json({ brawlStarsRewards });
+    } catch (err) {
+      console.error('[Features] Erreur suppression reward Brawl Stars :', err);
+      return res.status(500).json({ error: 'Erreur serveur lors de la suppression du palier.' });
+    }
+  }
+
+  async function handleBrawlStarsSync(req, res) {
+    try {
+      const guild = client.guilds.cache.get(process.env.GUILD_ID);
+      if (!guild) {
+        return res.status(400).json({ error: 'Serveur Discord introuvable.' });
+      }
+
+      const linkedUsers = await BrawlStarsUser.findAll();
+      let syncedCount = 0;
+
+      for (const u of linkedUsers) {
+        try {
+          const member = await guild.members.fetch(u.userId).catch(() => null);
+          if (member) {
+            const freshData = await brawlStarsService.fetchPlayerData(u.playerTag);
+            await brawlStarsService.syncUserRoles(client, member, freshData);
+            await u.update({
+              playerName: freshData.name || u.playerName,
+              lastTrophies: freshData.trophies || 0,
+              highestTrophies: freshData.highestTrophies || 0,
+              lastCheckedAt: new Date(),
+            });
+            syncedCount++;
+          }
+        } catch (_) {}
+      }
+
+      return res.json({ success: true, syncedCount, totalUsers: linkedUsers.length });
+    } catch (err) {
+      console.error('[Features] Erreur sync Brawl Stars :', err);
+      return res.status(500).json({ error: 'Erreur serveur lors de la synchronisation des rôles.' });
+    }
+  }
+
+  async function handleBrawlStarsTestKey(req, res) {
+    try {
+      const apiKey = req.body.apiKey;
+      if (!apiKey || !apiKey.trim()) {
+        return res.status(400).json({ valid: false, error: 'Veuillez saisir une clé API.' });
+      }
+
+      const testTag = '%232PP';
+      const response = await fetch(`https://api.brawlstars.com/v1/players/${testTag}`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.status === 403) {
+        return res.json({ valid: false, error: 'Clé API refusée (403 Forbidden). Assurez-vous que l\'IP configurée sur le portail Supercell correspond à celle de l\'hébergement.' });
+      }
+
+      if (response.ok || response.status === 404) {
+        return res.json({ valid: true, message: 'Clé API valide et opérationnelle !' });
+      }
+
+      return res.json({ valid: false, error: `Réponse inattendue de l'API (${response.status})` });
+    } catch (err) {
+      return res.status(500).json({ valid: false, error: err.message });
+    }
+  }
+
+  router.post(['/api/brawlstars/rewards', '/dashboard/brawlstars/rewards'], requireAdmin, handleBrawlStarsRewardAdd);
+  router.put(['/api/brawlstars/rewards/:id', '/dashboard/brawlstars/rewards/:id'], requireAdmin, handleBrawlStarsRewardUpdate);
+  router.delete(['/api/brawlstars/rewards/:id', '/dashboard/brawlstars/rewards/:id'], requireAdmin, handleBrawlStarsRewardDelete);
+  router.post(['/api/brawlstars/sync', '/dashboard/brawlstars/sync'], requireAdmin, handleBrawlStarsSync);
+  router.post(['/api/brawlstars/test-key', '/dashboard/brawlstars/test-key'], requireAdmin, handleBrawlStarsTestKey);
 
   return router;
 }

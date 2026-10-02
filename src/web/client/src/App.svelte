@@ -15,6 +15,7 @@
   import ModerationTab from './tabs/ModerationTab.svelte';
   import AutomodTab from './tabs/AutomodTab.svelte';
   import LevelsTab from './tabs/LevelsTab.svelte';
+  import GamingTab from './tabs/GamingTab.svelte';
   import TicketsTab from './tabs/TicketsTab.svelte';
   import LogsTab from './tabs/LogsTab.svelte';
   import AnalyticsTab from './tabs/AnalyticsTab.svelte';
@@ -59,6 +60,8 @@
           <AutomodTab />
         {:else if currentTab === 'levels' && $auth.permissions?.isAdmin}
           <LevelsTab />
+        {:else if currentTab === 'gaming' && $auth.permissions?.isAdmin}
+          <GamingTab />
         {:else if currentTab === 'tickets' && $auth.permissions?.isAdmin}
           <TicketsTab />
         {:else if currentTab === 'logs' && $auth.permissions?.isAdmin}
