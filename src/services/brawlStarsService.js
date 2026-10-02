@@ -128,12 +128,12 @@ function estimateAccountCreationYear(tag) {
 }
 
 /**
- * Resolves player's ranked league information from API data.
+ * Resolves player's highest ranked league information from API data.
  * @param {object} player 
  * @returns {{ name: string, color: string }}
  */
 function resolveRankedInfo(player) {
-  const rawRank = player.highestRank || player.soloLeagueRank || player.rankedRank || 0;
+  const rawRank = player.highestRankedRank || player.highestRank || player.highestSoloLeagueRank || player.soloLeagueRank || player.rankedRank || 0;
   const tier = RANKED_TIERS.find(t => t.id === rawRank);
   if (tier) {
     return { name: tier.name, color: tier.color };
@@ -142,24 +142,42 @@ function resolveRankedInfo(player) {
 }
 
 /**
- * Resolves challenge wins from API data.
+ * Resolves challenge wins from API data (excluding Robo Rumble).
  * @param {object} player 
  * @returns {string}
  */
 function resolveChallengeWins(player) {
-  if (player.challengeWins !== undefined && player.challengeWins !== null) {
-    return `${player.challengeWins}`;
-  }
   if (player.mostChallengeWins !== undefined && player.mostChallengeWins !== null) {
     return `${player.mostChallengeWins}`;
+  }
+  if (player.challengeWins !== undefined && player.challengeWins !== null) {
+    return `${player.challengeWins}`;
   }
   if (player.isQualifiedFromChampionshipChallenge) {
     return '15 (Qualifié)';
   }
-  if (player.bestRoboRumbleTime) {
-    return `Robo: ${player.bestRoboRumbleTime}m`;
-  }
   return '0';
+}
+
+/**
+ * Computes brawler prestige badge information based on the Brawl Stars prestige system.
+ * Prestige unlocks at 1,000 trophies. Below 1,000 trophies, returns Bronze/Silver/Gold tier.
+ * @param {object} brawler
+ * @returns {{ text: string, color: string } | null}
+ */
+function getBrawlerPrestigeBadge(brawler) {
+  if (brawler.prestige !== undefined && brawler.prestige !== null) {
+    return { text: `P${brawler.prestige}`, color: '#E11D48' };
+  }
+  const maxTr = Math.max(brawler.highestTrophies || 0, brawler.trophies || 0);
+  if (maxTr >= 1000) {
+    const level = Math.floor(maxTr / 1000);
+    return { text: `PR ${level}`, color: level >= 2 ? '#E11D48' : '#F59E0B' };
+  }
+  if (maxTr >= 750) return { text: 'OR', color: '#EAB308' };
+  if (maxTr >= 500) return { text: 'ARG', color: '#94A3B8' };
+  if (maxTr >= 250) return { text: 'BRZ', color: '#CD7F32' };
+  return null;
 }
 
 /**
@@ -483,15 +501,13 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
   ctx.fillStyle = accentColor;
   roundRect(ctx, 30, headerBoxY, cardWidth - 60, 4, 2, true, false);
 
-  // 3. Avatar Icon
+  // 3. Avatar Icon (Square with rounded corners)
   const avatarX = 50;
   const avatarY = 40;
   const avatarSize = 85;
-
+  const avatarRadius = 14;
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.closePath();
+  roundRect(ctx, avatarX, avatarY, avatarSize, avatarSize, avatarRadius, false, false);
   ctx.clip();
   if (avatarImg) {
     ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
@@ -503,9 +519,7 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
 
   ctx.strokeStyle = accentColor;
   ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.stroke();
+  roundRect(ctx, avatarX, avatarY, avatarSize, avatarSize, avatarRadius, false, true);
 
   // 4. Player Details (Name, Tag, Badges)
   const textX = avatarX + avatarSize + 22;
@@ -570,13 +584,14 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
   ctx.fillStyle = '#F59E0B';
   ctx.fillText(levelText, curBadgeX + 28, badgeY + 16);
 
-  // 5. Stat Metric Cards (8 cards perfectly spread across the width)
+  // 5. Stat Metric Cards (spread across the width)
   const rankedInfo = resolveRankedInfo(player);
   const challengeWinsText = resolveChallengeWins(player);
+  const curTrophies = Number(player.trophies || 0).toLocaleString('fr-FR');
+  const maxTrophies = Number(player.highestTrophies || 0).toLocaleString('fr-FR');
 
   const statCards = [
-    { label: 'Trophées', value: Number(player.trophies || 0).toLocaleString('fr-FR'), img: trophyAsset, color: '#FBBF24' },
-    { label: 'Record', value: Number(player.highestTrophies || 0).toLocaleString('fr-FR'), img: trophyAsset, color: '#F59E0B' },
+    { label: 'Trophées (Actuel / Record)', value: `${curTrophies} / ${maxTrophies}`, img: trophyAsset, color: '#FBBF24' },
     { label: 'Classé (Ranked)', value: rankedInfo.name, img: rankedAsset, color: rankedInfo.color },
     { label: 'Victoires 3v3', value: Number(player['3vs3Victories'] || 0).toLocaleString('fr-FR'), img: trioAsset, color: '#60A5FA' },
     { label: 'Victoires Solo', value: Number(player.soloVictories || 0).toLocaleString('fr-FR'), img: soloAsset, color: '#34D399' },
@@ -587,7 +602,7 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
 
   const statAreaX = 45;
   const statAreaY = 140;
-  const statCardGap = 10;
+  const statCardGap = 12;
   const statCardWidth = (cardWidth - 90 - (statCards.length - 1) * statCardGap) / statCards.length;
   const statCardHeight = 72;
 
@@ -630,7 +645,7 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
 
   ctx.fillStyle = '#64748B';
   ctx.font = '13px sans-serif';
-  ctx.fillText('Triés par nombre de trophées décroissant • Niveau & Rang', gridTitleX + titleW + 22, headerHeight + 5);
+  ctx.fillText('Triés par nombre de trophées décroissant • Niveau & Prestige', gridTitleX + titleW + 22, headerHeight + 5);
 
   // 7. Render Compact Brawlers Grid (14 columns)
   for (let idx = 0; idx < brawlers.length; idx++) {
@@ -674,14 +689,18 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
     ctx.font = 'bold 9.5px sans-serif';
     ctx.fillText(`P${power}`, bx + 7, by + 16);
 
-    // Rank Badge (Top Right)
-    if (brawler.rank) {
-      const rColor = brawler.rank >= 30 ? '#DC2626' : (brawler.rank >= 25 ? '#2563EB' : '#334155');
-      ctx.fillStyle = rColor;
-      roundRect(ctx, bx + tileWidth - 28, by + 5, 23, 15, 3.5, true, false);
+    // Prestige Badge (Top Right)
+    const prestige = getBrawlerPrestigeBadge(brawler);
+    if (prestige) {
+      ctx.font = 'bold 9px sans-serif';
+      const pW = ctx.measureText(prestige.text).width + 8;
+      const bW = Math.max(22, pW);
+      ctx.fillStyle = prestige.color;
+      roundRect(ctx, bx + tileWidth - bW - 4, by + 5, bW, 15, 3.5, true, false);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 9.5px sans-serif';
-      ctx.fillText(`R${brawler.rank}`, bx + tileWidth - 26, by + 16);
+      ctx.textAlign = 'center';
+      ctx.fillText(prestige.text, bx + tileWidth - bW / 2 - 4, by + 16);
+      ctx.textAlign = 'left';
     }
 
     // Bottom Trophies Bar
