@@ -170,9 +170,16 @@ module.exports = {
         const cardBuffer = await brawlStarsService.generateProfileCard(playerData, accentColor);
         const attachment = new AttachmentBuilder(cardBuffer, { name: `brawlstars-${linkedUser.playerTag.replace('#', '')}.png` });
 
+        const creationYear = brawlStarsService.estimateAccountCreationYear(playerData.tag || '');
+        const rankedInfo = brawlStarsService.resolveRankedInfo(playerData);
+        const challengeWins = brawlStarsService.resolveChallengeWins(playerData);
+        const totalBrawlers = playerData.brawlers?.length || 0;
+
         const embed = embeds.custom(
           `🎮 Profil Brawl Stars — ${playerData.name}`,
-          `Tag : \`${playerData.tag}\` • Membre : ${targetUser}`,
+          `**Joueur :** ${targetUser} • **Tag :** \`${playerData.tag}\`\n` +
+          `📅 **Création :** Compte ${creationYear} • 🏆 **Trophées :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')} (Max: ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')})\n` +
+          `👑 **Classé :** ${rankedInfo.name} • 🎯 **Brawlers :** ${totalBrawlers} / ${brawlStarsService.TOTAL_AVAILABLE_BRAWLERS} • 🏅 **Défi :** ${challengeWins}`,
           accentColor,
           null,
           null,

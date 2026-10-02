@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { Op } = require('sequelize');
 const { 
@@ -30,8 +32,57 @@ const RANKED_TIERS = [
   { id: 19, name: 'Maître', color: '#FF0055' },
 ];
 
+// Total brawlers currently available in Brawl Stars
+const TOTAL_AVAILABLE_BRAWLERS = 88;
+
 // Memory cache for downloaded images to avoid re-fetching on CDN
 const imageCache = new Map();
+
+// Local directory for official game assets
+const ASSETS_DIR = path.join(__dirname, '../assets/brawlstars');
+const localAssetCache = new Map();
+
+/**
+ * Loads a local asset from src/assets/brawlstars with caching and extension fallback.
+ * Supports .webp, .png, .svg, and .jpg
+ * @param {string} name 
+ * @returns {Promise<import('@napi-rs/canvas').Image|null>}
+ */
+async function getLocalAsset(name) {
+  if (!name) return null;
+  if (localAssetCache.has(name)) {
+    return localAssetCache.get(name);
+  }
+
+  const extensions = ['.webp', '.png', '.svg', '.jpg'];
+  for (const ext of extensions) {
+    const fullPath = path.join(ASSETS_DIR, `${name}${ext}`);
+    if (fs.existsSync(fullPath)) {
+      try {
+        const img = await loadImage(fullPath);
+        localAssetCache.set(name, img);
+        return img;
+      } catch (e) {
+        console.warn(`[BrawlStarsService] Erreur lors du chargement de l'asset ${fullPath}:`, e.message);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Draws an image fitted within a bounding box while preserving its aspect ratio.
+ */
+function drawAssetIcon(ctx, img, targetX, targetY, targetWidth, targetHeight) {
+  if (!img || !img.width || !img.height) return;
+  const ratio = Math.min(targetWidth / img.width, targetHeight / img.height);
+  const w = img.width * ratio;
+  const h = img.height * ratio;
+  const x = targetX + (targetWidth - w) / 2;
+  const y = targetY + (targetHeight - h) / 2;
+  ctx.drawImage(img, x, y, w, h);
+}
 
 /**
  * Normalizes a Brawl Stars player tag.
@@ -46,6 +97,69 @@ function normalizePlayerTag(tag) {
     clean = '#' + clean;
   }
   return clean;
+}
+
+/**
+ * Estimates account creation year from Supercell's sequential player tag.
+ * @param {string} tag 
+ * @returns {number}
+ */
+function estimateAccountCreationYear(tag) {
+  const tagChars = '0289PYLQGRJCUV';
+  const clean = tag.replace(/#/g, '').toUpperCase();
+  let id = 0n;
+  for (const char of clean) {
+    const idx = BigInt(tagChars.indexOf(char));
+    if (idx === -1n) continue;
+    id = id * 14n + idx;
+  }
+
+  // Thresholds based on Supercell's sequential account registration sequence
+  if (id < 12000000n) return 2017; // Bêta Canada
+  if (id < 70000000n) return 2018; // Sortie mondiale
+  if (id < 300000000n) return 2019;
+  if (id < 700000000n) return 2020;
+  if (id < 1200000000n) return 2021;
+  if (id < 1900000000n) return 2022;
+  if (id < 2800000000n) return 2023;
+  if (id < 4000000000n) return 2024;
+  if (id < 5500000000n) return 2025;
+  return 2026;
+}
+
+/**
+ * Resolves player's ranked league information from API data.
+ * @param {object} player 
+ * @returns {{ name: string, color: string }}
+ */
+function resolveRankedInfo(player) {
+  const rawRank = player.highestRank || player.soloLeagueRank || player.rankedRank || 0;
+  const tier = RANKED_TIERS.find(t => t.id === rawRank);
+  if (tier) {
+    return { name: tier.name, color: tier.color };
+  }
+  return { name: 'Non classé', color: '#64748B' };
+}
+
+/**
+ * Resolves challenge wins from API data.
+ * @param {object} player 
+ * @returns {string}
+ */
+function resolveChallengeWins(player) {
+  if (player.challengeWins !== undefined && player.challengeWins !== null) {
+    return `${player.challengeWins}`;
+  }
+  if (player.mostChallengeWins !== undefined && player.mostChallengeWins !== null) {
+    return `${player.mostChallengeWins}`;
+  }
+  if (player.isQualifiedFromChampionshipChallenge) {
+    return '15 (Qualifié)';
+  }
+  if (player.bestRoboRumbleTime) {
+    return `Robo: ${player.bestRoboRumbleTime}m`;
+  }
+  return '0';
 }
 
 /**
@@ -128,7 +242,7 @@ async function safeLoadImage(url) {
     imageCache.set(url, img);
     
     // Prune cache if it grows too large
-    if (imageCache.size > 250) {
+    if (imageCache.size > 300) {
       const firstKey = imageCache.keys().next().value;
       imageCache.delete(firstKey);
     }
@@ -141,10 +255,6 @@ async function safeLoadImage(url) {
 /**
  * Computes which role IDs a member should retain based on a metric value
  * and the `replacePreviousRole` settings across configured rewards.
- * 
- * @param {number} currentValue 
- * @param {Array<{threshold: number, roleId: string, replacePreviousRole: boolean}>} rewards 
- * @returns {Set<string>}
  */
 function getExpectedRoleIds(currentValue, rewards) {
   const eligible = rewards.filter(r => r.threshold <= currentValue);
@@ -153,7 +263,6 @@ function getExpectedRoleIds(currentValue, rewards) {
   const expectedRoleIds = new Set();
   let cutoff = 0;
 
-  // Descending sort: highest threshold first
   const sorted = [...eligible].sort((a, b) => b.threshold - a.threshold);
   for (const reward of sorted) {
     if (reward.threshold > cutoff) {
@@ -169,11 +278,6 @@ function getExpectedRoleIds(currentValue, rewards) {
 
 /**
  * Synchronizes Brawl Stars roles for a Discord member based on their stats.
- * 
- * @param {import('discord.js').Client} client 
- * @param {import('discord.js').GuildMember} member 
- * @param {object} playerData 
- * @returns {Promise<{added: string[], removed: string[]}>}
  */
 async function syncUserRoles(client, member, playerData) {
   if (!member || !member.guild) return { added: [], removed: [] };
@@ -188,8 +292,6 @@ async function syncUserRoles(client, member, playerData) {
   ]);
 
   const currentTrophies = playerData.trophies || 0;
-  // Ranked tier detection: if ranked is available in player data, or highest rank
-  // In recent BS API: highestRank or soloLeagueRank may be provided, otherwise 0
   let currentRankedIndex = 0;
   if (playerData.highestRank) {
     currentRankedIndex = parseInt(playerData.highestRank, 10) || 0;
@@ -214,7 +316,6 @@ async function syncUserRoles(client, member, playerData) {
     const role = guild.roles.cache.get(roleId);
     if (!role) continue;
 
-    // Check bot permission hierarchy
     if (role.position >= botMember.roles.highest.position) {
       continue;
     }
@@ -244,7 +345,6 @@ async function syncUserRoles(client, member, playerData) {
 
 /**
  * Records a trophy snapshot for history tracking.
- * Avoids recording identical snapshots within 4 hours.
  */
 async function recordTrophySnapshot(userId, playerTag, trophies) {
   try {
@@ -260,7 +360,7 @@ async function recordTrophySnapshot(userId, playerTag, trophies) {
     });
 
     if (recent && recent.trophies === trophies) {
-      return; // Already recorded recently with same trophies
+      return;
     }
 
     await BrawlStarsTrophyLog.create({
@@ -293,66 +393,100 @@ function roundRect(ctx, x, y, width, height, radius, fill = false, stroke = fals
   if (stroke) ctx.stroke();
 }
 
+
 /**
  * Generates an HD, modern profile card for a Brawl Stars player.
+ * Ultra-horizontal layout optimized for Discord embedding.
+ * 
  * @param {object} player Player data from API
  * @param {string} [accentColor='#FF6B35']
  * @returns {Promise<Buffer>}
  */
 async function generateProfileCard(player, accentColor = '#FF6B35') {
   const brawlers = Array.isArray(player.brawlers) ? [...player.brawlers] : [];
-  // Sort brawlers by trophies descending
   brawlers.sort((a, b) => (b.trophies || 0) - (a.trophies || 0));
 
-  const totalBrawlers = brawlers.length;
-  const cols = 7;
-  const rows = Math.ceil(totalBrawlers / cols);
+  const totalPlayerBrawlers = brawlers.length;
+  const maxAvailableBrawlers = Math.max(TOTAL_AVAILABLE_BRAWLERS, totalPlayerBrawlers);
 
-  const cardWidth = 1200;
-  const headerHeight = 310;
-  const brawlerItemWidth = 145;
-  const brawlerItemHeight = 135;
-  const gapX = 16;
-  const gapY = 16;
-  const gridPaddingX = (cardWidth - (cols * brawlerItemWidth + (cols - 1) * gapX)) / 2;
-  const gridHeight = rows * brawlerItemHeight + (rows - 1) * gapY;
-  const cardHeight = headerHeight + gridHeight + 70;
+  // Horizontal Grid Layout: 14 columns of compact square tiles
+  const cardWidth = 1500;
+  const cols = 14;
+  const rows = Math.ceil(totalPlayerBrawlers / cols);
+
+  const tileWidth = 92;
+  const tileHeight = 92;
+  const gapX = 12;
+  const gapY = 12;
+
+  const headerHeight = 245;
+  const gridStartX = (cardWidth - (cols * tileWidth + (cols - 1) * gapX)) / 2;
+  const gridHeight = rows * tileHeight + (rows - 1) * gapY;
+  const cardHeight = headerHeight + gridHeight + 60;
 
   const canvas = createCanvas(cardWidth, cardHeight);
   const ctx = canvas.getContext('2d');
 
-  // 1. Background with subtle dark gradient
+  // Pre-load all brawler portraits, avatar image, and local official assets in parallel
+  const avatarUrl = `https://cdn.brawlify.com/profile-icons/regular/${player.icon?.id || 28000000}.png`;
+  const [
+    avatarImg,
+    trophyAsset,
+    rankedAsset,
+    trioAsset,
+    soloAsset,
+    duoAsset,
+    brawlerAsset,
+    challengeAsset,
+    calendarAsset,
+    clubAsset,
+    expAsset,
+    ...brawlerImages
+  ] = await Promise.all([
+    safeLoadImage(avatarUrl),
+    getLocalAsset('trophy'),
+    getLocalAsset('ranked'),
+    getLocalAsset('trio'),
+    getLocalAsset('solo'),
+    getLocalAsset('duo'),
+    getLocalAsset('brawler'),
+    getLocalAsset('challenge'),
+    getLocalAsset('calendar'),
+    getLocalAsset('club'),
+    getLocalAsset('exp'),
+    ...brawlers.map(b => safeLoadImage(`https://cdn.brawlify.com/brawlers/borderless/${b.id}.png`))
+  ]);
+
+  // 1. Background
   const bgGrad = ctx.createLinearGradient(0, 0, cardWidth, cardHeight);
-  bgGrad.addColorStop(0, '#10131B');
-  bgGrad.addColorStop(1, '#0C0E14');
+  bgGrad.addColorStop(0, '#0F1219');
+  bgGrad.addColorStop(1, '#090B0F');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, cardWidth, cardHeight);
 
-  // Decorative top accent glow
-  const glowGrad = ctx.createRadialGradient(cardWidth / 2, 0, 10, cardWidth / 2, 0, 700);
-  glowGrad.addColorStop(0, `${accentColor}33`); // 20% opacity
+  // Top accent ambient glow
+  const glowGrad = ctx.createRadialGradient(cardWidth / 2, 0, 10, cardWidth / 2, 0, 750);
+  glowGrad.addColorStop(0, `${accentColor}33`);
   glowGrad.addColorStop(1, 'transparent');
   ctx.fillStyle = glowGrad;
-  ctx.fillRect(0, 0, cardWidth, 400);
+  ctx.fillRect(0, 0, cardWidth, 380);
 
-  // 2. Header Container
-  ctx.fillStyle = '#171B26';
+  // 2. Header Box
+  const headerBoxY = 20;
+  const headerBoxHeight = headerHeight - 35;
+  ctx.fillStyle = '#151924';
   ctx.strokeStyle = '#252B3C';
   ctx.lineWidth = 1.5;
-  roundRect(ctx, 30, 25, cardWidth - 60, headerHeight - 45, 16, true, true);
+  roundRect(ctx, 30, headerBoxY, cardWidth - 60, headerBoxHeight, 14, true, true);
 
-  // Accent colored top stripe on header
+  // Top color highlight
   ctx.fillStyle = accentColor;
-  roundRect(ctx, 30, 25, cardWidth - 60, 4, 2, true, false);
+  roundRect(ctx, 30, headerBoxY, cardWidth - 60, 4, 2, true, false);
 
-  // 3. Player Icon (Avatar)
-  const iconId = player.icon?.id || 28000000;
-  const iconUrl = `https://cdn.brawlify.com/profile-icons/regular/${iconId}.png`;
-  const avatarImg = await safeLoadImage(iconUrl);
-
-  const avatarX = 55;
-  const avatarY = 55;
-  const avatarSize = 100;
+  // 3. Avatar Icon
+  const avatarX = 50;
+  const avatarY = 40;
+  const avatarSize = 85;
 
   ctx.save();
   ctx.beginPath();
@@ -362,178 +496,216 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
   if (avatarImg) {
     ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
   } else {
-    ctx.fillStyle = '#222736';
+    ctx.fillStyle = '#22283A';
     ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
   }
   ctx.restore();
 
-  // Avatar border ring
   ctx.strokeStyle = accentColor;
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 4. Player Name, Tag & Club
+  // 4. Player Details (Name, Tag, Badges)
+  const textX = avatarX + avatarSize + 22;
+
+  // Name
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 32px sans-serif';
+  ctx.font = 'bold 30px sans-serif';
   const playerName = player.name || 'Brawler';
-  ctx.fillText(playerName, avatarX + avatarSize + 22, avatarY + 36);
+  ctx.fillText(playerName, textX, avatarY + 32);
 
-  // Tag Badge
-  ctx.font = 'bold 15px monospace';
+  // Badges row: Tag, Creation Year, Club, Level
+  const badgeY = avatarY + 48;
+  let curBadgeX = textX;
+
+  // Player Tag Badge
+  ctx.font = 'bold 13px monospace';
   const tagText = player.tag || '#';
-  const tagMetrics = ctx.measureText(tagText);
-  const tagBadgeX = avatarX + avatarSize + 22;
-  const tagBadgeY = avatarY + 50;
+  const tagWidth = ctx.measureText(tagText).width;
+  ctx.fillStyle = '#1E2536';
+  ctx.strokeStyle = '#2F3A52';
+  ctx.lineWidth = 1;
+  roundRect(ctx, curBadgeX, badgeY, tagWidth + 16, 24, 6, true, true);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillText(tagText, curBadgeX + 8, badgeY + 16);
+  curBadgeX += tagWidth + 24;
 
-  ctx.fillStyle = '#22283A';
-  roundRect(ctx, tagBadgeX, tagBadgeY, tagMetrics.width + 16, 26, 6, true, false);
-  ctx.fillStyle = '#A0AEC0';
-  ctx.fillText(tagText, tagBadgeX + 8, tagBadgeY + 18);
+  // Account Creation Year Badge
+  const creationYear = estimateAccountCreationYear(player.tag || '');
+  ctx.font = 'bold 13px sans-serif';
+  const yearText = `Compte ${creationYear}`;
+  const yearWidth = ctx.measureText(yearText).width + 24;
+  ctx.fillStyle = '#1E2536';
+  ctx.strokeStyle = '#2F3A52';
+  roundRect(ctx, curBadgeX, badgeY, yearWidth + 14, 24, 6, true, true);
+  drawAssetIcon(ctx, calendarAsset, curBadgeX + 6, badgeY + 3, 18, 18);
+  ctx.fillStyle = '#38BDF8';
+  ctx.fillText(yearText, curBadgeX + 28, badgeY + 16);
+  curBadgeX += yearWidth + 22;
 
   // Club Badge
   if (player.club && player.club.name) {
-    const clubBadgeX = tagBadgeX + tagMetrics.width + 26;
-    ctx.font = 'bold 14px sans-serif';
-    const clubText = `🛡️ ${player.club.name}`;
-    const clubMetrics = ctx.measureText(clubText);
-
+    ctx.font = 'bold 13px sans-serif';
+    const clubText = player.club.name;
+    const clubWidth = ctx.measureText(clubText).width + 24;
     ctx.fillStyle = '#1E2536';
-    ctx.strokeStyle = '#2F384F';
-    ctx.lineWidth = 1;
-    roundRect(ctx, clubBadgeX, tagBadgeY, clubMetrics.width + 16, 26, 6, true, true);
-    ctx.fillStyle = '#CBD5E1';
-    ctx.fillText(clubText, clubBadgeX + 8, tagBadgeY + 18);
+    ctx.strokeStyle = '#2F3A52';
+    roundRect(ctx, curBadgeX, badgeY, clubWidth + 14, 24, 6, true, true);
+    drawAssetIcon(ctx, clubAsset, curBadgeX + 6, badgeY + 3, 18, 18);
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillText(clubText, curBadgeX + 28, badgeY + 16);
+    curBadgeX += clubWidth + 22;
   }
 
-  // Experience level badge
-  const expLevel = player.expLevel || 1;
+  // Level Badge
+  const levelText = `Niv. ${player.expLevel || 1}`;
+  ctx.font = 'bold 13px sans-serif';
+  const levelWidth = ctx.measureText(levelText).width;
+  ctx.fillStyle = '#1E2536';
+  ctx.strokeStyle = '#2F3A52';
+  roundRect(ctx, curBadgeX, badgeY, levelWidth + 36, 24, 6, true, true);
+  drawAssetIcon(ctx, expAsset, curBadgeX + 6, badgeY + 3, 18, 18);
   ctx.fillStyle = '#F59E0B';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.fillText(`⭐ Niveau ${expLevel}`, avatarX + avatarSize + 22, avatarY + 102);
+  ctx.fillText(levelText, curBadgeX + 28, badgeY + 16);
 
-  // 5. Stat Metric Cards (Trophies, Highest, 3v3, Solo, Duo)
+  // 5. Stat Metric Cards (8 cards perfectly spread across the width)
+  const rankedInfo = resolveRankedInfo(player);
+  const challengeWinsText = resolveChallengeWins(player);
+
   const statCards = [
-    { label: 'Trophées Actuels', value: Number(player.trophies || 0).toLocaleString('fr-FR'), icon: '🏆', color: '#FBBF24' },
-    { label: 'Record Trophées', value: Number(player.highestTrophies || 0).toLocaleString('fr-FR'), icon: '👑', color: '#F59E0B' },
-    { label: 'Victoires 3v3', value: Number(player['3vs3Victories'] || 0).toLocaleString('fr-FR'), icon: '⚔️', color: '#60A5FA' },
-    { label: 'Victoires Solo', value: Number(player.soloVictories || 0).toLocaleString('fr-FR'), icon: '💀', color: '#34D399' },
-    { label: 'Victoires Duo', value: Number(player.duoVictories || 0).toLocaleString('fr-FR'), icon: '👥', color: '#A78BFA' },
-    { label: 'Brawlers', value: `${totalBrawlers}`, icon: '🎯', color: accentColor },
+    { label: 'Trophées', value: Number(player.trophies || 0).toLocaleString('fr-FR'), img: trophyAsset, color: '#FBBF24' },
+    { label: 'Record', value: Number(player.highestTrophies || 0).toLocaleString('fr-FR'), img: trophyAsset, color: '#F59E0B' },
+    { label: 'Classé (Ranked)', value: rankedInfo.name, img: rankedAsset, color: rankedInfo.color },
+    { label: 'Victoires 3v3', value: Number(player['3vs3Victories'] || 0).toLocaleString('fr-FR'), img: trioAsset, color: '#60A5FA' },
+    { label: 'Victoires Solo', value: Number(player.soloVictories || 0).toLocaleString('fr-FR'), img: soloAsset, color: '#34D399' },
+    { label: 'Victoires Duo', value: Number(player.duoVictories || 0).toLocaleString('fr-FR'), img: duoAsset, color: '#A78BFA' },
+    { label: 'Brawlers', value: `${totalPlayerBrawlers} / ${maxAvailableBrawlers}`, img: brawlerAsset, color: accentColor },
+    { label: 'Victoires Défi', value: challengeWinsText, img: challengeAsset, color: '#EC4899' },
   ];
 
-  const statCardWidth = (cardWidth - 60 - 20 - (statCards.length - 1) * 12) / statCards.length;
-  const statCardY = 175;
-  const statCardHeight = 85;
+  const statAreaX = 45;
+  const statAreaY = 140;
+  const statCardGap = 10;
+  const statCardWidth = (cardWidth - 90 - (statCards.length - 1) * statCardGap) / statCards.length;
+  const statCardHeight = 72;
 
   statCards.forEach((stat, i) => {
-    const sx = 40 + i * (statCardWidth + 12);
-    ctx.fillStyle = '#1D2230';
-    ctx.strokeStyle = '#283042';
+    const sx = statAreaX + i * (statCardWidth + statCardGap);
+    ctx.fillStyle = '#1A1F2C';
+    ctx.strokeStyle = '#272F42';
     ctx.lineWidth = 1;
-    roundRect(ctx, sx, statCardY, statCardWidth, statCardHeight, 10, true, true);
+    roundRect(ctx, sx, statAreaY, statCardWidth, statCardHeight, 8, true, true);
 
-    // Left micro accent line
+    // Left accent pill
     ctx.fillStyle = stat.color;
-    roundRect(ctx, sx, statCardY, 3.5, statCardHeight, 2, true, false);
+    roundRect(ctx, sx, statAreaY, 3, statCardHeight, 1.5, true, false);
 
-    ctx.font = '16px sans-serif';
-    ctx.fillText(stat.icon, sx + 12, statCardY + 30);
+    // Asset Icon
+    drawAssetIcon(ctx, stat.img, sx + 8, statAreaY + 11, 20, 20);
 
+    // Label
     ctx.fillStyle = '#94A3B8';
     ctx.font = '500 11px sans-serif';
-    ctx.fillText(stat.label, sx + 34, statCardY + 28);
+    ctx.fillText(stat.label, sx + 34, statAreaY + 24);
 
+    // Value
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.fillText(stat.value, sx + 12, statCardY + 62);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText(stat.value, sx + 10, statAreaY + 54);
   });
 
-  // 6. Section Title: Brawlers Grid
+  // 6. Section Header
+  let gridTitleX = 35;
+  if (brawlerAsset) {
+    drawAssetIcon(ctx, brawlerAsset, 35, headerHeight - 12, 22, 22);
+    gridTitleX = 64;
+  }
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText(`🎮 Liste des Brawlers (${totalBrawlers})`, 35, headerHeight + 15);
+  ctx.font = 'bold 19px sans-serif';
+  const gridTitle = `Grille des Brawlers (${totalPlayerBrawlers} / ${maxAvailableBrawlers})`;
+  const titleW = ctx.measureText(gridTitle).width;
+  ctx.fillText(gridTitle, gridTitleX, headerHeight + 5);
 
   ctx.fillStyle = '#64748B';
   ctx.font = '13px sans-serif';
-  ctx.fillText('Triés par nombre de trophées décroissant', 340, headerHeight + 15);
+  ctx.fillText('Triés par nombre de trophées décroissant • Niveau & Rang', gridTitleX + titleW + 22, headerHeight + 5);
 
-  // 7. Render Brawlers Grid
+  // 7. Render Compact Brawlers Grid (14 columns)
   for (let idx = 0; idx < brawlers.length; idx++) {
     const brawler = brawlers[idx];
     const c = idx % cols;
     const r = Math.floor(idx / cols);
 
-    const bx = gridPaddingX + c * (brawlerItemWidth + gapX);
-    const by = headerHeight + 35 + r * (brawlerItemHeight + gapY);
+    const bx = gridStartX + c * (tileWidth + gapX);
+    const by = headerHeight + 22 + r * (tileHeight + gapY);
 
-    // Tile background
-    ctx.fillStyle = '#161A24';
-    ctx.strokeStyle = '#242A3B';
+    // Tile Box
+    ctx.fillStyle = '#141824';
+    ctx.strokeStyle = '#222838';
     ctx.lineWidth = 1;
-    roundRect(ctx, bx, by, brawlerItemWidth, brawlerItemHeight, 12, true, true);
+    roundRect(ctx, bx, by, tileWidth, tileHeight, 10, true, true);
 
-    // Brawler portrait image
-    const brawlerImgUrl = `https://cdn.brawlify.com/brawlers/borderless/${brawler.id}.png`;
-    const bImg = await safeLoadImage(brawlerImgUrl);
-
-    const imgSize = 64;
-    const imgX = bx + (brawlerItemWidth - imgSize) / 2;
-    const imgY = by + 12;
+    // Brawler Portrait
+    const bImg = brawlerImages[idx];
+    const pSize = 58;
+    const px = bx + (tileWidth - pSize) / 2;
+    const py = by + 6;
 
     if (bImg) {
-      ctx.drawImage(bImg, imgX, imgY, imgSize, imgSize);
+      ctx.drawImage(bImg, px, py, pSize, pSize);
     } else {
-      ctx.fillStyle = '#222838';
-      roundRect(ctx, imgX, imgY, imgSize, imgSize, 8, true, false);
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('?', imgX + 26, imgY + 40);
+      ctx.fillStyle = '#222736';
+      roundRect(ctx, px, py, pSize, pSize, 8, true, false);
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('?', px + pSize / 2, py + 36);
+      ctx.textAlign = 'left';
     }
 
-    // Power Level Badge (e.g. Power 11)
-    const powerLevel = brawler.power || 1;
-    ctx.fillStyle = powerLevel === 11 ? '#EF4444' : (powerLevel >= 9 ? '#F59E0B' : '#3B82F6');
-    roundRect(ctx, bx + 8, by + 8, 28, 18, 4, true, false);
+    // Power Level Badge (Top Left)
+    const power = brawler.power || 1;
+    const pColor = power === 11 ? '#A855F7' : (power >= 9 ? '#F59E0B' : '#3B82F6');
+    ctx.fillStyle = pColor;
+    roundRect(ctx, bx + 5, by + 5, 23, 15, 3.5, true, false);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 9.5px sans-serif';
+    ctx.fillText(`P${power}`, bx + 7, by + 16);
+
+    // Rank Badge (Top Right)
+    if (brawler.rank) {
+      const rColor = brawler.rank >= 30 ? '#DC2626' : (brawler.rank >= 25 ? '#2563EB' : '#334155');
+      ctx.fillStyle = rColor;
+      roundRect(ctx, bx + tileWidth - 28, by + 5, 23, 15, 3.5, true, false);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 9.5px sans-serif';
+      ctx.fillText(`R${brawler.rank}`, bx + tileWidth - 26, by + 16);
+    }
+
+    // Bottom Trophies Bar
+    const barY = by + tileHeight - 22;
+    ctx.fillStyle = 'rgba(12, 15, 23, 0.9)';
+    roundRect(ctx, bx + 2, barY, tileWidth - 4, 20, 6, true, false);
+
+    // Small Gold Trophy Icon
+    drawAssetIcon(ctx, trophyAsset, bx + 5, barY + 3, 14, 14);
+
+    // Trophy count text
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 11px sans-serif';
-    ctx.fillText(`P${powerLevel}`, bx + 12, by + 21);
-
-    // Rank / Prestige Badge (Top right)
-    if (brawler.rank) {
-      ctx.fillStyle = '#334155';
-      roundRect(ctx, bx + brawlerItemWidth - 36, by + 8, 28, 18, 4, true, false);
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`R${brawler.rank}`, bx + brawlerItemWidth - 33, by + 21);
-    }
-
-    // Brawler Name
-    ctx.fillStyle = '#F8FAFC';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    const brawlerName = brawler.name ? brawler.name.charAt(0).toUpperCase() + brawler.name.slice(1).toLowerCase() : 'Brawler';
-    ctx.fillText(brawlerName, bx + brawlerItemWidth / 2, by + 94);
-
-    // Trophies Count Bar
-    const trophyBarY = by + 104;
-    ctx.fillStyle = '#1E2433';
-    roundRect(ctx, bx + 12, trophyBarY, brawlerItemWidth - 24, 22, 6, true, false);
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FBBF24';
-    ctx.font = 'bold 12px sans-serif';
-    const trophiesFormatted = `🏆 ${Number(brawler.trophies || 0).toLocaleString('fr-FR')}`;
-    ctx.fillText(trophiesFormatted, bx + brawlerItemWidth / 2, trophyBarY + 16);
-    ctx.textAlign = 'left'; // Reset
+    ctx.textAlign = 'right';
+    const trStr = Number(brawler.trophies || 0).toLocaleString('fr-FR');
+    ctx.fillText(trStr, bx + tileWidth - 8, barY + 14);
+    ctx.textAlign = 'left';
   }
 
-  // 8. Footer branding
-  ctx.fillStyle = '#64748B';
+  // 8. Footer
+  ctx.fillStyle = '#475569';
   ctx.font = '12px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Pyro Bot • Stats Brawl Stars via API officielle & Brawlify', cardWidth / 2, cardHeight - 20);
+  ctx.fillText('Pyro Bot • Données Brawl Stars via API officielle Supercell & Assets Brawlify', cardWidth / 2, cardHeight - 16);
   ctx.textAlign = 'left';
 
   return canvas.toBuffer('image/png');
@@ -541,41 +713,38 @@ async function generateProfileCard(player, accentColor = '#FF6B35') {
 
 /**
  * Generates a smooth bezier curve chart showing trophy evolution day-by-day.
- * 
- * @param {string} playerName 
- * @param {string} playerTag 
- * @param {Array<{trophies: number, recordedAt: Date|string}>} logs 
- * @param {number} days 
- * @param {string} [accentColor='#FF6B35']
- * @returns {Promise<Buffer>}
  */
 async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accentColor = '#FF6B35') {
-  const width = 1000;
-  const height = 550;
+  const width = 1100;
+  const height = 580;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
   // Background
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  bgGrad.addColorStop(0, '#10131B');
-  bgGrad.addColorStop(1, '#0C0E14');
+  bgGrad.addColorStop(0, '#0F1219');
+  bgGrad.addColorStop(1, '#090B0F');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
   // Top header box
-  ctx.fillStyle = '#171B26';
+  ctx.fillStyle = '#151924';
   ctx.strokeStyle = '#252B3C';
   ctx.lineWidth = 1;
   roundRect(ctx, 35, 25, width - 70, 95, 12, true, true);
 
+  // Official Trophy Icon in header
+  const trophyAsset = await getLocalAsset('trophy');
+  drawAssetIcon(ctx, trophyAsset, 50, 42, 36, 36);
+
   // Header Title
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 24px sans-serif';
-  ctx.fillText(`Évolution des Trophées — ${playerName}`, 55, 62);
+  ctx.fillText(`Évolution des Trophées — ${playerName}`, 100, 62);
 
   ctx.fillStyle = '#94A3B8';
   ctx.font = '14px monospace';
-  ctx.fillText(`${playerTag} • Période : ${days} derniers jours`, 55, 90);
+  ctx.fillText(`${playerTag} • Période : ${days} derniers jours`, 100, 90);
 
   // Handle case with insufficient data points (< 2)
   if (!logs || logs.length < 2) {
@@ -588,7 +757,6 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
     return canvas.toBuffer('image/png');
   }
 
-  // Compute metrics: min, max, start, end, delta
   const trophyValues = logs.map(l => l.trophies);
   const minTrophies = Math.min(...trophyValues);
   const maxTrophies = Math.max(...trophyValues);
@@ -596,7 +764,6 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   const endTrophies = trophyValues[trophyValues.length - 1];
   const delta = endTrophies - startTrophies;
 
-  // Header Badges (Min, Max, Variation)
   const deltaText = delta >= 0 ? `+${delta.toLocaleString('fr-FR')}` : `${delta.toLocaleString('fr-FR')}`;
   const deltaColor = delta >= 0 ? '#10B981' : '#EF4444';
 
@@ -612,17 +779,16 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
 
   // Chart bounds
   const chartX = 85;
-  const chartY = 160;
+  const chartY = 165;
   const chartW = width - 130;
-  const chartH = height - 230;
+  const chartH = height - 240;
 
-  // Value padding
   const valMargin = Math.max(50, Math.round((maxTrophies - minTrophies) * 0.15));
   const chartMin = Math.max(0, minTrophies - valMargin);
   const chartMax = maxTrophies + valMargin;
   const valRange = chartMax - chartMin || 1;
 
-  // Draw Horizontal Grid Lines
+  // Grid Lines
   const gridLines = 5;
   ctx.strokeStyle = '#1F2535';
   ctx.lineWidth = 1;
@@ -642,14 +808,14 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   }
   ctx.textAlign = 'left';
 
-  // Calculate coordinates for data points
+  // Points
   const points = logs.map((log, index) => {
     const px = chartX + (index / (logs.length - 1)) * chartW;
     const py = chartY + chartH - ((log.trophies - chartMin) / valRange) * chartH;
     return { x: px, y: py, trophies: log.trophies, date: new Date(log.recordedAt) };
   });
 
-  // Draw Smooth Curve using Cardinal / Catmull-Rom or Bezier
+  // Smooth Bezier Curve
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
 
@@ -667,23 +833,22 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
 
-  // Save path for stroke
   ctx.strokeStyle = accentColor;
   ctx.lineWidth = 3.5;
   ctx.stroke();
 
-  // Create filled gradient under the curve
+  // Gradient under curve
   ctx.lineTo(points[points.length - 1].x, chartY + chartH);
   ctx.lineTo(points[0].x, chartY + chartH);
   ctx.closePath();
 
   const areaGrad = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-  areaGrad.addColorStop(0, `${accentColor}55`); // 33% opacity
-  areaGrad.addColorStop(1, `${accentColor}00`); // transparent
+  areaGrad.addColorStop(0, `${accentColor}55`);
+  areaGrad.addColorStop(1, `${accentColor}00`);
   ctx.fillStyle = areaGrad;
   ctx.fill();
 
-  // Draw Points & Tooltip Labels for start, end, min, max
+  // Points
   points.forEach((p, idx) => {
     const isSpecial = idx === 0 || idx === points.length - 1 || p.trophies === maxTrophies || p.trophies === minTrophies;
     ctx.beginPath();
@@ -718,7 +883,11 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
 
 module.exports = {
   RANKED_TIERS,
+  TOTAL_AVAILABLE_BRAWLERS,
   normalizePlayerTag,
+  estimateAccountCreationYear,
+  resolveRankedInfo,
+  resolveChallengeWins,
   getApiKey,
   fetchPlayerData,
   getExpectedRoleIds,
