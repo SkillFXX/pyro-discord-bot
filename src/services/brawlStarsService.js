@@ -225,7 +225,7 @@ async function fetchPlayerData(playerTag) {
   }
 
   if (response.status === 403) {
-    throw new Error('Accès refusé par l\'API Brawl Stars (Code 403). La clé d\'API est invalide ou restreinte à une autre adresse IP.');
+    throw new Error('Accès refusé par l\'API Brawl Stars (Code 403). L\'adresse IP de ce serveur est **193.51.159.240**. Pensez à l\'autoriser dans votre clé sur https://developer.brawlstars.com/.');
   }
 
   if (!response.ok) {
@@ -234,6 +234,64 @@ async function fetchPlayerData(playerTag) {
 
   const data = await response.json();
   return data;
+}
+
+/**
+ * Fetches a profile card directly from SpotLight CDN.
+ * Available types: 'trophies' (default), 'ranks', 'mastery', 'trmax'.
+ * @param {string} playerTag
+ * @param {string} type
+ * @returns {Promise<Buffer>}
+ */
+async function fetchSpotlightCard(playerTag, type = 'trophies') {
+  const cleanTag = normalizePlayerTag(playerTag).replace('#', '');
+  const validTypes = ['trophies', 'ranks', 'mastery', 'trmax'];
+  const cardType = validTypes.includes(type) ? type : 'trophies';
+  const url = `https://img.sltbot.com/player/${cleanTag}/${cardType}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Pyro-Discord-Bot/1.0 (+https://github.com/SkillFXX/pyro-discord-bot)',
+      },
+    });
+  } catch (err) {
+    throw new Error(`Erreur réseau lors de la récupération de la carte SpotLight : ${err.message}`);
+  }
+
+  if (response.status === 404) {
+    throw new Error(`Le joueur avec le tag **#${cleanTag}** est introuvable sur Brawl Stars.`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Erreur lors de la récupération de la carte SpotLight (${response.status} ${response.statusText}).`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Validates whether a player tag exists by checking the SpotLight CDN.
+ * @param {string} playerTag
+ * @returns {Promise<boolean>}
+ */
+async function validatePlayerTagViaSpotlight(playerTag) {
+  const cleanTag = normalizePlayerTag(playerTag).replace('#', '');
+  if (!cleanTag || cleanTag.length < 3) return false;
+
+  try {
+    const res = await fetch(`https://img.sltbot.com/player/${cleanTag}/trophies`, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'Pyro-Discord-Bot/1.0',
+      },
+    });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -909,6 +967,8 @@ module.exports = {
   resolveChallengeWins,
   getApiKey,
   fetchPlayerData,
+  fetchSpotlightCard,
+  validatePlayerTagViaSpotlight,
   getExpectedRoleIds,
   syncUserRoles,
   recordTrophySnapshot,

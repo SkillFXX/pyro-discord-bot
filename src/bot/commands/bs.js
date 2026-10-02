@@ -29,12 +29,37 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('profil')
-        .setDescription('Afficher la carte de profil complète et la grille des brawlers d\'un joueur.')
+        .setDescription('Afficher la carte de profil Brawl Stars d\'un joueur.')
         .addUserOption(option =>
           option
             .setName('membre')
-            .setDescription('Le membre dont vous souhaitez inspecter le profil Brawl Stars (défaut: vous)')
-            .setRequired(false)))
+            .setDescription('Le membre Discord dont vous souhaitez inspecter le profil (défaut: vous)')
+            .setRequired(false))
+        .addStringOption(option =>
+          option
+            .setName('tag')
+            .setDescription('Tag Brawl Stars du joueur à inspecter directement (ex: #GGUGPYJRV)')
+            .setRequired(false))
+        .addStringOption(option =>
+          option
+            .setName('style')
+            .setDescription('Style de la carte : Spotlight (complet) ou Canvas Pyro')
+            .setRequired(false)
+            .addChoices(
+              { name: '🌟 Spotlight (Winstreak, Gloire, Rangs, Prestiges)', value: 'spotlight' },
+              { name: '🎨 Pyro Bot (Canvas HD personnalisé)', value: 'custom' },
+            ))
+        .addStringOption(option =>
+          option
+            .setName('type')
+            .setDescription('Type de carte Spotlight (défaut: Trophées)')
+            .setRequired(false)
+            .addChoices(
+              { name: '🏆 Trophées & Général', value: 'trophies' },
+              { name: '🎖️ Rangs & Prestiges', value: 'ranks' },
+              { name: '⭐ Maîtrise des Brawlers', value: 'mastery' },
+              { name: '👑 Trophées Maximum (TR Max)', value: 'trmax' },
+            )))
 
     // Subcommand: graph
     .addSubcommand(subcommand =>
@@ -79,49 +104,83 @@ module.exports = {
 
       try {
         const cleanTag = brawlStarsService.normalizePlayerTag(inputTag);
-        const playerData = await brawlStarsService.fetchPlayerData(cleanTag);
+        let playerData = null;
 
-        // Save or update user link
-        await BrawlStarsUser.upsert({
-          userId: targetUser.id,
-          playerTag: cleanTag,
-          playerName: playerData.name || 'Brawler',
-          lastTrophies: playerData.trophies || 0,
-          highestTrophies: playerData.highestTrophies || 0,
-          lastRankedRank: playerData.highestRank || playerData.soloLeagueRank || 0,
-          lastCheckedAt: new Date(),
-        });
-
-        // Record trophy snapshot
-        await brawlStarsService.recordTrophySnapshot(targetUser.id, cleanTag, playerData.trophies || 0);
-
-        // Sync guild roles based on trophies and ranked tiers
-        const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        let roleSummary = 'Aucun nouveau rôle attribué.';
-
-        if (guildMember) {
-          const syncResult = await brawlStarsService.syncUserRoles(client, guildMember, playerData);
-          if (syncResult.added.length > 0 || syncResult.removed.length > 0) {
-            const parts = [];
-            if (syncResult.added.length > 0) parts.push(`➕ Rôles obtenus : **${syncResult.added.join(', ')}**`);
-            if (syncResult.removed.length > 0) parts.push(`➖ Rôles retirés : **${syncResult.removed.join(', ')}**`);
-            roleSummary = parts.join('\n');
+        try {
+          playerData = await brawlStarsService.fetchPlayerData(cleanTag);
+        } catch (apiErr) {
+          // If official API throws 403 or missing key, verify tag existence via SpotLight CDN
+          const isValidViaSpotlight = await brawlStarsService.validatePlayerTagViaSpotlight(cleanTag);
+          if (!isValidViaSpotlight) {
+            throw apiErr;
           }
         }
 
-        const linkEmbed = embeds.custom(
-          '🎮 Compte Brawl Stars Lié !',
-          `Le compte Discord de ${targetUser} a été lié avec succès au joueur Brawl Stars **${playerData.name}** (\`${cleanTag}\`).\n\n` +
-          `**🏆 Trophées actuels :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')}\n` +
-          `**👑 Record :** ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')}\n` +
-          `**⚔️ Victoires 3v3 :** ${Number(playerData['3vs3Victories'] || 0).toLocaleString('fr-FR')}\n\n` +
-          `**Gestion des Rôles :**\n${roleSummary}`,
-          embeds.COLORS.SUCCESS,
-          null,
-          `https://cdn.brawlify.com/profile-icons/regular/${playerData.icon?.id || 28000000}.png`
-        );
+        if (playerData) {
+          // Save or update user link with fresh official data
+          await BrawlStarsUser.upsert({
+            userId: targetUser.id,
+            playerTag: cleanTag,
+            playerName: playerData.name || 'Brawler',
+            lastTrophies: playerData.trophies || 0,
+            highestTrophies: playerData.highestTrophies || 0,
+            lastRankedRank: playerData.highestRank || playerData.soloLeagueRank || 0,
+            lastCheckedAt: new Date(),
+          });
 
-        return interaction.editReply({ embeds: [linkEmbed] });
+          // Record trophy snapshot
+          await brawlStarsService.recordTrophySnapshot(targetUser.id, cleanTag, playerData.trophies || 0);
+
+          // Sync guild roles based on trophies and ranked tiers
+          const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+          let roleSummary = 'Aucun nouveau rôle attribué.';
+
+          if (guildMember) {
+            const syncResult = await brawlStarsService.syncUserRoles(client, guildMember, playerData);
+            if (syncResult.added.length > 0 || syncResult.removed.length > 0) {
+              const parts = [];
+              if (syncResult.added.length > 0) parts.push(`➕ Rôles obtenus : **${syncResult.added.join(', ')}**`);
+              if (syncResult.removed.length > 0) parts.push(`➖ Rôles retirés : **${syncResult.removed.join(', ')}**`);
+              roleSummary = parts.join('\n');
+            }
+          }
+
+          const linkEmbed = embeds.custom(
+            '🎮 Compte Brawl Stars Lié !',
+            `Le compte Discord de ${targetUser} a été lié avec succès au joueur Brawl Stars **${playerData.name}** (\`${cleanTag}\`).\n\n` +
+            `**🏆 Trophées actuels :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')}\n` +
+            `**👑 Record :** ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')}\n` +
+            `**⚔️ Victoires 3v3 :** ${Number(playerData['3vs3Victories'] || 0).toLocaleString('fr-FR')}\n\n` +
+            `**Gestion des Rôles :**\n${roleSummary}`,
+            embeds.COLORS.SUCCESS,
+            null,
+            `https://cdn.brawlify.com/profile-icons/regular/${playerData.icon?.id || 28000000}.png`
+          );
+
+          return interaction.editReply({ embeds: [linkEmbed] });
+        } else {
+          // Linked via fallback (Tag validated via SpotLight)
+          await BrawlStarsUser.upsert({
+            userId: targetUser.id,
+            playerTag: cleanTag,
+            playerName: 'Brawler',
+            lastTrophies: 0,
+            highestTrophies: 0,
+            lastRankedRank: 0,
+            lastCheckedAt: new Date(),
+          });
+
+          const linkEmbed = embeds.custom(
+            '🎮 Compte Brawl Stars Lié !',
+            `Le compte Discord de ${targetUser} a été lié avec succès au tag joueur \`${cleanTag}\`.\n\n` +
+            `🌟 **Profils opérationnels :** Vous pouvez dès à présent afficher votre carte avec la commande \`/bs profil\` !\n\n` +
+            `ℹ️ **Note pour les rôles automatiques & graphiques :**\n` +
+            `Pour activer la synchronisation automatique des rôles sur le serveur, ajoutez l'adresse IP du serveur (**193.51.159.240**) dans les paramètres de votre clé d'API sur https://developer.brawlstars.com/.`,
+            embeds.COLORS.SUCCESS
+          );
+
+          return interaction.editReply({ embeds: [linkEmbed] });
+        }
 
       } catch (err) {
         console.error('[Command /bs link] Erreur :', err);
@@ -135,40 +194,84 @@ module.exports = {
     // 2. SUBCOMMAND: PROFIL
     // ==========================================
     else if (subcommand === 'profil') {
+      const explicitTag = interaction.options.getString('tag');
       const targetUser = interaction.options.getUser('membre') || interaction.user;
+      const style = interaction.options.getString('style') || 'spotlight';
+      const cardType = interaction.options.getString('type') || 'trophies';
+
       await interaction.deferReply();
 
       try {
+        let playerTag = null;
+
+        if (explicitTag) {
+          playerTag = brawlStarsService.normalizePlayerTag(explicitTag);
+        } else {
+          const linkedUser = await BrawlStarsUser.findByPk(targetUser.id);
+          if (!linkedUser) {
+            const isSelf = targetUser.id === interaction.user.id;
+            const msg = isSelf
+              ? 'Vous n\'avez pas encore lié votre compte Brawl Stars. Utilisez `/bs link <tag>` ou spécifiez directement votre tag avec `/bs profil tag:<tag>`.'
+              : `${targetUser} n'a pas encore lié son profil Brawl Stars sur ce serveur. Vous pouvez utiliser \`/bs profil tag:<tag>\`.`;
+            return interaction.editReply({ embeds: [embeds.warning(msg)] });
+          }
+          playerTag = linkedUser.playerTag;
+        }
+
+        // --- OPTION A : CARTE SPOTLIGHT (Recommandée : Winstreak, Gloire, Date 2023, Score...) ---
+        if (style === 'spotlight') {
+          const cardBuffer = await brawlStarsService.fetchSpotlightCard(playerTag, cardType);
+          const cleanTag = playerTag.replace('#', '');
+          const filename = `spotlight-${cleanTag}-${cardType}.png`;
+          const attachment = new AttachmentBuilder(cardBuffer, { name: filename });
+
+          const typeTitles = {
+            trophies: 'Trophées & Général',
+            ranks: 'Rangs & Prestiges',
+            mastery: 'Maîtrise des Brawlers',
+            trmax: 'Trophées Maximum (TR Max)',
+          };
+          const titleType = typeTitles[cardType] || 'Profil';
+
+          const embed = embeds.custom(
+            `🎮 Brawl Stars — ${titleType}`,
+            `**Joueur :** ${explicitTag ? `\`${playerTag}\`` : targetUser} • **Tag :** \`${playerTag}\`\n` +
+            `*Données complètes via SpotLight (Winstreak, Gloire, Prestiges). Pour la carte Pyro HD, ajoutez l'option \`style: Pyro Bot\`.*`,
+            accentColor,
+            null,
+            null,
+            `attachment://${filename}`
+          );
+
+          return interaction.editReply({
+            embeds: [embed],
+            files: [attachment],
+          });
+        }
+
+        // --- OPTION B : CARTE CANVAS LOCALE PYRO BOT ---
+        const playerData = await brawlStarsService.fetchPlayerData(playerTag);
+
+        // Update stored stats & snapshot if applicable
         const linkedUser = await BrawlStarsUser.findByPk(targetUser.id);
-        if (!linkedUser) {
-          const isSelf = targetUser.id === interaction.user.id;
-          const msg = isSelf
-            ? 'Vous n\'avez pas encore lié votre compte Brawl Stars. Utilisez d\'abord la commande `/bs link <tag>`.'
-            : `${targetUser} n'a pas encore lié son profil Brawl Stars sur ce serveur.`;
-          return interaction.editReply({ embeds: [embeds.warning(msg)] });
+        if (linkedUser && linkedUser.playerTag === playerTag) {
+          await linkedUser.update({
+            playerName: playerData.name || linkedUser.playerName,
+            lastTrophies: playerData.trophies || 0,
+            highestTrophies: playerData.highestTrophies || 0,
+            lastCheckedAt: new Date(),
+          });
+          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, playerData.trophies || 0);
+
+          const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+          if (guildMember) {
+            brawlStarsService.syncUserRoles(client, guildMember, playerData).catch(() => {});
+          }
         }
 
-        // Fetch fresh player data
-        const playerData = await brawlStarsService.fetchPlayerData(linkedUser.playerTag);
-
-        // Update stored stats & snapshot
-        await linkedUser.update({
-          playerName: playerData.name || linkedUser.playerName,
-          lastTrophies: playerData.trophies || 0,
-          highestTrophies: playerData.highestTrophies || 0,
-          lastCheckedAt: new Date(),
-        });
-        await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, playerData.trophies || 0);
-
-        // Sync member roles in background
-        const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        if (guildMember) {
-          brawlStarsService.syncUserRoles(client, guildMember, playerData).catch(() => {});
-        }
-
-        // Generate profile card canvas
+        // Generate custom profile card canvas
         const cardBuffer = await brawlStarsService.generateProfileCard(playerData, accentColor);
-        const attachment = new AttachmentBuilder(cardBuffer, { name: `brawlstars-${linkedUser.playerTag.replace('#', '')}.png` });
+        const attachment = new AttachmentBuilder(cardBuffer, { name: `brawlstars-${playerTag.replace('#', '')}.png` });
 
         const creationYear = brawlStarsService.estimateAccountCreationYear(playerData.tag || '');
         const rankedInfo = brawlStarsService.resolveRankedInfo(playerData);
@@ -177,13 +280,13 @@ module.exports = {
 
         const embed = embeds.custom(
           `🎮 Profil Brawl Stars — ${playerData.name}`,
-          `**Joueur :** ${targetUser} • **Tag :** \`${playerData.tag}\`\n` +
+          `**Joueur :** ${explicitTag ? `\`${playerTag}\`` : targetUser} • **Tag :** \`${playerData.tag}\`\n` +
           `📅 **Création :** Compte ${creationYear} • 🏆 **Trophées :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')} (Max: ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')})\n` +
           `👑 **Classé :** ${rankedInfo.name} • 🎯 **Brawlers :** ${totalBrawlers} / ${brawlStarsService.TOTAL_AVAILABLE_BRAWLERS} • 🏅 **Défi :** ${challengeWins}`,
           accentColor,
           null,
           null,
-          `attachment://brawlstars-${linkedUser.playerTag.replace('#', '')}.png`
+          `attachment://brawlstars-${playerTag.replace('#', '')}.png`
         );
 
         return interaction.editReply({
