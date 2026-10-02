@@ -32,6 +32,53 @@ function formatDateKey(date) {
   return `${month}/${day}`;
 }
 
+/**
+ * Splits a voice session into hourly slices.
+ * Correctly distributes long voice sessions across the hours/days they span.
+ *
+ * @param {Date|string|number} joinedAt Start of the session
+ * @param {number} durationSeconds Duration in seconds
+ * @param {Date} [filterStart] Optional lower bound date
+ * @param {Date} [filterEnd] Optional upper bound date
+ * @returns {Array<{ hour: number, hourKey: string, dateKey: string, sliceMinutes: number, sliceSeconds: number }>}
+ */
+function splitVoiceSessionIntoHourlySlices(joinedAt, durationSeconds, filterStart = null, filterEnd = null) {
+  if (!durationSeconds || durationSeconds <= 0) return [];
+
+  const startMs = new Date(joinedAt).getTime();
+  const endMs = startMs + (durationSeconds * 1000);
+
+  const boundedStartMs = filterStart ? Math.max(startMs, filterStart.getTime()) : startMs;
+  const boundedEndMs = filterEnd ? Math.min(endMs, filterEnd.getTime()) : endMs;
+
+  if (boundedStartMs >= boundedEndMs) return [];
+
+  const slices = [];
+  let curStart = new Date(boundedStartMs);
+
+  while (curStart.getTime() < boundedEndMs) {
+    const nextHour = new Date(curStart);
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+
+    const curEndMs = Math.min(nextHour.getTime(), boundedEndMs);
+    const sliceSeconds = (curEndMs - curStart.getTime()) / 1000;
+    const sliceMinutes = sliceSeconds / 60;
+
+    slices.push({
+      hour: curStart.getHours(),
+      hourKey: `${String(curStart.getHours()).padStart(2, '0')}h`,
+      dateKey: formatDateKey(curStart),
+      sliceMinutes,
+      sliceSeconds,
+    });
+
+    curStart = new Date(curEndMs);
+  }
+
+  return slices;
+}
+
 const analyticsService = {
   // ==========================================
   // TRACKING FUNCTIONS
@@ -329,7 +376,10 @@ const analyticsService = {
       createdAt: { [Op.between]: [startDate, endDate] },
     };
     const voiceWhere = {
-      joinedAt: { [Op.between]: [startDate, endDate] },
+      [Op.or]: [
+        { joinedAt: { [Op.between]: [startDate, endDate] } },
+        { leftAt: { [Op.between]: [startDate, endDate] } },
+      ],
     };
     const memberWhere = {
       createdAt: { [Op.between]: [startDate, endDate] },
@@ -377,7 +427,7 @@ const analyticsService = {
       }),
       VoiceLog.findAll({
         where: voiceWhere,
-        attributes: ['userId', 'channelId', 'durationSeconds', 'roleIds', 'joinedAt'],
+        attributes: ['userId', 'channelId', 'durationSeconds', 'roleIds', 'joinedAt', 'leftAt'],
         raw: true,
       }),
       MemberLog.findAll({
@@ -524,10 +574,15 @@ const analyticsService = {
     }
 
     for (const v of voiceLogs) {
-      const h = new Date(v.joinedAt).getHours();
-      const mins = Math.round(v.durationSeconds / 60);
-      hourlyActivity[h].voiceMinutes += mins;
-      hourlyActivity[h].totalWeight += Math.max(1, Math.round(mins / 2));
+      const slices = splitVoiceSessionIntoHourlySlices(v.joinedAt, v.durationSeconds, startDate, endDate);
+      for (const slice of slices) {
+        hourlyActivity[slice.hour].voiceMinutes += slice.sliceMinutes;
+        hourlyActivity[slice.hour].totalWeight += Math.max(0.5, Math.round(slice.sliceMinutes / 2));
+      }
+    }
+
+    for (const h of hourlyActivity) {
+      h.voiceMinutes = Math.round(h.voiceMinutes);
     }
 
     let peakHourIndex = 0;
@@ -562,8 +617,12 @@ const analyticsService = {
         if (timelineMap.has(key)) timelineMap.get(key).messages += 1;
       }
       for (const v of voiceLogs) {
-        const key = `${String(new Date(v.joinedAt).getHours()).padStart(2, '0')}h`;
-        if (timelineMap.has(key)) timelineMap.get(key).voiceMinutes += Math.round(v.durationSeconds / 60);
+        const slices = splitVoiceSessionIntoHourlySlices(v.joinedAt, v.durationSeconds, startDate, endDate);
+        for (const slice of slices) {
+          if (timelineMap.has(slice.hourKey)) {
+            timelineMap.get(slice.hourKey).voiceMinutes += slice.sliceMinutes;
+          }
+        }
       }
       for (const l of memberLogs) {
         const key = `${String(new Date(l.createdAt).getHours()).padStart(2, '0')}h`;
@@ -589,8 +648,12 @@ const analyticsService = {
         if (timelineMap.has(key)) timelineMap.get(key).messages += 1;
       }
       for (const v of voiceLogs) {
-        const key = formatDateKey(v.joinedAt);
-        if (timelineMap.has(key)) timelineMap.get(key).voiceMinutes += Math.round(v.durationSeconds / 60);
+        const slices = splitVoiceSessionIntoHourlySlices(v.joinedAt, v.durationSeconds, startDate, endDate);
+        for (const slice of slices) {
+          if (timelineMap.has(slice.dateKey)) {
+            timelineMap.get(slice.dateKey).voiceMinutes += slice.sliceMinutes;
+          }
+        }
       }
       for (const l of memberLogs) {
         const key = formatDateKey(l.createdAt);
@@ -599,6 +662,10 @@ const analyticsService = {
           else timelineMap.get(key).leaves += 1;
         }
       }
+    }
+
+    for (const item of timelineMap.values()) {
+      item.voiceMinutes = Math.round(item.voiceMinutes);
     }
 
     const timeline = Array.from(timelineMap.values());
