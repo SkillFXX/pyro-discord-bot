@@ -83,6 +83,12 @@ async function handleConfigSave(section, body, client) {
     if (body.xp_voice_ignore_deafened !== undefined) {
       await ConfigHelper.set('xp_voice_ignore_deafened', body.xp_voice_ignore_deafened === true || body.xp_voice_ignore_deafened === 'true');
     }
+    if (body.xp_public_leaderboard !== undefined) {
+      await ConfigHelper.set('xp_public_leaderboard', body.xp_public_leaderboard === true || body.xp_public_leaderboard === 'true');
+    }
+    if (body.xp_leaderboard_search !== undefined) {
+      await ConfigHelper.set('xp_leaderboard_search', body.xp_leaderboard_search === true || body.xp_leaderboard_search === 'true');
+    }
   } else if (section === 'gaming') {
     if (body.brawlstars_api_key !== undefined) {
       await ConfigHelper.set('brawlstars_api_key', (body.brawlstars_api_key || '').trim());

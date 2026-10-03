@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { auth } from '../stores/auth';
-  import { ShieldAlert, AlertCircle } from '@lucide/svelte';
+  import { ShieldAlert, AlertCircle, Trophy } from '@lucide/svelte';
 
+  export let navigate = null;
   let errorMsg = '';
 
   const ERROR_MESSAGES = {
@@ -61,6 +62,20 @@
           </div>
         </div>
       {/if}
+    </div>
+
+    <div class="login-footer-links">
+      <a
+        href="/leaderboard"
+        class="link-leaderboard"
+        on:click|preventDefault={() => {
+          if (typeof navigate === 'function') navigate('/leaderboard');
+          else window.location.href = '/leaderboard';
+        }}
+      >
+        <Trophy size={16} />
+        <span>Consulter le classement public</span>
+      </a>
     </div>
   </div>
 </div>
@@ -194,5 +209,27 @@
     background: var(--surface-2);
     padding: 0.15rem 0.35rem;
     border-radius: var(--radius-xs);
+  }
+
+  .login-footer-links {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border, #202636);
+  }
+
+  .link-leaderboard {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary, #FF6B35);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .link-leaderboard:hover {
+    opacity: 0.85;
+    text-decoration: underline;
   }
 </style>

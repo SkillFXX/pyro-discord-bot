@@ -9,6 +9,7 @@
   import Sidebar from './components/Sidebar.svelte';
 
   import Login from './views/Login.svelte';
+  import Leaderboard from './views/Leaderboard.svelte';
 
   import GeneralTab from './tabs/GeneralTab.svelte';
   import CustomizationTab from './tabs/CustomizationTab.svelte';
@@ -21,6 +22,22 @@
   import AnalyticsTab from './tabs/AnalyticsTab.svelte';
 
   let currentTab = 'general';
+  let currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+  let isLeaderboard = currentPath === '/leaderboard' || currentPath === '/classement';
+
+  function updateRoute() {
+    if (typeof window !== 'undefined') {
+      currentPath = window.location.pathname.toLowerCase();
+      isLeaderboard = currentPath === '/leaderboard' || currentPath === '/classement';
+    }
+  }
+
+  function navigateTo(path) {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', path);
+      updateRoute();
+    }
+  }
 
   $: if ($auth.permissions && !$auth.permissions.isAdmin && $auth.permissions.canViewAuditLog) {
     if (currentTab !== 'analytics') {
@@ -29,19 +46,24 @@
   }
 
   onMount(() => {
+    updateRoute();
+    window.addEventListener('popstate', updateRoute);
     bootstrapApplication();
+    return () => window.removeEventListener('popstate', updateRoute);
   });
 </script>
 
 <Toast />
 
-{#if $preloader.loading}
+{#if isLeaderboard}
+  <Leaderboard navigate={navigateTo} />
+{:else if $preloader.loading}
   <div class="app-loader">
     <video class="loader-media" src="/loader.webm" autoplay loop muted playsinline aria-label="Chargement"></video>
     <p class="loader-text">Chargement...</p>
   </div>
 {:else if !$auth.authenticated || !$auth.permissions || (!$auth.permissions.isAdmin && !$auth.permissions.canViewAuditLog)}
-  <Login />
+  <Login navigate={navigateTo} />
 {:else}
   <div class="app-layout">
     <Header serverName={$dashboardData.serverName || 'Serveur Discord'} on:logout={logout} />

@@ -17,6 +17,7 @@ const createDashboardRouter = require('./routes/dashboard');
 const createConfigRouter = require('./routes/config');
 const createFeaturesRouter = require('./routes/features');
 const createAnalyticsRouter = require('./routes/analytics');
+const createPublicRouter = require('./routes/public');
 
 /**
  * Starts the Express web dashboard server with modular routes and security middleware.
@@ -101,6 +102,7 @@ function startWebServer(client, rawPort) {
   app.use(createConfigRouter(client));
   app.use(createFeaturesRouter(client));
   app.use(createAnalyticsRouter(client));
+  app.use(createPublicRouter(client));
 
   // SPA Wildcard & Fallback Handler (rate limited)
   app.get('*', apiLimiter, (req, res, next) => {

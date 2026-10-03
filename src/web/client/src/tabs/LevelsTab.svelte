@@ -1,5 +1,5 @@
 <script>
-  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save, Mic, Users, VolumeX, MicOff } from '@lucide/svelte';
+  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save, Mic, Users, VolumeX, MicOff, ExternalLink } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import Toggle from '../components/Toggle.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -68,6 +68,8 @@
       xp_max_gain: parseInt($dashboardData.config.xp_max_gain || 25),
       xp_cooldown_seconds: parseInt($dashboardData.config.xp_cooldown_seconds || 60),
       xp_announcement_channel_id: $dashboardData.config.xp_announcement_channel_id || '',
+      xp_public_leaderboard: $dashboardData.config.xp_public_leaderboard ?? true,
+      xp_leaderboard_search: $dashboardData.config.xp_leaderboard_search ?? true,
     });
     savingXp = false;
   }
@@ -253,6 +255,41 @@
               <option value={c.id}># {c.name}</option>
             {/each}
           </select>
+        </div>
+      </div>
+
+      <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: #FFFFFF; display: flex; align-items: center; gap: 0.5rem;">
+          <Award size={18} style="color: var(--primary);" /> Classement Public en Ligne
+        </h4>
+
+        <Toggle
+          id="xp_public_leaderboard"
+          bind:checked={$dashboardData.config.xp_public_leaderboard}
+          label="Activer la page publique du classement (/leaderboard)"
+          description="Permet à n'importe quel membre ou visiteur de consulter le classement des niveaux sur la page web publique sans être connecté."
+        />
+
+        <div style="margin-top: 1rem;">
+          <Toggle
+            id="xp_leaderboard_search"
+            bind:checked={$dashboardData.config.xp_leaderboard_search}
+            label="Activer la barre de recherche sur le classement"
+            description="Permet aux visiteurs de rechercher un membre par son pseudo sur la page du classement."
+          />
+        </div>
+
+        <div style="margin-top: 1rem; margin-bottom: 1rem;">
+          <a
+            href="/leaderboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-secondary"
+            style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; width: fit-content;"
+          >
+            <ExternalLink size={15} />
+            <span>Ouvrir la page du classement public</span>
+          </a>
         </div>
       </div>
 
