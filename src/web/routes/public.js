@@ -8,7 +8,11 @@ function createPublicRouter(client) {
   // Public Leaderboard API endpoint
   router.get('/api/public/leaderboard', apiLimiter, async (req, res) => {
     try {
-      const data = await getLeaderboardData(client);
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 10));
+      const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+      const data = await getLeaderboardData(client, { limit, offset, search });
       res.json(data);
     } catch (err) {
       console.error('[Public Router] Erreur leaderboard :', err);

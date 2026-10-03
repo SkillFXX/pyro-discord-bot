@@ -56,7 +56,7 @@
 <Toast />
 
 {#if isLeaderboard}
-  <Leaderboard navigate={navigateTo} />
+  <Leaderboard />
 {:else if $preloader.loading}
   <div class="app-loader">
     <video class="loader-media" src="/loader.webm" autoplay loop muted playsinline aria-label="Chargement"></video>

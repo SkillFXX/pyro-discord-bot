@@ -1,11 +1,11 @@
 <script>
-  import { onMount } from 'svelte';
-  import { Trophy, Search, Sparkles, ExternalLink, ArrowLeft, ShieldAlert, Award, X, Flame } from '@lucide/svelte';
-
-  export let navigate = null;
+  import { onMount, onDestroy } from 'svelte';
+  import { Trophy, Search, X, Flame, ShieldAlert, Award } from '@lucide/svelte';
 
   let loading = true;
+  let loadingMore = false;
   let error = null;
+
   let data = {
     enabled: true,
     searchEnabled: true,
@@ -13,62 +13,170 @@
     serverIcon: null,
     botName: 'Pyro Bot',
     botAvatar: '/icon.svg',
+    themeColor: '#ef490b',
     totalCount: 0,
+    hasMore: false,
     leaderboard: [],
   };
 
+  let topThree = [];
   let searchQuery = '';
+  let searchDebounceTimer = null;
 
-  onMount(async () => {
-    await fetchLeaderboard();
+  // Color utilities for dynamic theme adaptation
+  function hexToRgba(hex, alpha = 1) {
+    if (!hex || typeof hex !== 'string') return `rgba(239, 73, 11, ${alpha})`;
+    let clean = hex.replace('#', '').trim();
+    if (clean.length === 3) {
+      clean = clean.split('').map((c) => c + c).join('');
+    }
+    if (clean.length !== 6) return `rgba(239, 73, 11, ${alpha})`;
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function lightenHex(hex, percent = 25) {
+    if (!hex || typeof hex !== 'string') return '#ff7a45';
+    let clean = hex.replace('#', '').trim();
+    if (clean.length === 3) {
+      clean = clean.split('').map((c) => c + c).join('');
+    }
+    if (clean.length !== 6) return '#ff7a45';
+    let r = parseInt(clean.substring(0, 2), 16);
+    let g = parseInt(clean.substring(2, 4), 16);
+    let b = parseInt(clean.substring(4, 6), 16);
+    r = Math.min(255, Math.floor(r + (255 - r) * (percent / 100)));
+    g = Math.min(255, Math.floor(g + (255 - g) * (percent / 100)));
+    b = Math.min(255, Math.floor(b + (255 - g) * (percent / 100)));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  // Reactive theme styles
+  $: themeColor = data.themeColor || '#ef490b';
+  $: themeLight = lightenHex(themeColor, 35);
+  $: themeSubtle = hexToRgba(themeColor, 0.12);
+  $: themeBorder = hexToRgba(themeColor, 0.35);
+  $: themeGlow = hexToRgba(themeColor, 0.22);
+  $: themeHover = lightenHex(themeColor, 12);
+
+  onMount(() => {
+    fetchLeaderboard({ reset: true });
+
+    const handleWindowScroll = () => {
+      if (loading || loadingMore || !data.hasMore) return;
+      const scrollPos = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 350;
+      if (scrollPos >= threshold) {
+        fetchNextBatch();
+      }
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleWindowScroll);
+      clearTimeout(searchDebounceTimer);
+    };
   });
 
-  async function fetchLeaderboard() {
-    loading = true;
-    error = null;
+  async function fetchLeaderboard({ reset = false, query = searchQuery } = {}) {
+    if (reset) {
+      loading = true;
+      error = null;
+    }
+
     try {
-      const res = await fetch('/api/public/leaderboard');
+      const limit = 10;
+      const offset = reset ? 0 : data.leaderboard.length;
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      });
+
+      if (query && query.trim()) {
+        params.set('search', query.trim());
+      }
+
+      const res = await fetch(`/api/public/leaderboard?${params.toString()}`);
       if (!res.ok) {
         throw new Error(`Erreur HTTP ${res.status}`);
       }
-      data = await res.json();
+      const json = await res.json();
+
+      if (reset) {
+        data = json;
+        // Keep top 3 for podium when not searching
+        if (!query.trim() && (json.leaderboard || []).length >= 3) {
+          topThree = json.leaderboard.slice(0, 3);
+        }
+      } else {
+        data = {
+          ...json,
+          leaderboard: [...data.leaderboard, ...(json.leaderboard || [])],
+        };
+      }
     } catch (err) {
       console.error('Erreur chargement classement :', err);
-      error = 'Impossible de charger le classement pour le moment. Veuillez réessayer plus tard.';
+      if (reset) {
+        error = 'Impossible de charger le classement pour le moment. Veuillez réessayer plus tard.';
+      }
     } finally {
       loading = false;
+      loadingMore = false;
     }
   }
 
-  function handleGoHome(e) {
-    e.preventDefault();
-    if (typeof navigate === 'function') {
-      navigate('/');
-    } else {
-      window.location.href = '/';
-    }
+  function fetchNextBatch() {
+    if (loading || loadingMore || !data.hasMore) return;
+    loadingMore = true;
+    fetchLeaderboard({ reset: false, query: searchQuery });
   }
 
-  // Filter members based on search query
-  $: filteredLeaderboard = (data.leaderboard || []).filter((user) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      (user.displayName && user.displayName.toLowerCase().includes(q)) ||
-      (user.username && user.username.toLowerCase().includes(q)) ||
-      String(user.level).includes(q)
+  function handleSearchInput(e) {
+    searchQuery = e.target.value;
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      fetchLeaderboard({ reset: true, query: searchQuery });
+    }, 300);
+  }
+
+  function handleClearSearch() {
+    searchQuery = '';
+    clearTimeout(searchDebounceTimer);
+    fetchLeaderboard({ reset: true, query: '' });
+  }
+
+  // Svelte action for the infinite scroll sentinel element
+  function sentinelAction(node) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && data.hasMore) {
+          fetchNextBatch();
+        }
+      },
+      { rootMargin: '300px' }
     );
-  });
 
-  // Top 3 for podium (only when not searching or when top 3 matches)
-  $: topThree = (data.leaderboard || []).slice(0, 3);
+    observer.observe(node);
+
+    return {
+      destroy() {
+        observer.disconnect();
+      },
+    };
+  }
 </script>
 
 <svelte:head>
   <title>Classement des Niveaux • {data.serverName || 'Pyro Bot'}</title>
 </svelte:head>
 
-<div class="leaderboard-page">
+<div
+  class="leaderboard-page"
+  style="--primary: {themeColor}; --primary-light: {themeLight}; --primary-subtle: {themeSubtle}; --primary-border: {themeBorder}; --primary-glow: {themeGlow}; --primary-hover: {themeHover};"
+>
   <!-- Top Navigation Header -->
   <header class="top-nav">
     <div class="nav-inner">
@@ -85,20 +193,11 @@
           <span class="brand-sub">Classement Officiel</span>
         </div>
       </div>
-
-      <a href="/" on:click={handleGoHome} class="btn-dashboard">
-        <ArrowLeft size={16} />
-        <span>Tableau de bord</span>
-      </a>
     </div>
   </header>
 
   <!-- Hero Header -->
   <section class="hero-section">
-    <div class="hero-badge">
-      <Sparkles size={14} class="sparkle-icon" />
-      <span>Système de Niveaux & XP</span>
-    </div>
     <h1 class="hero-title">
       Classement des <span class="highlight">Niveaux</span>
     </h1>
@@ -120,7 +219,7 @@
         <ShieldAlert size={48} class="empty-icon text-error" />
         <h3>Erreur de connexion</h3>
         <p>{error}</p>
-        <button class="btn btn-primary" on:click={fetchLeaderboard}>Réessayer</button>
+        <button class="btn btn-primary" on:click={() => fetchLeaderboard({ reset: true })}>Réessayer</button>
       </div>
     {:else if !data.enabled}
       <!-- Disabled State -->
@@ -128,9 +227,6 @@
         <Award size={48} class="empty-icon text-muted" />
         <h3>Classement Indisponible</h3>
         <p>{data.reason || 'Le système de niveau ou le classement public est actuellement désactivé sur ce serveur.'}</p>
-        <a href="/" on:click={handleGoHome} class="btn btn-primary" style="margin-top: 1rem;">
-          Retour à l'accueil
-        </a>
       </div>
     {:else}
       <!-- SEARCH BAR (If enabled) -->
@@ -140,12 +236,13 @@
             <Search size={18} class="search-icon" />
             <input
               type="text"
-              bind:value={searchQuery}
+              value={searchQuery}
+              on:input={handleSearchInput}
               placeholder="Rechercher un membre par pseudo ou niveau..."
               class="search-input"
             />
             {#if searchQuery}
-              <button class="clear-search-btn" on:click={() => (searchQuery = '')} aria-label="Effacer la recherche">
+              <button class="clear-search-btn" on:click={handleClearSearch} aria-label="Effacer la recherche">
                 <X size={16} />
               </button>
             {/if}
@@ -153,8 +250,8 @@
         </div>
       {/if}
 
-      <!-- PODIUM TOP 3 (Shown if at least 3 members and no active search) -->
-      {#if !searchQuery && topThree.length >= 3}
+      <!-- PODIUM TOP 3 (Shown when no search query and top 3 available) -->
+      {#if !searchQuery.trim() && topThree.length >= 3}
         <section class="podium-section" aria-label="Podium des 3 premiers membres">
           <!-- 2nd Place -->
           <div class="podium-col rank-2">
@@ -221,14 +318,20 @@
           <span class="col-xp">Expérience (XP)</span>
         </div>
 
-        {#if filteredLeaderboard.length === 0}
+        {#if data.leaderboard.length === 0}
           <div class="empty-search">
             <Search size={36} class="text-muted" />
-            <p>Aucun membre ne correspond à votre recherche "<strong>{searchQuery}</strong>".</p>
+            <p>
+              {#if searchQuery.trim()}
+                Aucun membre ne correspond à votre recherche "<strong>{searchQuery}</strong>".
+              {:else}
+                Aucun membre n'a encore gagné d'XP sur ce serveur.
+              {/if}
+            </p>
           </div>
         {:else}
           <div class="list-body">
-            {#each filteredLeaderboard as user (user.userId)}
+            {#each data.leaderboard as user (user.userId)}
               <div class="user-row" class:top-one={user.rank === 1} class:top-two={user.rank === 2} class:top-three={user.rank === 3}>
                 <!-- Rank -->
                 <div class="col-rank">
@@ -262,68 +365,61 @@
 
                 <!-- Level -->
                 <div class="col-level">
-                  <div class="level-pill">
+                  <span class="level-pill">
                     <span class="level-lbl">Niv.</span>
                     <span class="level-num">{user.level}</span>
-                  </div>
+                  </span>
                 </div>
 
-                <!-- Progress Bar with XP on Hover Tooltip -->
+                <!-- XP Progress Bar (with tooltip on hover) -->
                 <div class="col-progress">
-                  <div
-                    class="progress-wrapper has-tooltip"
-                    aria-label={`Progression: ${user.xpInLevel} sur ${user.xpRequiredForNext} XP (${user.progressPercent}%)`}
-                  >
+                  <div class="progress-wrapper has-tooltip">
                     <div class="progress-bar-bg">
                       <div class="progress-bar-fill" style="width: {user.progressPercent}%"></div>
                     </div>
                     <span class="progress-text">{user.progressPercent}%</span>
 
-                    <!-- XP ON HOVER TOOLTIP -->
-                    <div class="xp-tooltip" role="tooltip">
+                    <!-- Tooltip on hover -->
+                    <div class="xp-tooltip">
                       <div class="tooltip-header">
                         <Flame size={14} class="tooltip-flame" />
-                        <strong>Statistiques d'XP</strong>
+                        <span>Progression Niveau {user.level} &rarr; {user.level + 1}</span>
                       </div>
                       <div class="tooltip-row">
-                        <span>XP Total :</span>
-                        <strong>{user.xp.toLocaleString('fr-FR')} XP</strong>
+                        <span>XP dans le niveau :</span>
+                        <strong>{user.xpInLevel.toLocaleString('fr-FR')} / {user.xpRequiredForNext.toLocaleString('fr-FR')}</strong>
                       </div>
                       <div class="tooltip-row">
-                        <span>Niveau actuel :</span>
-                        <strong>{user.xpInLevel.toLocaleString('fr-FR')} / {user.xpRequiredForNext.toLocaleString('fr-FR')} XP</strong>
-                      </div>
-                      <div class="tooltip-row">
-                        <span>Restant Niv. {user.level + 1} :</span>
-                        <strong class="text-highlight">
-                          {Math.max(0, user.xpRequiredForNext - user.xpInLevel).toLocaleString('fr-FR')} XP
-                        </strong>
+                        <span>Total accumulé :</span>
+                        <strong class="text-highlight">{user.xp.toLocaleString('fr-FR')} XP</strong>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Total XP (with Hover Enhancement) -->
+                <!-- Total XP Badge -->
                 <div class="col-xp">
-                  <div
-                    class="xp-badge has-tooltip"
-                    aria-label={`${user.xp.toLocaleString('fr-FR')} XP au total`}
-                  >
-                    <Sparkles size={13} class="xp-sparkle" />
+                  <div class="xp-badge has-tooltip">
+                    <Flame size={14} class="tooltip-flame" />
                     <span class="xp-value">{user.xp.toLocaleString('fr-FR')}</span>
                     <span class="xp-unit">XP</span>
 
-                    <!-- Secondary tooltip on XP badge -->
-                    <div class="xp-tooltip" role="tooltip">
-                      <div class="tooltip-row">
-                        <span>XP Total :</span>
-                        <strong>{user.xp.toLocaleString('fr-FR')} XP</strong>
+                    <!-- Tooltip on hover -->
+                    <div class="xp-tooltip">
+                      <div class="tooltip-header">
+                        <span>Détails de l'Expérience</span>
                       </div>
                       <div class="tooltip-row">
-                        <span>Pour Niv. {user.level + 1} :</span>
-                        <strong class="text-highlight">
-                          {Math.max(0, user.xpRequiredForNext - user.xpInLevel).toLocaleString('fr-FR')} XP restants
-                        </strong>
+                        <span>Niveau actuel :</span>
+                        <strong>{user.level}</strong>
+                      </div>
+                      <div class="tooltip-row">
+                        <span>XP total :</span>
+                        <strong class="text-highlight">{user.xp.toLocaleString('fr-FR')}</strong>
+                      </div>
+                      <div class="tooltip-row">
+                        <span>Prochain palier :</span>
+                        <span>{user.levelEndXP.toLocaleString('fr-FR')} XP</span>
                       </div>
                     </div>
                   </div>
@@ -331,18 +427,32 @@
               </div>
             {/each}
           </div>
+
+          <!-- INFINITE SCROLL SENTINEL & STATUS -->
+          {#if data.hasMore}
+            <div use:sentinelAction class="infinite-scroll-sentinel">
+              {#if loadingMore}
+                <div class="scroll-spinner"></div>
+                <span>Chargement des membres suivants...</span>
+              {:else}
+                <span class="scroll-hint">Faites défiler pour voir la suite</span>
+              {/if}
+            </div>
+          {:else if data.leaderboard.length > 0}
+            <div class="end-of-list">
+              <span>Tous les membres ont été affichés ({data.leaderboard.length} / {data.totalCount})</span>
+            </div>
+          {/if}
         {/if}
       </section>
     {/if}
   </main>
 
-  <!-- Footer -->
+  <!-- Public Footer -->
   <footer class="public-footer">
     <div class="footer-inner">
-      <span>Pyro Bot • Système de Niveaux</span>
-      <a href="https://github.com/SkillFXX/pyro-discord-bot" target="_blank" rel="noopener noreferrer" class="footer-link">
-        GitHub
-      </a>
+      <span>{data.serverName || 'Serveur Discord'} • Classement des Niveaux</span>
+      <span>Propulsé par <a href="/" class="footer-link">{data.botName || 'Pyro Bot'}</a></span>
     </div>
   </footer>
 </div>
@@ -355,6 +465,8 @@
     display: flex;
     flex-direction: column;
     font-family: inherit;
+    position: relative;
+    overflow-x: hidden;
   }
 
   /* TOP NAVIGATION */
@@ -373,7 +485,7 @@
     padding: 0.85rem 1.5rem;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .brand {
@@ -394,7 +506,7 @@
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: rgba(255, 107, 53, 0.15);
+    background: var(--primary-subtle, rgba(255, 107, 53, 0.15));
     color: var(--primary, #FF6B35);
     display: flex;
     align-items: center;
@@ -418,69 +530,40 @@
     color: var(--text-secondary, #94A3B8);
   }
 
-  .btn-dashboard {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.95rem;
-    background: #1A202E;
-    border: 1px solid #2B354C;
-    border-radius: var(--radius-md, 8px);
-    color: #E2E8F0;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s ease;
-  }
-
-  .btn-dashboard:hover {
-    background: #252E42;
-    border-color: var(--primary, #FF6B35);
-    color: #FFFFFF;
-    transform: translateY(-1px);
-  }
-
   /* HERO SECTION */
   .hero-section {
     text-align: center;
-    padding: 3rem 1.5rem 2rem;
+    padding: 3.5rem 1.5rem 2.25rem;
     max-width: 800px;
     margin: 0 auto;
+    position: relative;
   }
 
-  .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.85rem;
-    background: rgba(255, 107, 53, 0.12);
-    border: 1px solid rgba(255, 107, 53, 0.3);
-    border-radius: 9999px;
-    color: var(--primary, #FF6B35);
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-  }
-
-  :global(.sparkle-icon) {
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(0.9); }
+  .hero-section::before {
+    content: '';
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    height: 240px;
+    background: radial-gradient(circle, var(--primary-glow, rgba(239, 73, 11, 0.2)) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
   }
 
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.6rem;
     font-weight: 800;
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.85rem;
     letter-spacing: -0.02em;
     color: #FFFFFF;
+    position: relative;
+    z-index: 1;
   }
 
   .highlight {
-    background: linear-gradient(135deg, #FF6B35 0%, #FFA07A 100%);
+    background: linear-gradient(135deg, var(--primary, #FF6B35) 0%, var(--primary-light, #FFA07A) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
@@ -490,7 +573,9 @@
     color: var(--text-secondary, #94A3B8);
     margin: 0 auto;
     max-width: 600px;
-    line-height: 1.5;
+    line-height: 1.55;
+    position: relative;
+    z-index: 1;
   }
 
   /* MAIN CONTENT */
@@ -500,6 +585,8 @@
     margin: 0 auto;
     padding: 0 1.5rem 4rem;
     flex: 1;
+    position: relative;
+    z-index: 1;
   }
 
   /* SEARCH BAR */
@@ -517,7 +604,7 @@
 
   :global(.search-icon) {
     position: absolute;
-    left: 1rem;
+    left: 1.15rem;
     top: 50%;
     transform: translateY(-50%);
     color: #64748B;
@@ -529,7 +616,7 @@
     background: #111520;
     border: 1px solid #202738;
     border-radius: 9999px;
-    padding: 0.85rem 2.75rem;
+    padding: 0.85rem 2.85rem;
     font-size: 0.95rem;
     color: #FFFFFF;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -540,7 +627,7 @@
     outline: none;
     border-color: var(--primary, #FF6B35);
     background: #151A27;
-    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.2);
+    box-shadow: 0 0 0 3px var(--primary-subtle, rgba(239, 73, 11, 0.2));
   }
 
   .clear-search-btn {
@@ -572,7 +659,7 @@
     align-items: flex-end;
     justify-content: center;
     gap: 1.5rem;
-    margin: 1.5rem 0 3.5rem;
+    margin: 1rem 0 3.5rem;
     padding: 0 1rem;
   }
 
@@ -735,6 +822,11 @@
     animation: pulse 1.5s infinite;
   }
 
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
+
   /* LIST SECTION */
   .list-section {
     background: #10141E;
@@ -777,6 +869,7 @@
 
   .user-row:hover {
     background: #151A28;
+    border-color: var(--primary-border, #262933);
     transform: translateX(2px);
   }
 
@@ -868,8 +961,8 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.25rem 0.65rem;
-    background: rgba(255, 107, 53, 0.12);
-    border: 1px solid rgba(255, 107, 53, 0.25);
+    background: var(--primary-subtle, rgba(255, 107, 53, 0.12));
+    border: 1px solid var(--primary-border, rgba(255, 107, 53, 0.25));
     border-radius: 6px;
   }
 
@@ -912,7 +1005,7 @@
 
   .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #FF6B35, #FFA07A);
+    background: linear-gradient(90deg, var(--primary, #FF6B35), var(--primary-light, #FFA07A));
     border-radius: 9999px;
     transition: width 0.4s ease;
   }
@@ -947,10 +1040,6 @@
   .user-row:hover .xp-badge {
     border-color: var(--primary, #FF6B35);
     background: #1B2335;
-  }
-
-  :global(.xp-sparkle) {
-    color: #F59E0B;
   }
 
   .xp-value {
@@ -1017,7 +1106,7 @@
   }
 
   :global(.tooltip-flame) {
-    color: #FF6B35;
+    color: var(--primary, #FF6B35);
   }
 
   .tooltip-row {
@@ -1036,6 +1125,42 @@
     color: #38BDF8 !important;
   }
 
+  /* INFINITE SCROLL SENTINEL & STATUS */
+  .infinite-scroll-sentinel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.75rem 1rem;
+    color: #94A3B8;
+    font-size: 0.85rem;
+    border-top: 1px solid #181E2B;
+    background: #0D111A;
+  }
+
+  .scroll-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--primary-subtle, rgba(239, 73, 11, 0.2));
+    border-top-color: var(--primary, #FF6B35);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .scroll-hint {
+    color: #64748B;
+    font-size: 0.8rem;
+  }
+
+  .end-of-list {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: #64748B;
+    font-size: 0.82rem;
+    border-top: 1px solid #181E2B;
+    background: #0D111A;
+  }
+
   /* EMPTY & LOADING STATES */
   .loading-state {
     display: flex;
@@ -1050,7 +1175,7 @@
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(255, 107, 53, 0.2);
+    border: 3px solid var(--primary-subtle, rgba(239, 73, 11, 0.2));
     border-top-color: var(--primary, #FF6B35);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -1094,7 +1219,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 3rem 1rem;
+    padding: 3.5rem 1rem;
     gap: 0.75rem;
     color: #94A3B8;
     font-size: 0.95rem;
@@ -1120,6 +1245,7 @@
   .footer-link {
     color: #94A3B8;
     text-decoration: none;
+    transition: color 0.15s ease;
   }
 
   .footer-link:hover {
