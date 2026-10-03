@@ -42,17 +42,8 @@ module.exports = {
             .setRequired(false))
         .addStringOption(option =>
           option
-            .setName('style')
-            .setDescription('Style de la carte : Spotlight (complet) ou Canvas Pyro')
-            .setRequired(false)
-            .addChoices(
-              { name: '🌟 Spotlight (Winstreak, Gloire, Rangs, Prestiges)', value: 'spotlight' },
-              { name: '🎨 Pyro Bot (Canvas HD personnalisé)', value: 'custom' },
-            ))
-        .addStringOption(option =>
-          option
             .setName('type')
-            .setDescription('Type de carte Spotlight (défaut: Trophées)')
+            .setDescription('Type de carte à afficher (défaut: Trophées)')
             .setRequired(false)
             .addChoices(
               { name: '🏆 Trophées & Général', value: 'trophies' },
@@ -196,7 +187,6 @@ module.exports = {
     else if (subcommand === 'profil') {
       const explicitTag = interaction.options.getString('tag');
       const targetUser = interaction.options.getUser('membre') || interaction.user;
-      const style = interaction.options.getString('style') || 'spotlight';
       const cardType = interaction.options.getString('type') || 'trophies';
 
       await interaction.deferReply();
@@ -218,75 +208,26 @@ module.exports = {
           playerTag = linkedUser.playerTag;
         }
 
-        // --- OPTION A : CARTE SPOTLIGHT (Recommandée : Winstreak, Gloire, Date 2023, Score...) ---
-        if (style === 'spotlight') {
-          const cardBuffer = await brawlStarsService.fetchSpotlightCard(playerTag, cardType);
-          const cleanTag = playerTag.replace('#', '');
-          const filename = `spotlight-${cleanTag}-${cardType}.png`;
-          const attachment = new AttachmentBuilder(cardBuffer, { name: filename });
+        const cardBuffer = await brawlStarsService.fetchSpotlightCard(playerTag, cardType);
+        const cleanTag = playerTag.replace('#', '');
+        const filename = `spotlight-${cleanTag}-${cardType}.png`;
+        const attachment = new AttachmentBuilder(cardBuffer, { name: filename });
 
-          const typeTitles = {
-            trophies: 'Trophées & Général',
-            ranks: 'Rangs & Prestiges',
-            mastery: 'Maîtrise des Brawlers',
-            trmax: 'Trophées Maximum (TR Max)',
-          };
-          const titleType = typeTitles[cardType] || 'Profil';
-
-          const embed = embeds.custom(
-            `🎮 Brawl Stars — ${titleType}`,
-            `**Joueur :** ${explicitTag ? `\`${playerTag}\`` : targetUser} • **Tag :** \`${playerTag}\`\n` +
-            `*Données complètes via SpotLight (Winstreak, Gloire, Prestiges). Pour la carte Pyro HD, ajoutez l'option \`style: Pyro Bot\`.*`,
-            accentColor,
-            null,
-            null,
-            `attachment://${filename}`
-          );
-
-          return interaction.editReply({
-            embeds: [embed],
-            files: [attachment],
-          });
-        }
-
-        // --- OPTION B : CARTE CANVAS LOCALE PYRO BOT ---
-        const playerData = await brawlStarsService.fetchPlayerData(playerTag);
-
-        // Update stored stats & snapshot if applicable
-        const linkedUser = await BrawlStarsUser.findByPk(targetUser.id);
-        if (linkedUser && linkedUser.playerTag === playerTag) {
-          await linkedUser.update({
-            playerName: playerData.name || linkedUser.playerName,
-            lastTrophies: playerData.trophies || 0,
-            highestTrophies: playerData.highestTrophies || 0,
-            lastCheckedAt: new Date(),
-          });
-          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, playerData.trophies || 0);
-
-          const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-          if (guildMember) {
-            brawlStarsService.syncUserRoles(client, guildMember, playerData).catch(() => {});
-          }
-        }
-
-        // Generate custom profile card canvas
-        const cardBuffer = await brawlStarsService.generateProfileCard(playerData, accentColor);
-        const attachment = new AttachmentBuilder(cardBuffer, { name: `brawlstars-${playerTag.replace('#', '')}.png` });
-
-        const creationYear = brawlStarsService.estimateAccountCreationYear(playerData.tag || '');
-        const rankedInfo = brawlStarsService.resolveRankedInfo(playerData);
-        const challengeWins = brawlStarsService.resolveChallengeWins(playerData);
-        const totalBrawlers = playerData.brawlers?.length || 0;
+        const typeTitles = {
+          trophies: 'Trophées & Général',
+          ranks: 'Rangs & Prestiges',
+          mastery: 'Maîtrise des Brawlers',
+          trmax: 'Trophées Maximum (TR Max)',
+        };
+        const titleType = typeTitles[cardType] || 'Profil';
 
         const embed = embeds.custom(
-          `🎮 Profil Brawl Stars — ${playerData.name}`,
-          `**Joueur :** ${explicitTag ? `\`${playerTag}\`` : targetUser} • **Tag :** \`${playerData.tag}\`\n` +
-          `📅 **Création :** Compte ${creationYear} • 🏆 **Trophées :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')} (Max: ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')})\n` +
-          `👑 **Classé :** ${rankedInfo.name} • 🎯 **Brawlers :** ${totalBrawlers} / ${brawlStarsService.TOTAL_AVAILABLE_BRAWLERS} • 🏅 **Défi :** ${challengeWins}`,
+          `🎮 Brawl Stars — ${titleType}`,
+          `**Joueur :** ${explicitTag ? `\`${playerTag}\`` : targetUser} • **Tag :** \`${playerTag}\``,
           accentColor,
           null,
           null,
-          `attachment://brawlstars-${playerTag.replace('#', '')}.png`
+          `attachment://${filename}`
         );
 
         return interaction.editReply({
@@ -297,7 +238,7 @@ module.exports = {
       } catch (err) {
         console.error('[Command /bs profil] Erreur :', err);
         return interaction.editReply({
-          embeds: [embeds.error(err.message || 'Une erreur est survenue lors de la génération de la carte de profil.')],
+          embeds: [embeds.error(err.message || 'Une erreur est survenue lors de la récupération de la carte de profil.')],
         });
       }
     }
