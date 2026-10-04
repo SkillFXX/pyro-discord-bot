@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guide d'Installation & Configuration • Pyro Bot</title>
+  <meta name="description" content="Guide pas-à-pas complet avec captures d'écran pour configurer votre bot sur le Discord Developer Portal et le déployer en auto-hébergement ou via FlowHost.">
+  <meta name="theme-color" content="#ef490b">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Guide d'Installation & Configuration • Pyro Bot">
+  <meta property="og:description" content="Configuration pas-à-pas avec captures d'écran pour créer votre bot Discord et le déployer.">
+  <meta property="og:image" content="assets/panel.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+
+  <!-- Google Fonts : Syne, Figtree & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="assets/styles.css">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- ================= Navbar ================= -->
+  <header class="navbar">
+    <div class="container">
+      <a href="index.html" class="brand">
+        <img src="assets/logo.svg" alt="Pyro Logo">
+        <span>Pyro</span>
+      </a>
+
+      <nav class="nav-links" id="navLinks">
+        <a href="#portal">1. Developer Portal</a>
+        <a href="#flowhost-path">2. Hébergement FlowHost</a>
+        <a href="#selfhost-path">3. Auto-hébergement</a>
+        <a href="#contact">Contactez moi</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="index.html" class="btn btn-secondary btn-sm">
+          <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Retour au site
+        </a>
+        <button class="menu-toggle" id="menuToggle" aria-label="Menu de navigation">
+          <i data-lucide="menu" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= Header Hero ================= -->
+  <section class="guide-header-hero">
+    <div class="container">
+      <a href="index.html" class="back-link">
+        <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Retour à la présentation de Pyro
+      </a>
+      <span class="section-tag">Guide d'installation</span>
+      <h1 class="hero-title" style="font-size:2.4rem;margin-bottom:0.75rem;">
+        Guide d'Installation &amp; <span class="accent">Configuration</span>
+      </h1>
+      <p class="hero-subtitle" style="max-width:720px;margin:0;">
+        Ce guide illustré pas-à-pas vous accompagne pour créer votre instance sur le <strong>Discord Developer Portal</strong>, puis vous explique comment déployer Pyro sur votre propre machine ou confier son hébergement infogéré à <strong>FlowHost (10€/an)</strong>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= Section 1: Developer Portal (Indispensable pour tous) ================= -->
+  <section class="section" id="portal">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Étape Préalable Commune</span>
+        <h2 class="section-title">1. Création du Bot sur le Discord Developer Portal</h2>
+        <p class="section-desc">
+          Que vous choisissiez l'hébergement clé-en-main FlowHost ou l'auto-hébergement autonome, <strong>vous devez impérativement créer l'application de votre bot sur Discord</strong>. C'est ce qui garantit que vous êtes le propriétaire légitime de votre bot et de ses autorisations.
+        </p>
+      </div>
+
+      <div class="portal-steps-grid">
+        <!-- Step 1 -->
+        <div class="portal-step-card" id="step-1">
+          <div class="portal-step-header">
+            <span class="portal-step-number">1</span>
+            <div>
+              <h3 class="portal-step-title">Créer l'application sur le Discord Developer Portal</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Connectez-vous sur le portail développeur : <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:underline;">discord.com/developers/applications</a>.
+              En haut à droite de l'écran, cliquez sur le bouton bleu <strong>« New Application »</strong>. Donnez un nom à votre application (ex: <em>Pyro</em>) et cochez l'acceptation des conditions d'utilisation Discord.
+            </p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-1.png" alt="Étape 1 : Création de la nouvelle application sur Discord" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Cliquez sur le bouton bleu <strong>« New Application »</strong> situé en haut à droite.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="portal-step-card" id="step-2">
+          <div class="portal-step-header">
+            <span class="portal-step-number">2</span>
+            <div>
+              <h3 class="portal-step-title">Récupérer l'ID Client (<code>CLIENT_ID</code>)</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Dans le menu latéral gauche, rendez-vous dans l'onglet <strong>« General Information »</strong>.
+              Repérez la ligne <strong>« Application ID »</strong> puis cliquez sur le bouton <strong>« Copy »</strong>.
+              Conservez cet identifiant numérique, il correspond à la variable <code>CLIENT_ID</code>.
+            </p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-2.png" alt="Étape 2 : Copie de l'Application ID" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Dans <strong>General Information</strong>, copiez la valeur de l'<strong>Application ID</strong>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="portal-step-card" id="step-3">
+          <div class="portal-step-header">
+            <span class="portal-step-number">3</span>
+            <div>
+              <h3 class="portal-step-title">Générer le Client Secret (<code>DISCORD_CLIENT_SECRET</code>)</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Dans le menu de gauche, cliquez sur <strong>« OAuth2 »</strong> > <strong>« General »</strong>.
+              Sous la section <strong>« Client Secret »</strong>, cliquez sur <strong>« Reset Secret »</strong> puis confirmez.
+              Copiez immédiatement la clé secrète affichée et stockez-la en lieu sûr (elle ne sera plus visible par la suite).
+            </p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-3.png" alt="Étape 3 : Reset et copie du Client Secret" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Dans <strong>OAuth2 > General</strong>, cliquez sur <strong>« Reset Secret »</strong> et copiez la clé générée.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="portal-step-card" id="step-4">
+          <div class="portal-step-header">
+            <span class="portal-step-number">4</span>
+            <div>
+              <h3 class="portal-step-title">Configurer l'URL de Redirection (Redirect URI)</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Toujours dans l'onglet <strong>« OAuth2 »</strong>, descendez jusqu'à la section <strong>« Redirects »</strong>.
+              Cliquez sur <strong>« Add Redirect »</strong> et collez l'URL de connexion du dashboard :
+            </p>
+            <div class="code-box" style="margin: 0.75rem 0;">
+              <pre><code>http://localhost:3000/api/auth/discord/callback</code></pre>
+            </div>
+            <p>
+              <em>(Si vous passez par l'hébergement FlowHost, renseignez l'URL personnalisée qui vous a été transmise lors de votre souscription)</em>.
+              <br><strong style="color:var(--primary);">Important :</strong> Cliquez impérativement sur le bouton vert <strong>« Save Changes »</strong> en bas à droite pour enregistrer.
+            </p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-4.png" alt="Étape 4 : Ajout de la Redirect URI dans OAuth2" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Ajoutez l'URL dans <strong>Redirects</strong> et validez en cliquant sur <strong>« Save Changes »</strong>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="portal-step-card" id="step-5">
+          <div class="portal-step-header">
+            <span class="portal-step-number">5</span>
+            <div>
+              <h3 class="portal-step-title">Activer les Privileged Gateway Intents (Critique)</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Dans le menu de gauche, rendez-vous dans l'onglet <strong>« Bot »</strong>. Descendez sur la page jusqu'à la section <strong>« Privileged Gateway Intents »</strong>.
+              Activez obligatoirement les 3 commutateurs :
+            </p>
+            <ul style="padding-left:1.25rem;margin:0.5rem 0;color:var(--text-secondary);">
+              <li><strong>Presence Intent</strong> : détection d'activité et statuts.</li>
+              <li><strong>Server Members Intent</strong> : gestion de l'XP, compteurs de membres et auto-rôles.</li>
+              <li><strong>Message Content Intent</strong> : calcul de l'XP sur les messages, automodération et logs d'audit.</li>
+            </ul>
+            <p>Cliquez à nouveau sur <strong>« Save Changes »</strong> en bas de page pour enregistrer.</p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-5.png" alt="Étape 5 : Activation des Privileged Gateway Intents" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Cochez impérativement les <strong>3 cases violettes</strong> dans <em>Privileged Gateway Intents</em>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="portal-step-card" id="step-6">
+          <div class="portal-step-header">
+            <span class="portal-step-number">6</span>
+            <div>
+              <h3 class="portal-step-title">Générer et copier le Token du Bot (<code>DISCORD_TOKEN</code>)</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Toujours dans l'onglet <strong>« Bot »</strong>, remontez vers le haut sous le nom du bot.
+              Cliquez sur le bouton <strong>« Reset Token »</strong>, confirmez l'action, puis cliquez sur <strong>« Copy »</strong>.
+              <br>⚠️ <em>Attention : Ce token est le mot de passe maître de votre bot. Ne le partagez jamais publiquement. Si vous choisissez FlowHost, transmettez-le uniquement en message privé sécurisé.</em>
+            </p>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-6.png" alt="Étape 6 : Reset Token et copie du token bot" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Cliquez sur <strong>« Reset Token »</strong> puis <strong>« Copy »</strong> pour obtenir votre <code>DISCORD_TOKEN</code>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="portal-step-card" id="step-7">
+          <div class="portal-step-header">
+            <span class="portal-step-number">7</span>
+            <div>
+              <h3 class="portal-step-title">Inviter le Bot sur votre serveur Discord</h3>
+            </div>
+          </div>
+          <div class="portal-step-body">
+            <p>
+              Dans le menu latéral gauche, rendez-vous dans <strong>« OAuth2 »</strong> > <strong>« URL Generator »</strong> :
+            </p>
+            <ol style="padding-left:1.25rem;margin:0.5rem 0;color:var(--text-secondary);">
+              <li>Dans la grille <strong>Scopes</strong>, cochez <code>bot</code> et <code>applications.commands</code>.</li>
+              <li>Dans la grille <strong>Bot Permissions</strong> ci-dessous, cochez <strong>« Administrator »</strong> (ou manuellement les permissions de gestion des salons, rôles, messages et vocaux).</li>
+              <li>Tout en bas de la page, copiez l'adresse affichée dans <strong>« Generated URL »</strong> et collez-la dans votre navigateur pour ajouter le bot sur votre serveur !</li>
+            </ol>
+            <div class="guide-image-container">
+              <img src="assets/guide/step-7.png" alt="Étape 7 : Génération de l'URL d'invitation Discord" loading="lazy">
+              <div class="guide-image-caption">
+                <i data-lucide="info" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span>Cochez <code>bot</code>, <code>applications.commands</code> et <code>Administrator</code>, puis copiez le lien d'invitation.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Section 2: Choose Deployment Path ================= -->
+  <section class="section" id="choose-path">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Étape Finale</span>
+        <h2 class="section-title">2. Choisissez votre mode de déploiement</h2>
+        <p class="section-desc">Vous avez maintenant vos 3 identifiants (Token, Client ID, Client Secret). Deux possibilités s'offrent à vous :</p>
+      </div>
+
+      <!-- Path A: FlowHost -->
+      <div id="flowhost-path" class="choice-card featured" style="margin-bottom: 2rem;">
+        <span class="choice-badge featured-badge">Option A • Clé-en-main Infogéré</span>
+        <div class="choice-icon featured-icon">
+          <i data-lucide="server" style="width:24px;height:24px;"></i>
+        </div>
+        <div class="pricing-headline">
+          <span class="price-from">À partir de</span>
+          <span class="price-amount">10€</span>
+          <span class="price-period">/ an</span>
+        </div>
+        <h3>Vous choisissez l'hébergement FlowHost (Zéro prise de tête)</h3>
+        <p class="choice-summary">
+          Vous n'avez <strong>absolument rien à installer, aucun serveur à payer ni aucune ligne de commande à taper</strong> ! FlowHost déploie et maintient votre bot 24h/24 en France avec 99,9% de disponibilité garantie.
+        </p>
+
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:1.25rem;margin-bottom:1.5rem;">
+          <h4 style="font-size:0.95rem;margin-bottom:0.5rem;color:var(--text-primary);">Ce qu'il vous suffit de me transmettre en privé :</h4>
+          <ol style="padding-left:1.25rem;color:var(--text-secondary);font-size:0.9rem;line-height:1.7;">
+            <li>Votre <code>CLIENT_ID</code> (récupéré à l'<a href="#step-2" style="color:var(--primary);text-decoration:underline;">étape 2</a>)</li>
+            <li>Votre <code>DISCORD_CLIENT_SECRET</code> (récupéré à l'<a href="#step-3" style="color:var(--primary);text-decoration:underline;">étape 3</a>)</li>
+            <li>Votre <code>DISCORD_TOKEN</code> (récupéré à l'<a href="#step-6" style="color:var(--primary);text-decoration:underline;">étape 6</a>)</li>
+            <li>L'ID de votre serveur Discord (clic droit sur votre serveur > <em>Copier l'identifiant du serveur</em>)</li>
+          </ol>
+          <p style="font-size:0.84rem;color:var(--primary);margin:0.75rem 0 0;">
+            🚀 Votre bot sera activé en quelques minutes et vous recevrez votre lien d'accès direct au dashboard web !
+          </p>
+        </div>
+
+        <div class="choice-footer">
+          <a href="#contact" class="btn btn-primary">
+            <i data-lucide="message-square" style="width:16px;height:16px;"></i> Contactez moi pour activer votre bot
+          </a>
+        </div>
+      </div>
+
+      <!-- Path B: Self-Host -->
+      <div id="selfhost-path" class="choice-card">
+        <span class="choice-badge">Option B • Développeur Autonome</span>
+        <div class="choice-icon">
+          <i data-lucide="terminal" style="width:24px;height:24px;"></i>
+        </div>
+        <h3>Vous hébergez le bot vous-même (Auto-hébergement)</h3>
+        <p class="choice-summary">
+          Si vous possédez votre propre serveur VPS Linux ou conteneur, suivez les instructions ci-dessous pour initialiser le projet :
+        </p>
+
+        <div class="steps-grid" style="margin-top:1rem;">
+          <!-- Sub-Step 1 -->
+          <div class="step-card">
+            <div class="step-header">
+              <span class="step-number">A</span>
+              <h3>Installation des dépendances</h3>
+            </div>
+            <p>Clonez le code source et installez les paquets Node.js v20+ :</p>
+            <div class="code-box">
+              <pre><code>git clone https://github.com/SkillFXX/pyro-discord-bot.git
+cd pyro-discord-bot
+npm install
+npm run build</code></pre>
+            </div>
+          </div>
+
+          <!-- Sub-Step 2 -->
+          <div class="step-card">
+            <div class="step-header">
+              <span class="step-number">B</span>
+              <h3>Configuration du fichier <code>.env</code></h3>
+            </div>
+            <p>Créez le fichier <code>.env</code> avec vos identifiants récupérés lors des étapes précédentes (<a href="#step-2" style="color:var(--primary);text-decoration:underline;">étape 2</a>, <a href="#step-3" style="color:var(--primary);text-decoration:underline;">étape 3</a>, <a href="#step-6" style="color:var(--primary);text-decoration:underline;">étape 6</a>) :</p>
+            <div class="code-box">
+              <pre><code>DISCORD_TOKEN=votre_bot_token
+CLIENT_ID=votre_client_id
+GUILD_ID=votre_id_de_serveur
+DISCORD_CLIENT_SECRET=votre_client_secret
+DISCORD_REDIRECT_URI=http://localhost:3000/api/auth/discord/callback
+PORT=3000
+SESSION_SECRET=cle_secrete_aleatoire_securisee
+COOKIE_SECURE=false
+NODE_ENV=production</code></pre>
+            </div>
+          </div>
+
+          <!-- Sub-Step 3 -->
+          <div class="step-card">
+            <div class="step-header">
+              <span class="step-number">C</span>
+              <h3>Démarrage de Pyro</h3>
+            </div>
+            <p>Lancez le bot et le serveur web Express en simultané :</p>
+            <div class="code-box">
+              <pre><code>npm start</code></pre>
+            </div>
+            <p style="font-size:0.82rem;color:var(--text-muted);margin-top:0.5rem;">
+              Votre tableau de bord sera directement disponible sur <code>http://localhost:3000</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Contact Section ================= -->
+  <section class="section" id="contact" style="background-color: var(--surface-1); border-top: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Assistance &amp; Souscription</span>
+        <h2 class="section-title">Contactez moi</h2>
+        <p class="section-desc">
+          Pour souscrire à l'hébergement clé-en-main FlowHost (10€/an) ou poser vos questions sur l'installation de Pyro, contactez-moi directement :
+        </p>
+      </div>
+
+      <div class="contact-grid">
+        <!-- Discord -->
+        <div class="contact-card">
+          <div class="contact-card-header">
+            <div class="icon-wrap">
+              <i data-lucide="message-square" style="width:16px;height:16px;"></i>
+            </div>
+            <h3>Sur Discord (Recommandé)</h3>
+          </div>
+          <p>Envoyez-moi un message privé pour une prise en charge rapide :</p>
+          <div class="contact-value-row">
+            <span>@flowskill</span>
+            <button class="copy-btn" data-copy="@flowskill" data-label="@flowskill" title="Copier le tag Discord">
+              <i data-lucide="copy" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="contact-card">
+          <div class="contact-card-header">
+            <div class="icon-wrap">
+              <i data-lucide="mail" style="width:16px;height:16px;"></i>
+            </div>
+            <h3>Par Email</h3>
+          </div>
+          <p>Pour vos demandes d'activation FlowHost, facturation ou questions techniques :</p>
+          <div class="contact-value-row">
+            <span>skillfx.dev@gmail.com</span>
+            <button class="copy-btn" data-copy="skillfx.dev@gmail.com" data-label="skillfx.dev@gmail.com" title="Copier l'email">
+              <i data-lucide="copy" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Footer ================= -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="assets/logo.svg" alt="Pyro Logo">
+          <span>Pyro Discord Bot</span>
+        </div>
+
+        <div class="footer-links">
+          <a href="index.html">Accueil</a>
+          <a href="#portal">Developer Portal</a>
+          <a href="#flowhost-path">FlowHost (10€/an)</a>
+          <a href="#selfhost-path">Auto-hébergement</a>
+          <a href="https://github.com/SkillFXX/pyro-discord-bot" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="#contact">Contactez moi</a>
+        </div>
+      </div>
+
+      <div class="footer-credits">
+        Développé avec soin par <strong>SkillFX</strong>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= Toast ================= -->
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <i data-lucide="check" style="width:14px;height:14px;color:var(--success);"></i>
+    <span id="toastMessage">Copié dans le presse-papier</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="assets/script.js"></script>
+</body>
+</html>

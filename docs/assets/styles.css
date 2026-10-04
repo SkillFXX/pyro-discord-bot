@@ -288,6 +288,14 @@ code, pre {
   flex-wrap: wrap;
 }
 
+.hero-actions .btn {
+  padding: 0.75rem 1.4rem;
+  font-size: 0.92rem;
+  min-width: 230px;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 /* Hero Panel Preview Frame - Flush on top of metrics section */
 .hero-preview {
   max-width: 1040px;
@@ -497,8 +505,9 @@ code, pre {
 /* ================= Installation Steps ================= */
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.25rem;
+  width: 100%;
 }
 
 .step-card {
@@ -508,6 +517,11 @@ code, pre {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .step-header {
@@ -529,10 +543,12 @@ code, pre {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .step-header h3 {
   font-size: 0.95rem;
+  margin: 0;
 }
 
 .step-card p {
@@ -548,6 +564,10 @@ code, pre {
   border-radius: var(--radius-sm);
   overflow: hidden;
   margin-top: auto;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .code-box-header {
@@ -587,6 +607,17 @@ code, pre {
   font-size: 0.8rem;
   line-height: 1.5;
   color: var(--text-primary);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-box pre code {
+  font-family: var(--font-mono);
+  white-space: pre;
+  display: block;
+  min-width: 0;
 }
 
 /* ================= Commands Table ================= */
@@ -647,6 +678,306 @@ code, pre {
 .badge-xp { background: var(--warning-subtle); color: var(--warning); }
 .badge-ticket { background: var(--info-subtle); color: var(--info); }
 .badge-admin { background: var(--purple-subtle); color: var(--purple); }
+.badge-gaming { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-form { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+
+/* ================= Choice Cards Grid (Deployment Options) ================= */
+.choice-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.choice-card {
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.choice-card:hover {
+  border-color: var(--border-strong);
+}
+
+.choice-card.featured {
+  border-color: var(--primary-border);
+  background: linear-gradient(180deg, rgba(239, 73, 11, 0.05) 0%, var(--surface-1) 100%);
+  box-shadow: 0 10px 30px rgba(239, 73, 11, 0.08);
+}
+
+.choice-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.choice-badge.featured-badge {
+  background: var(--primary-subtle);
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+
+.choice-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.choice-icon.featured-icon {
+  background: var(--primary-subtle);
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+.pricing-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.price-from {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.price-amount {
+  font-family: var(--font-title);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.price-period {
+  font-size: 0.95rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.choice-card h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.choice-summary {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.choice-perks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.choice-perks li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.choice-perks li i {
+  color: var(--success);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.choice-footer {
+  margin-top: auto;
+}
+
+/* ================= Portal Steps Grid ================= */
+.portal-steps-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.portal-step-card {
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  scroll-margin-top: 80px;
+}
+
+.portal-step-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.portal-step-number {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-subtle);
+  color: var(--primary);
+  font-family: var(--font-title);
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.portal-step-title {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.portal-step-body {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.portal-step-body strong {
+  color: var(--text-primary);
+}
+
+.portal-step-body code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--primary);
+}
+
+/* ================= Screen Callout Box ================= */
+.screen-callout {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px dashed rgba(59, 130, 246, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.screen-callout-icon {
+  color: #60a5fa;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.screen-callout-content {
+  font-size: 0.84rem;
+  color: #93c5fd;
+  line-height: 1.45;
+}
+
+.screen-callout-content strong {
+  color: #dbeafe;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ================= Guide & Setup Page Specific Styles ================= */
+.guide-header-hero {
+  padding: 3.5rem 0 2rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(239, 73, 11, 0.04) 0%, transparent 100%);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+.guide-image-container {
+  margin-top: 1.25rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.guide-image-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.guide-image-caption {
+  padding: 0.65rem 1rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.guide-image-caption strong {
+  color: var(--primary);
+}
 
 /* ================= Subtle Hosting Card ================= */
 .hosting-card {
@@ -861,8 +1192,32 @@ code, pre {
 
   .features-grid,
   .steps-grid,
+  .choice-cards-grid,
   .contact-grid {
     grid-template-columns: 1fr;
+  }
+
+  .choice-card {
+    padding: 1.35rem 1.15rem;
+  }
+
+  .step-card {
+    padding: 1.25rem 1rem;
+  }
+
+  .portal-step-card {
+    padding: 1.35rem 1.15rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .hosting-card {
