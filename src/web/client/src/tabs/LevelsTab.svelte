@@ -220,6 +220,7 @@
             min="1"
             required
           />
+          <small style="color:var(--text-muted); font-size: 0.75rem;">Attribué pour les messages courts (10 caractères ou moins).</small>
         </div>
 
         <div class="form-group">
@@ -231,6 +232,7 @@
             min="1"
             required
           />
+          <small style="color:var(--text-muted); font-size: 0.75rem;">Attribué pour les messages longs et détaillés (150+ caractères).</small>
         </div>
       </div>
 

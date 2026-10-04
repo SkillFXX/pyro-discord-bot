@@ -71,9 +71,32 @@ async function handleXP(message, client) {
   xpCooldowns.set(userId, now);
 
   try {
-    // Random XP gain (default: 15-25 XP)
-    const minXP = await ConfigHelper.get('xp_min_gain', 15);
-    const maxXP = await ConfigHelper.get('xp_max_gain', 25);
+    // Calculate XP based on message length between minXP and maxXP
+    const minXP = parseInt(await ConfigHelper.get('xp_min_gain', 15), 10) || 15;
+    const maxXP = parseInt(await ConfigHelper.get('xp_max_gain', 25), 10) || 25;
+    const lowerBound = Math.min(minXP, maxXP);
+    const upperBound = Math.max(minXP, maxXP);
+
+    // Thresholds:
+    // - Short message (<= 10 characters, e.g. "salut", "ok") -> lowerBound
+    // - Long message (>= 150 characters, e.g. developed discussion) -> upperBound
+    // - Linear progression between 10 and 150 characters
+    const textContent = (message.content || '').trim();
+    const charCount = textContent.length;
+    const MIN_LEN = 10;
+    const MAX_LEN = 150;
+
+    let baseGain;
+    if (upperBound <= lowerBound) {
+      baseGain = lowerBound;
+    } else if (charCount <= MIN_LEN) {
+      baseGain = lowerBound;
+    } else if (charCount >= MAX_LEN) {
+      baseGain = upperBound;
+    } else {
+      const ratio = (charCount - MIN_LEN) / (MAX_LEN - MIN_LEN);
+      baseGain = Math.round(lowerBound + ratio * (upperBound - lowerBound));
+    }
     
     // Resolve channel ID for multiplier check (handles threads/forum posts parent channel)
     const xpChannelIdToCheck = message.channel.isThread() ? message.channel.parentId : message.channel.id;
@@ -84,7 +107,6 @@ async function handleXP(message, client) {
     const roleMultiplier = await getMemberRoleMultiplier(message.member);
     
     const totalMultiplier = channelMultiplier * roleMultiplier;
-    let baseGain = Math.floor(Math.random() * (maxXP - minXP + 1)) + minXP;
     let xpGained = Math.max(1, Math.floor(baseGain * totalMultiplier));
 
     await awardUserXP({
