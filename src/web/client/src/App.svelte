@@ -13,6 +13,7 @@
 
   import GeneralTab from './tabs/GeneralTab.svelte';
   import CustomizationTab from './tabs/CustomizationTab.svelte';
+  import MessagesTab from './tabs/MessagesTab.svelte';
   import ModerationTab from './tabs/ModerationTab.svelte';
   import AutomodTab from './tabs/AutomodTab.svelte';
   import LevelsTab from './tabs/LevelsTab.svelte';
@@ -76,6 +77,8 @@
           <GeneralTab />
         {:else if currentTab === 'customization' && $auth.permissions?.isAdmin}
           <CustomizationTab />
+        {:else if currentTab === 'messages' && $auth.permissions?.isAdmin}
+          <MessagesTab />
         {:else if currentTab === 'moderation' && $auth.permissions?.isAdmin}
           <ModerationTab />
         {:else if currentTab === 'automod' && $auth.permissions?.isAdmin}

@@ -456,6 +456,91 @@ const BrawlStarsTrophyLog = sequelize.define('BrawlStarsTrophyLog', {
   ],
 });
 
+// 18. CustomMessage: Messages, Rich Embeds, and Interactive Forms created from dashboard
+const CustomMessage = sequelize.define('CustomMessage', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'Nouveau message',
+  },
+  type: {
+    type: DataTypes.STRING, // 'text' | 'embed' | 'form'
+    allowNull: false,
+    defaultValue: 'embed',
+  },
+  channelId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  messageId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  content: {
+    type: DataTypes.TEXT, // Text content above embed or plain message
+    allowNull: true,
+    defaultValue: '',
+  },
+  embedData: {
+    type: DataTypes.TEXT, // JSON serialized embed configuration
+    allowNull: true,
+    defaultValue: '{}',
+  },
+  formData: {
+    type: DataTypes.TEXT, // JSON serialized form modal & submissions configuration
+    allowNull: true,
+    defaultValue: '{}',
+  },
+  status: {
+    type: DataTypes.STRING, // 'draft' | 'sent' | 'error'
+    defaultValue: 'draft',
+  },
+  lastError: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+});
+
+// 19. FormSubmission: User submissions from Discord modal forms
+const FormSubmission = sequelize.define('FormSubmission', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  formId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  username: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  userAvatar: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  answers: {
+    type: DataTypes.TEXT, // JSON serialized array of { id, label, value }
+    allowNull: false,
+    defaultValue: '[]',
+  },
+}, {
+  indexes: [
+    { fields: ['formId'] },
+    { fields: ['userId'] },
+  ],
+});
+
 // In-memory cache for fast and synchronous access
 const configMemoryCache = new Map();
 
@@ -627,6 +712,8 @@ module.exports = {
   BrawlStarsRoleReward,
   BrawlStarsUser,
   BrawlStarsTrophyLog,
+  CustomMessage,
+  FormSubmission,
   ConfigHelper,
   LOG_CONFIG_KEYS,
 };

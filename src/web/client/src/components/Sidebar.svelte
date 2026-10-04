@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn, Gamepad2 } from '@lucide/svelte';
+  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn, Gamepad2, MessageSquarePlus } from '@lucide/svelte';
   import { auth } from '../stores/auth';
 
   export let currentTab = 'general';
@@ -26,6 +26,11 @@
         { id: 'custom-presence', label: 'Présence & Statut' },
         { id: 'custom-embeds', label: 'Embeds & Couleurs' },
       ],
+    },
+    {
+      id: 'messages',
+      label: 'Messages & Formulaires',
+      icon: MessageSquarePlus,
     },
     {
       id: 'moderation',

@@ -1,5 +1,6 @@
 const { MessageFlags } = require('discord.js');
 const { showTicketModal, handleTicketModalSubmit, closeTicket, reopenTicket, deleteTicket } = require('../utils/ticketHelper');
+const { handleCustomFormButton, handleCustomFormSubmit } = require('../utils/formHelper');
 const embeds = require('../utils/embeds');
 
 module.exports = {
@@ -48,6 +49,10 @@ module.exports = {
       if (customId === 'ticket_delete_btn') {
         return deleteTicket(interaction, client);
       }
+
+      if (customId.startsWith('custom_form_open_')) {
+        return handleCustomFormButton(interaction);
+      }
       return;
     }
 
@@ -57,6 +62,10 @@ module.exports = {
 
       if (customId === 'ticket_creation_modal') {
         return handleTicketModalSubmit(interaction, client);
+      }
+
+      if (customId.startsWith('custom_form_submit_')) {
+        return handleCustomFormSubmit(interaction, client);
       }
       return;
     }

@@ -533,4 +533,138 @@ export async function testBrawlStarsKey(apiKey) {
   }
 }
 
+// Custom Messages & Forms API Helpers
+export async function fetchCustomMessages() {
+  try {
+    const res = await fetch('/api/messages', { headers: getHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      return data.messages || [];
+    }
+  } catch (e) {
+    console.error('Erreur chargement messages :', e);
+  }
+  return [];
+}
+
+export async function createCustomMessage(payload) {
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (data.warning) {
+        showToast(data.warning, 'warning');
+      } else {
+        showToast('Message créé et envoyé avec succès !', 'success');
+      }
+      return data.message;
+    } else {
+      showToast(data.error || 'Erreur lors de la création du message', 'error');
+      return null;
+    }
+  } catch (e) {
+    showToast('Erreur réseau lors de la création', 'error');
+    return null;
+  }
+}
+
+export async function updateCustomMessage(id, payload) {
+  try {
+    const res = await fetch(`/api/messages/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (data.warning) {
+        showToast(data.warning, 'warning');
+      } else {
+        showToast('Message mis à jour avec succès !', 'success');
+      }
+      return data.message;
+    } else {
+      showToast(data.error || 'Erreur lors de la mise à jour', 'error');
+      return null;
+    }
+  } catch (e) {
+    showToast('Erreur réseau lors de la mise à jour', 'error');
+    return null;
+  }
+}
+
+export async function sendCustomMessage(id) {
+  try {
+    const res = await fetch(`/api/messages/${id}/send`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast('Message envoyé sur Discord avec succès !', 'success');
+      return data.message;
+    } else {
+      showToast(data.error || "Erreur lors de l'envoi sur Discord", 'error');
+      return null;
+    }
+  } catch (e) {
+    showToast("Erreur réseau lors de l'envoi", 'error');
+    return null;
+  }
+}
+
+export async function deleteCustomMessage(id) {
+  try {
+    const res = await fetch(`/api/messages/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      showToast('Message supprimé avec succès !', 'success');
+      return true;
+    } else {
+      const data = await res.json();
+      showToast(data.error || 'Erreur lors de la suppression', 'error');
+      return false;
+    }
+  } catch (e) {
+    showToast('Erreur réseau lors de la suppression', 'error');
+    return false;
+  }
+}
+
+export async function fetchFormSubmissions(formId) {
+  try {
+    const res = await fetch(`/api/messages/${formId}/submissions`, { headers: getHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      return data.submissions || [];
+    }
+  } catch (e) {
+    console.error('Erreur chargement réponses :', e);
+  }
+  return [];
+}
+
+export async function deleteFormSubmission(formId, subId) {
+  try {
+    const res = await fetch(`/api/messages/${formId}/submissions/${subId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      showToast('Réponse supprimée !', 'success');
+      return true;
+    }
+  } catch (e) {
+    showToast('Erreur lors de la suppression', 'error');
+  }
+  return false;
+}
+
+
 
