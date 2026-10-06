@@ -1,8 +1,10 @@
 const loggerService = require('../../services/loggerService');
+const { clearGuildCache } = require('../../web/services/guildService');
 
 module.exports = {
   name: 'roleDelete',
   async execute(role, client) {
+    clearGuildCache();
     if (!role.guild) return;
 
     try {

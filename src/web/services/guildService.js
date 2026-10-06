@@ -59,10 +59,21 @@ async function getGuildContext(client, forceRefresh = false) {
     else if (c.type === ChannelType.GuildCategory) categories.push(channelData);
   });
 
-  const roles = guild.roles.cache
+  // Fetch fresh roles from Discord REST API to guarantee all server roles are present
+  const fetchedRoles = await guild.roles.fetch().catch((err) => {
+    console.warn('[GuildService] Warning fetching roles from Discord API:', err.message);
+    return guild.roles.cache;
+  });
+
+  const roles = Array.from((fetchedRoles || guild.roles.cache).values())
     .filter(r => r.id !== guild.id && !r.managed)
-    .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position }))
+    .sort((a, b) => {
+      if (b.position !== a.position) {
+        return b.position - a.position;
+      }
+      return a.name.localeCompare(b.name, 'fr', { numeric: true, sensitivity: 'base' });
+    });
 
   const membersMap = new Map();
   guild.members.cache.forEach(m => {
