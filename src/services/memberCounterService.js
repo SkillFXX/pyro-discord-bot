@@ -68,7 +68,7 @@ async function updateMemberCounter(guild, options = {}) {
 
     const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
     if (!channel) {
-      console.warn(`[MemberCounter] Salon de compteur introuvable (${channelId})`);
+      console.warn('[MemberCounter] Salon de compteur introuvable sur le serveur Discord.');
       return { updated: false, reason: 'channel_not_found' };
     }
 
@@ -112,7 +112,7 @@ async function updateMemberCounter(guild, options = {}) {
 
       await channel.setName(targetName, `Mise à jour automatique du compteur de membres (${memberCount})`);
       lastUpdateTimestamp = Date.now();
-      console.log(`[MemberCounter] Salon renommé avec succès : "${targetName}" (${channel.id})`);
+      console.log(`[MemberCounter] Salon de compteur (${channel.id}) mis à jour avec succès : ${memberCount} membre(s).`);
       return { updated: true, newName: targetName };
     } finally {
       isUpdating = false;

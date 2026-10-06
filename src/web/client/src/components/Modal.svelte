@@ -3,14 +3,16 @@
   export let title = '';
   export let isOpen = false;
   export let open = false;
+  export let show = false;
 
-  $: active = isOpen || open;
+  $: active = isOpen || open || show;
 
   const dispatch = createEventDispatcher();
 
   function close() {
     isOpen = false;
     open = false;
+    show = false;
     dispatch('close');
   }
 

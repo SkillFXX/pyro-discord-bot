@@ -440,8 +440,8 @@ function createFeaturesRouter(client) {
       }
 
       const parsedThreshold = parseInt(threshold, 10);
-      if (isNaN(parsedThreshold) || parsedThreshold < 1) {
-        return res.status(400).json({ error: 'Le seuil doit être un nombre supérieur ou égal à 1.' });
+      if (isNaN(parsedThreshold) || parsedThreshold < 0) {
+        return res.status(400).json({ error: 'Le seuil doit être un nombre positif ou nul.' });
       }
 
       await BrawlStarsRoleReward.create({
@@ -474,7 +474,7 @@ function createFeaturesRouter(client) {
       if (type) updateData.type = type === 'ranked' ? 'ranked' : 'trophies';
       if (threshold !== undefined) {
         const parsed = parseInt(threshold, 10);
-        if (!isNaN(parsed) && parsed >= 1) updateData.threshold = parsed;
+        if (!isNaN(parsed) && parsed >= 0) updateData.threshold = parsed;
       }
       if (roleId) updateData.roleId = roleId;
       if (replacePreviousRole !== undefined) updateData.replacePreviousRole = Boolean(replacePreviousRole);

@@ -307,44 +307,45 @@
     </p>
 
     <!-- Add Form -->
-    <form class="reward-form" on:submit|preventDefault={handleAddTrophyReward}>
-      <div class="form-group">
-        <label for="trophy-threshold">Palier de Trophées</label>
-        <input
-          id="trophy-threshold"
-          type="number"
-          min="0"
-          step="500"
-          class="form-control"
-          placeholder="ex: 25000"
-          bind:value={trophyThreshold}
-          required
-        />
-      </div>
+    <form class="reward-form-container" on:submit|preventDefault={handleAddTrophyReward}>
+      <div class="inline-form-row" style="grid-template-columns: 180px 1fr 1fr auto;">
+        <div class="form-group">
+          <label for="trophy-threshold">Palier de Trophées</label>
+          <input
+            id="trophy-threshold"
+            type="number"
+            min="0"
+            step="500"
+            placeholder="ex: 25000"
+            bind:value={trophyThreshold}
+            required
+          />
+        </div>
 
-      <div class="form-group flex-1">
-        <label for="trophy-role">Rôle à Attribuer</label>
-        <select id="trophy-role" class="form-control" bind:value={trophyRoleId} required>
-          <option value="" disabled selected>Sélectionner un rôle...</option>
-          {#each $dashboardData.roles as role}
-            <option value={role.id}>{role.name}</option>
-          {/each}
-        </select>
-      </div>
+        <div class="form-group">
+          <label for="trophy-role">Rôle à Attribuer</label>
+          <select id="trophy-role" bind:value={trophyRoleId} required>
+            <option value="" disabled selected>Sélectionner un rôle...</option>
+            {#each $dashboardData.roles as role}
+              <option value={role.id}>{role.name}</option>
+            {/each}
+          </select>
+        </div>
 
-      <div class="form-group">
-        <label for="trophy-replace">Mode de Rôles</label>
-        <select id="trophy-replace" class="form-control" bind:value={trophyReplace}>
-          <option value="false">Garder les précédents</option>
-          <option value="true">Supprimer les précédents</option>
-        </select>
-      </div>
+        <div class="form-group">
+          <label for="trophy-replace">Mode de Rôles</label>
+          <select id="trophy-replace" bind:value={trophyReplace}>
+            <option value="false">Cumulatif (Garder précédents)</option>
+            <option value="true">Remplacement (Supprimer précédents)</option>
+          </select>
+        </div>
 
-      <div class="form-group form-btn-align">
-        <button type="submit" class="btn btn-primary">
-          <Plus size={16} />
-          <span>Ajouter</span>
-        </button>
+        <div class="form-group">
+          <button type="submit" class="btn btn-primary inline-form-btn">
+            <Plus size={16} />
+            <span>Ajouter</span>
+          </button>
+        </div>
       </div>
     </form>
 
@@ -355,7 +356,7 @@
         items={trophyRewards}
         emptyMessage="Aucun palier de trophées configuré pour le moment."
       >
-        <svelte:fragment slot="row" let:item>
+        <tr slot="row" let:item>
           <td>
             <div class="trophy-cell">
               <Trophy size={16} class="trophy-icon" />
@@ -372,7 +373,7 @@
               <span class="badge badge-keep">Cumulatif (Garde précédents)</span>
             {/if}
           </td>
-          <td>
+          <td style="text-align: right; white-space: nowrap;">
             <div class="actions-cell">
               <button
                 type="button"
@@ -392,7 +393,7 @@
               </button>
             </div>
           </td>
-        </svelte:fragment>
+        </tr>
       </DataTable>
     </div>
   </Card>
@@ -405,39 +406,41 @@
     </p>
 
     <!-- Add Form -->
-    <form class="reward-form" on:submit|preventDefault={handleAddRankedReward}>
-      <div class="form-group">
-        <label for="ranked-threshold">Rang Ranked</label>
-        <select id="ranked-threshold" class="form-control" bind:value={rankedThreshold} required>
-          {#each rankedTiers as tier}
-            <option value={tier.id}>{tier.name}</option>
-          {/each}
-        </select>
-      </div>
+    <form class="reward-form-container" on:submit|preventDefault={handleAddRankedReward}>
+      <div class="inline-form-row" style="grid-template-columns: 180px 1fr 1fr auto;">
+        <div class="form-group">
+          <label for="ranked-threshold">Rang Ranked</label>
+          <select id="ranked-threshold" bind:value={rankedThreshold} required>
+            {#each rankedTiers as tier}
+              <option value={tier.id}>{tier.name}</option>
+            {/each}
+          </select>
+        </div>
 
-      <div class="form-group flex-1">
-        <label for="ranked-role">Rôle à Attribuer</label>
-        <select id="ranked-role" class="form-control" bind:value={rankedRoleId} required>
-          <option value="" disabled selected>Sélectionner un rôle...</option>
-          {#each $dashboardData.roles as role}
-            <option value={role.id}>{role.name}</option>
-          {/each}
-        </select>
-      </div>
+        <div class="form-group">
+          <label for="ranked-role">Rôle à Attribuer</label>
+          <select id="ranked-role" bind:value={rankedRoleId} required>
+            <option value="" disabled selected>Sélectionner un rôle...</option>
+            {#each $dashboardData.roles as role}
+              <option value={role.id}>{role.name}</option>
+            {/each}
+          </select>
+        </div>
 
-      <div class="form-group">
-        <label for="ranked-replace">Mode de Rôles</label>
-        <select id="ranked-replace" class="form-control" bind:value={rankedReplace}>
-          <option value="false">Garder les précédents</option>
-          <option value="true">Supprimer les précédents</option>
-        </select>
-      </div>
+        <div class="form-group">
+          <label for="ranked-replace">Mode de Rôles</label>
+          <select id="ranked-replace" bind:value={rankedReplace}>
+            <option value="false">Cumulatif (Garder précédents)</option>
+            <option value="true">Remplacement (Supprimer précédents)</option>
+          </select>
+        </div>
 
-      <div class="form-group form-btn-align">
-        <button type="submit" class="btn btn-primary">
-          <Plus size={16} />
-          <span>Ajouter</span>
-        </button>
+        <div class="form-group">
+          <button type="submit" class="btn btn-primary inline-form-btn">
+            <Plus size={16} />
+            <span>Ajouter</span>
+          </button>
+        </div>
       </div>
     </form>
 
@@ -448,7 +451,7 @@
         items={rankedRewards}
         emptyMessage="Aucun palier de ranked configuré pour le moment."
       >
-        <svelte:fragment slot="row" let:item>
+        <tr slot="row" let:item>
           <td>
             <div class="ranked-cell">
               <Crown size={16} class="ranked-icon" />
@@ -465,7 +468,7 @@
               <span class="badge badge-keep">Cumulatif (Garde précédents)</span>
             {/if}
           </td>
-          <td>
+          <td style="text-align: right; white-space: nowrap;">
             <div class="actions-cell">
               <button
                 type="button"
@@ -485,42 +488,41 @@
               </button>
             </div>
           </td>
-        </svelte:fragment>
+        </tr>
       </DataTable>
     </div>
   </Card>
 </div>
 
 <!-- Edit Trophy Modal -->
-<Modal bind:show={showEditTrophyModal} title="Modifier le Palier de Trophées">
+<Modal bind:open={showEditTrophyModal} title="Modifier le Palier de Trophées">
   <form on:submit|preventDefault={handleSaveEditTrophy}>
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1rem;">
       <label for="edit-trophy-threshold">Palier de Trophées</label>
       <input
         id="edit-trophy-threshold"
         type="number"
         min="0"
         step="500"
-        class="form-control"
         bind:value={editTrophyThreshold}
         required
       />
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1rem;">
       <label for="edit-trophy-role">Rôle à Attribuer</label>
-      <select id="edit-trophy-role" class="form-control" bind:value={editTrophyRoleId} required>
+      <select id="edit-trophy-role" bind:value={editTrophyRoleId} required>
         {#each $dashboardData.roles as role}
           <option value={role.id}>{role.name}</option>
         {/each}
       </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1.5rem;">
       <label for="edit-trophy-replace">Mode de Rôles</label>
-      <select id="edit-trophy-replace" class="form-control" bind:value={editTrophyReplace}>
-        <option value="false">Garder les précédents</option>
-        <option value="true">Supprimer les précédents</option>
+      <select id="edit-trophy-replace" bind:value={editTrophyReplace}>
+        <option value="false">Cumulatif (Garder les précédents)</option>
+        <option value="true">Remplacement (Supprimer les précédents)</option>
       </select>
     </div>
 
@@ -529,38 +531,38 @@
         Annuler
       </button>
       <button type="submit" class="btn btn-primary">
-        Enregistrer
+        Enregistrer les modifications
       </button>
     </div>
   </form>
 </Modal>
 
 <!-- Edit Ranked Modal -->
-<Modal bind:show={showEditRankedModal} title="Modifier le Palier Ranked">
+<Modal bind:open={showEditRankedModal} title="Modifier le Palier Ranked">
   <form on:submit|preventDefault={handleSaveEditRanked}>
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1rem;">
       <label for="edit-ranked-threshold">Rang Ranked</label>
-      <select id="edit-ranked-threshold" class="form-control" bind:value={editRankedThreshold} required>
+      <select id="edit-ranked-threshold" bind:value={editRankedThreshold} required>
         {#each rankedTiers as tier}
           <option value={tier.id}>{tier.name}</option>
         {/each}
       </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1rem;">
       <label for="edit-ranked-role">Rôle à Attribuer</label>
-      <select id="edit-ranked-role" class="form-control" bind:value={editRankedRoleId} required>
+      <select id="edit-ranked-role" bind:value={editRankedRoleId} required>
         {#each $dashboardData.roles as role}
           <option value={role.id}>{role.name}</option>
         {/each}
       </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom: 1.5rem;">
       <label for="edit-ranked-replace">Mode de Rôles</label>
-      <select id="edit-ranked-replace" class="form-control" bind:value={editRankedReplace}>
-        <option value="false">Garder les précédents</option>
-        <option value="true">Supprimer les précédents</option>
+      <select id="edit-ranked-replace" bind:value={editRankedReplace}>
+        <option value="false">Cumulatif (Garder les précédents)</option>
+        <option value="true">Remplacement (Supprimer les précédents)</option>
       </select>
     </div>
 
@@ -569,7 +571,7 @@
         Annuler
       </button>
       <button type="submit" class="btn btn-primary">
-        Enregistrer
+        Enregistrer les modifications
       </button>
     </div>
   </form>
@@ -674,31 +676,22 @@
     color: #E74C3C;
   }
 
-  .reward-form {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-end;
-    flex-wrap: wrap;
+  .reward-form-container {
     background-color: var(--surface-2, rgba(255, 255, 255, 0.02));
-    padding: 1rem;
+    padding: 1.25rem;
     border-radius: var(--radius-sm, 6px);
     border: 1px solid var(--border);
     margin-bottom: 1.25rem;
+  }
+
+  .reward-form-container .inline-form-row {
+    margin-bottom: 0;
   }
 
   .form-group {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-  }
-
-  .flex-1 {
-    flex: 1;
-    min-width: 200px;
-  }
-
-  .form-btn-align {
-    margin-bottom: 0;
   }
 
   .form-help {
@@ -755,16 +748,18 @@
   }
 
   .actions-cell {
-    display: flex;
-    gap: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
   }
 
   .btn-icon {
-    background: transparent;
+    background: var(--surface-2, rgba(255, 255, 255, 0.04));
     border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text-secondary);
-    padding: 0.35rem;
+    padding: 0.35rem 0.5rem;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -801,10 +796,6 @@
   }
 
   @media (max-width: 768px) {
-    .reward-form {
-      flex-direction: column;
-      align-items: stretch;
-    }
     .api-key-form {
       flex-direction: column;
     }
