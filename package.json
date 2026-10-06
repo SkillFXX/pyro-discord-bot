@@ -42,7 +42,9 @@
     "@tootallnate/once": "^2.0.1",
     "uuid": "^11.1.1",
     "chokidar": "^4.0.3",
-    "node-gyp": "^13.1.0"
+    "node-gyp": "^13.1.0",
+    "proxy-addr": "^2.0.8",
+    "source-map-js": "^1.2.2"
   },
   "author": "",
   "license": "ISC"
