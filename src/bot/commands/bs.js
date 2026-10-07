@@ -107,6 +107,9 @@ module.exports = {
 
           const tag = linkedUser.playerTag;
 
+          // Remove account link from database
+          await BrawlStarsUser.destroy({ where: { userId: targetUser.id } });
+
           // Clean up managed Brawl Stars roles from member
           const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
           if (guildMember) {
@@ -117,10 +120,6 @@ module.exports = {
               highestRankedRank: 0,
             });
           }
-
-          // Remove from database
-          await BrawlStarsUser.destroy({ where: { userId: targetUser.id } });
-          await BrawlStarsTrophyLog.destroy({ where: { userId: targetUser.id } });
 
           const isSelf = targetUser.id === interaction.user.id;
           const desc = isSelf
@@ -336,6 +335,7 @@ module.exports = {
         const logs = await BrawlStarsTrophyLog.findAll({
           where: {
             userId: targetUser.id,
+            playerTag: linkedUser.playerTag,
             recordedAt: { [Op.gte]: startDate },
           },
           order: [['recordedAt', 'ASC']],

@@ -304,7 +304,7 @@ function getExpectedRoleIds(currentValue, rewards) {
 /**
  * Synchronizes Brawl Stars roles for a Discord member based on their stats (peak trophies and best rank).
  */
-async function syncUserRoles(client, member, playerData) {
+async function syncUserRoles(client, member, playerData = null) {
   if (!member || !member.guild) return { added: [], removed: [] };
 
   const guild = member.guild;
@@ -316,26 +316,30 @@ async function syncUserRoles(client, member, playerData) {
     BrawlStarsRoleReward.findAll({ where: { type: 'ranked' }, order: [['threshold', 'ASC']] }),
   ]);
 
-  const currentTrophies = playerData.trophies || 0;
-  let bestRankedIndex = (
-    playerData.highestRankedRank ||
-    playerData.rankedRank ||
-    playerData.highestRank ||
-    playerData.soloLeagueRank ||
-    playerData.lastRankedRank ||
-    0
-  );
+  let currentTrophies = 0;
+  let bestRankedIndex = 0;
 
-  if (bestRankedIndex === 0 && member && member.id) {
+  if (playerData) {
+    currentTrophies = playerData.trophies || 0;
+    bestRankedIndex = (
+      playerData.highestRankedRank ||
+      playerData.rankedRank ||
+      playerData.highestRank ||
+      playerData.soloLeagueRank ||
+      playerData.lastRankedRank ||
+      0
+    );
+  } else if (member && member.id) {
     try {
       const dbUser = await BrawlStarsUser.findByPk(member.id);
       if (dbUser) {
+        currentTrophies = dbUser.lastTrophies || 0;
         bestRankedIndex = dbUser.highestRankedRank || dbUser.lastRankedRank || 0;
       }
     } catch (_) {}
   }
 
-  const expectedTrophyRoles = getExpectedRoleIds(currentTrophies, trophyRewards);
+  const expectedTrophyRoles = currentTrophies > 0 ? getExpectedRoleIds(currentTrophies, trophyRewards) : new Set();
   const expectedRankedRoles = bestRankedIndex > 0 ? getExpectedRoleIds(bestRankedIndex, rankedRewards) : new Set();
 
   const allExpectedRoleIds = new Set([...expectedTrophyRoles, ...expectedRankedRoles]);
@@ -349,7 +353,7 @@ async function syncUserRoles(client, member, playerData) {
   const rolesToRemove = [];
 
   for (const roleId of allManagedRoleIds) {
-    const role = guild.roles.cache.get(roleId);
+    const role = guild.roles.cache.get(roleId) || (await guild.roles.fetch(roleId).catch(() => null));
     if (!role) continue;
 
     if (role.position >= botMember.roles.highest.position) {
@@ -367,10 +371,14 @@ async function syncUserRoles(client, member, playerData) {
   }
 
   if (rolesToRemove.length > 0) {
-    await member.roles.remove(rolesToRemove, 'Brawl Stars - Mise à jour des paliers').catch(() => {});
+    await member.roles.remove(rolesToRemove, 'Brawl Stars - Mise à jour des paliers').catch(e => {
+      console.warn('[BrawlStarsService] Erreur retrait rôles :', e.message);
+    });
   }
   if (rolesToAdd.length > 0) {
-    await member.roles.add(rolesToAdd, 'Brawl Stars - Obtention des rôles de palier').catch(() => {});
+    await member.roles.add(rolesToAdd, 'Brawl Stars - Obtention des rôles de palier').catch(e => {
+      console.warn('[BrawlStarsService] Erreur ajout rôles :', e.message);
+    });
   }
 
   return {
