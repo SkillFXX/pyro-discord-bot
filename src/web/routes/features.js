@@ -524,6 +524,7 @@ function createFeaturesRouter(client) {
               playerName: freshData.name || u.playerName,
               lastTrophies: freshData.trophies || 0,
               highestTrophies: freshData.highestTrophies || 0,
+              lastRankedRank: freshData.rankedRank || freshData.highestRank || u.lastRankedRank || 0,
               lastCheckedAt: new Date(),
             });
             syncedCount++;

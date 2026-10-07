@@ -106,6 +106,95 @@ async function getApiKey() {
 }
 
 /**
+ * Fetches recent battle log for a player from official Brawl Stars API.
+ * @param {string} playerTag
+ * @param {string} apiKey
+ * @returns {Promise<object|null>}
+ */
+async function fetchBattlelog(playerTag, apiKey) {
+  try {
+    const cleanTag = normalizePlayerTag(playerTag);
+    const encodedTag = encodeURIComponent(cleanTag);
+    const url = `https://api.brawlstars.com/v1/players/${encodedTag}/battlelog`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts the latest/highest Ranked mode tier index (1 to 22) from a player's battlelog.
+ * In Brawl Stars API, ranked matches have battle.type: 'soloRanked' / 'teamRanked' / 'ranked'
+ * and the participant brawler's trophies field contains the Ranked Tier ID (1 = Bronze I, ... 22 = Pro).
+ * @param {object} battlelog
+ * @param {string} playerTag
+ * @returns {number}
+ */
+function extractRankedTierFromBattlelog(battlelog, playerTag) {
+  if (!battlelog || !Array.isArray(battlelog.items)) return 0;
+  const cleanTag = normalizePlayerTag(playerTag);
+
+  let latestRankedTier = 0;
+  let highestRankedTier = 0;
+
+  for (const item of battlelog.items) {
+    const battle = item.battle;
+    if (!battle) continue;
+
+    const battleType = (battle.type || '').toLowerCase();
+    const battleMode = (battle.mode || '').toLowerCase();
+    const isRanked = battleType.includes('ranked') || battleMode.includes('ranked');
+
+    if (!isRanked) continue;
+
+    let playerObj = null;
+
+    if (Array.isArray(battle.teams)) {
+      for (const team of battle.teams) {
+        if (Array.isArray(team)) {
+          const found = team.find(p => p && normalizePlayerTag(p.tag) === cleanTag);
+          if (found) {
+            playerObj = found;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!playerObj && Array.isArray(battle.players)) {
+      playerObj = battle.players.find(p => p && normalizePlayerTag(p.tag) === cleanTag);
+    }
+
+    if (!playerObj && battle.starPlayer && normalizePlayerTag(battle.starPlayer.tag) === cleanTag) {
+      playerObj = battle.starPlayer;
+    }
+
+    if (playerObj && playerObj.brawler && typeof playerObj.brawler.trophies === 'number') {
+      const tier = playerObj.brawler.trophies;
+      if (tier >= 1 && tier <= 30) {
+        if (latestRankedTier === 0) {
+          latestRankedTier = tier;
+        }
+        if (tier > highestRankedTier) {
+          highestRankedTier = tier;
+        }
+      }
+    }
+  }
+
+  return latestRankedTier || highestRankedTier || 0;
+}
+
+/**
  * Fetches player data from the official Brawl Stars API.
  * @param {string} playerTag
  * @returns {Promise<object>}
@@ -124,31 +213,54 @@ async function fetchPlayerData(playerTag) {
   const encodedTag = encodeURIComponent(cleanTag);
   const url = `https://api.brawlstars.com/v1/players/${encodedTag}`;
 
-  let response;
+  let playerRes;
+  let battlelog = null;
+
   try {
-    response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json',
-      },
-    });
+    const [pRes, bLog] = await Promise.all([
+      fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+        },
+      }),
+      fetchBattlelog(cleanTag, apiKey),
+    ]);
+    playerRes = pRes;
+    battlelog = bLog;
   } catch (netErr) {
     throw new Error(`Erreur réseau lors de la communication avec l'API Brawl Stars : ${netErr.message}`);
   }
 
-  if (response.status === 404) {
+  if (playerRes.status === 404) {
     throw new Error(`Le joueur avec le tag **${cleanTag}** est introuvable. Vérifiez que le tag est correct.`);
   }
 
-  if (response.status === 403) {
+  if (playerRes.status === 403) {
     throw new Error('Accès refusé par l\'API Brawl Stars (Code 403). L\'adresse IP de ce serveur est **193.51.159.240**. Pensez à l\'autoriser dans votre clé sur https://developer.brawlstars.com/.');
   }
 
-  if (!response.ok) {
-    throw new Error(`Erreur API Brawl Stars (${response.status} ${response.statusText})`);
+  if (!playerRes.ok) {
+    throw new Error(`Erreur API Brawl Stars (${playerRes.status} ${playerRes.statusText})`);
   }
 
-  const data = await response.json();
+  const data = await playerRes.json();
+
+  // Extract Ranked Tier from battlelog or DB fallback
+  let rankedRank = extractRankedTierFromBattlelog(battlelog, cleanTag);
+  if (!rankedRank) {
+    try {
+      const existingUser = await BrawlStarsUser.findOne({ where: { playerTag: cleanTag } });
+      if (existingUser && existingUser.lastRankedRank) {
+        rankedRank = existingUser.lastRankedRank;
+      }
+    } catch (_) {}
+  }
+
+  data.rankedRank = rankedRank;
+  data.highestRank = rankedRank;
+  data.soloLeagueRank = rankedRank;
+
   return data;
 }
 
@@ -250,11 +362,13 @@ async function syncUserRoles(client, member, playerData) {
   ]);
 
   const currentTrophies = playerData.trophies || 0;
-  let currentRankedIndex = 0;
-  if (playerData.highestRank) {
-    currentRankedIndex = parseInt(playerData.highestRank, 10) || 0;
-  } else if (playerData.soloLeagueRank) {
-    currentRankedIndex = parseInt(playerData.soloLeagueRank, 10) || 0;
+  let currentRankedIndex = playerData.rankedRank || playerData.highestRank || playerData.soloLeagueRank || playerData.lastRankedRank || 0;
+
+  if (!currentRankedIndex && member && member.id) {
+    const dbUser = await BrawlStarsUser.findByPk(member.id);
+    if (dbUser && dbUser.lastRankedRank) {
+      currentRankedIndex = dbUser.lastRankedRank;
+    }
   }
 
   const expectedTrophyRoles = getExpectedRoleIds(currentTrophies, trophyRewards);
@@ -526,6 +640,8 @@ module.exports = {
   normalizePlayerTag,
   getApiKey,
   fetchPlayerData,
+  fetchBattlelog,
+  extractRankedTierFromBattlelog,
   fetchSpotlightCard,
   validatePlayerTagViaSpotlight,
   getExpectedRoleIds,
