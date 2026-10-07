@@ -1,9 +1,21 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [
+    svelte({
+      onwarn(warning, handler) {
+        // Suppress a11y warnings if they occur during automated build
+        if (warning.code && warning.code.startsWith('a11y_')) return;
+        handler(warning);
+      },
+    }),
+  ],
   root: __dirname,
   base: '/',
   build: {

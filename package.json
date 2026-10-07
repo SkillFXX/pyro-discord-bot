@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "build": "vite build --config src/web/client/vite.config.js",
-    "dev:web": "vite src/web/client --config src/web/client/vite.config.js"
+    "build": "vite build --config src/web/client/vite.config.mjs",
+    "dev:web": "vite src/web/client --config src/web/client/vite.config.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

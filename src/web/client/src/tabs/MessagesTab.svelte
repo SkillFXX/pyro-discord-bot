@@ -926,7 +926,7 @@
               <div class="questions-builder">
                 <div class="fields-header">
                   <div>
-                    <label class="section-label">Questions du formulaire ({formQuestions.length}/5)</label>
+                    <span class="section-label">Questions du formulaire ({formQuestions.length}/5)</span>
                     <p class="hint-text">Discord autorise jusqu'à 5 questions par formulaire interactif.</p>
                   </div>
                   {#if formQuestions.length < 5}
@@ -943,12 +943,12 @@
                       <div class="question-fields">
                         <div class="form-row">
                           <div class="form-group flex-1">
-                            <label>Intitulé de la question</label>
-                            <input type="text" maxlength={45} bind:value={q.label} placeholder="ex: Quel est votre âge ?" class="form-control form-control-sm" />
+                            <label for="q-label-{index}">Intitulé de la question</label>
+                            <input id="q-label-{index}" type="text" maxlength={45} bind:value={q.label} placeholder="ex: Quel est votre âge ?" class="form-control form-control-sm" />
                           </div>
                           <div class="form-group" style="width: 170px;">
-                            <label>Type de réponse</label>
-                            <select bind:value={q.style} class="form-control form-control-sm">
+                            <label for="q-style-{index}">Type de réponse</label>
+                            <select id="q-style-{index}" bind:value={q.style} class="form-control form-control-sm">
                               <option value="short">Ligne courte</option>
                               <option value="paragraph">Paragraphe long</option>
                             </select>
