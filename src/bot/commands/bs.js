@@ -157,12 +157,7 @@ module.exports = {
         }
 
         const existingUser = await BrawlStarsUser.findByPk(targetUser.id);
-        const bestRank = Math.max(
-          existingUser?.highestRankedRank || 0,
-          existingUser?.lastRankedRank || 0,
-          playerData?.highestRankedRank || 0,
-          playerData?.rankedRank || 0
-        );
+        const bestRank = playerData?.highestRankedRank ?? existingUser?.highestRankedRank ?? 0;
 
         if (playerData) {
           playerData.highestRankedRank = bestRank;

@@ -115,31 +115,31 @@ function convertEloToRankedTier(elo) {
   if (typeof elo !== 'number' || isNaN(elo) || elo <= 0) return 0;
 
   // If already a rank tier ID (1 to 22)
-  if (elo >= 1 && elo <= 22) return elo;
+  if (Number.isInteger(elo) && elo >= 1 && elo <= 22) return elo;
 
-  // Ranked points thresholds
-  if (elo >= 11250) return 22; // Pro
-  if (elo >= 10250) return 21; // Maître III (Master III)
-  if (elo >= 9250) return 20;  // Maître II (Master II)
-  if (elo >= 8250) return 19;  // Maître I (Master I)
-  if (elo >= 7500) return 18;  // Légendaire III
-  if (elo >= 6750) return 17;  // Légendaire II
-  if (elo >= 6000) return 16;  // Légendaire I
-  if (elo >= 5500) return 15;  // Mythique III
-  if (elo >= 5000) return 14;  // Mythique II
-  if (elo >= 4500) return 13;  // Mythique I
-  if (elo >= 4000) return 12;  // Diamant III
-  if (elo >= 3500) return 11;  // Diamant II
-  if (elo >= 3000) return 10;  // Diamant I
-  if (elo >= 2500) return 9;   // Or III
-  if (elo >= 2000) return 8;   // Or II
-  if (elo >= 1500) return 7;   // Or I
-  if (elo >= 1250) return 6;   // Argent III
-  if (elo >= 1000) return 5;   // Argent II
-  if (elo >= 750) return 4;    // Argent I
-  if (elo >= 500) return 3;    // Bronze III
-  if (elo >= 250) return 2;    // Bronze II
-  if (elo > 0) return 1;       // Bronze I
+  // Ranked points thresholds (Ranked 2.0 / Elo)
+  if (elo >= 11250) return 22; // Pro (11250+)
+  if (elo >= 11000) return 21; // Maître III (Master III) (11000+)
+  if (elo >= 10000) return 20; // Maître II (Master II) (10000+)
+  if (elo >= 9000) return 19;  // Maître I (Master I) (9000+)
+  if (elo >= 7500) return 18;  // Légendaire III (7500 - 8999)
+  if (elo >= 6750) return 17;  // Légendaire II (6750 - 7499)
+  if (elo >= 6000) return 16;  // Légendaire I (6000 - 6749)
+  if (elo >= 5500) return 15;  // Mythique III (5500 - 5999)
+  if (elo >= 5000) return 14;  // Mythique II (5000 - 5499)
+  if (elo >= 4500) return 13;  // Mythique I (4500 - 4999)
+  if (elo >= 4000) return 12;  // Diamant III (4000 - 4499)
+  if (elo >= 3500) return 11;  // Diamant II (3500 - 3999)
+  if (elo >= 3000) return 10;  // Diamant I (3000 - 3499)
+  if (elo >= 2500) return 9;   // Or III (2500 - 2999)
+  if (elo >= 2000) return 8;   // Or II (2000 - 2499)
+  if (elo >= 1500) return 7;   // Or I (1500 - 1999)
+  if (elo >= 1250) return 6;   // Argent III (1250 - 1499)
+  if (elo >= 1000) return 5;   // Argent II (1000 - 1249)
+  if (elo >= 750) return 4;    // Argent I (750 - 999)
+  if (elo >= 500) return 3;    // Bronze III (500 - 749)
+  if (elo >= 250) return 2;    // Bronze II (250 - 499)
+  if (elo > 0) return 1;       // Bronze I (1 - 249)
 
   return 0;
 }
@@ -190,16 +190,24 @@ async function fetchPlayerData(playerTag) {
   const data = await response.json();
 
   // Extract Peak Ranked Elo & Tier from official player object
-  const rawElo = (
-    data.highestAllTimeRankedElo ??
-    data.highestRankedElo ??
-    data.rankedElo ??
-    data.highestRank ??
-    data.soloLeagueRank ??
-    0
-  );
+  const candidates = [
+    data.highestAllTimeRankedElo,
+    data.highestRankedElo,
+    data.rankedElo,
+    data.highestRank,
+    data.soloLeagueRank,
+    data.highestSoloLeagueRank,
+  ].filter(v => typeof v === 'number' && !isNaN(v) && v > 0);
 
-  const bestRank = convertEloToRankedTier(Number(rawElo));
+  let bestRank = 0;
+  for (const val of candidates) {
+    const tier = convertEloToRankedTier(val);
+    if (tier > bestRank) {
+      bestRank = tier;
+    }
+  }
+
+  const rawElo = data.highestAllTimeRankedElo || data.highestRankedElo || data.rankedElo || bestRank;
 
   data.rankedElo = rawElo;
   data.highestAllTimeRankedElo = data.highestAllTimeRankedElo || rawElo;
@@ -309,23 +317,20 @@ async function syncUserRoles(client, member, playerData) {
   ]);
 
   const currentTrophies = playerData.trophies || 0;
-  let bestRankedIndex = Math.max(
-    playerData.highestRankedRank || 0,
-    playerData.rankedRank || 0,
-    playerData.highestRank || 0,
-    playerData.soloLeagueRank || 0,
-    playerData.lastRankedRank || 0
+  let bestRankedIndex = (
+    playerData.highestRankedRank ||
+    playerData.rankedRank ||
+    playerData.highestRank ||
+    playerData.soloLeagueRank ||
+    playerData.lastRankedRank ||
+    0
   );
 
-  if (member && member.id) {
+  if (bestRankedIndex === 0 && member && member.id) {
     try {
       const dbUser = await BrawlStarsUser.findByPk(member.id);
       if (dbUser) {
-        bestRankedIndex = Math.max(
-          bestRankedIndex,
-          dbUser.highestRankedRank || 0,
-          dbUser.lastRankedRank || 0
-        );
+        bestRankedIndex = dbUser.highestRankedRank || dbUser.lastRankedRank || 0;
       }
     } catch (_) {}
   }
