@@ -52,6 +52,96 @@
   let minLength = 50;
   let maxLength = 500;
   let regexPattern = '';
+  let regexTestInput = '';
+
+  const REGEX_PRESETS = [
+    {
+      id: 'discord_invites',
+      icon: '🔗',
+      name: 'Invitations Discord',
+      desc: 'discord.gg/..., discord.com/invite/...',
+      pattern: '(?:https?:\\/\\/)?(?:www\\.)?(?:discord\\.(?:gg|io|me|li)|discord(?:app)?\\.com\\/invite)\\/[a-zA-Z0-9_-]+',
+      reason: 'Invitations Discord non autorisées',
+      example: 'Rejoignez mon serveur https://discord.gg/exempLe12'
+    },
+    {
+      id: 'external_links',
+      icon: '🌐',
+      name: 'Liens Web (HTTP/HTTPS)',
+      desc: 'Tous les liens externes http:// ou https://',
+      pattern: 'https?:\\/\\/[^\\s]+',
+      reason: 'Liens externes non autorisés',
+      example: 'Regardez ce site https://exemple.com'
+    },
+    {
+      id: 'phone_numbers',
+      icon: '📞',
+      name: 'Numéros de téléphone',
+      desc: 'Formats FR & Internationaux (06..., +33...)',
+      pattern: '(?:(?:\\+|00)33|0)[1-9](?:[\\s.-]?\\d{2}){4}',
+      reason: 'Partage de numéro de téléphone interdit',
+      example: 'Mon numéro est le 06 12 34 56 78'
+    },
+    {
+      id: 'email_addresses',
+      icon: '📧',
+      name: 'Adresses Email',
+      desc: 'Protection anti-spam et coordonnées',
+      pattern: '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+',
+      reason: 'Partage d\'adresse email interdit',
+      example: 'Écris-moi sur contact@mon-site.com'
+    },
+    {
+      id: 'social_media',
+      icon: '📱',
+      name: 'Réseaux Sociaux',
+      desc: 'TikTok, Instagram, Twitter/X, Twitch, YouTube',
+      pattern: '(?:https?:\\/\\/)?(?:www\\.)?(?:instagram\\.com|tiktok\\.com|twitter\\.com|x\\.com|twitch\\.tv|youtube\\.com|youtu\\.be)\\/[^\\s]+',
+      reason: 'Publicité pour réseaux sociaux interdite',
+      example: 'Abonne-toi à https://instagram.com/moncompte'
+    },
+    {
+      id: 'ip_addresses',
+      icon: '🖥️',
+      name: 'Adresses IP (IPv4)',
+      desc: 'Anti-doxxing & sécurité réseau',
+      pattern: '\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b',
+      reason: 'Partage d\'adresse IP interdit',
+      example: 'Rejoins le serveur 192.168.1.1'
+    },
+    {
+      id: 'mass_mentions',
+      icon: '📢',
+      name: 'Mentions @everyone & @here',
+      desc: 'Détecte les pings globaux',
+      pattern: '@(?:everyone|here)',
+      reason: 'Mentions globales @everyone / @here interdites',
+      example: 'Attention @everyone annonce importante'
+    }
+  ];
+
+  function applyRegexPreset(preset) {
+    regexPattern = preset.pattern;
+    if (!customReason || customReason.trim() === '') {
+      customReason = preset.reason;
+    }
+    regexTestInput = preset.example;
+  }
+
+  $: regexValidation = (() => {
+    if (!regexPattern || regexPattern.trim() === '') {
+      return null;
+    }
+    try {
+      const reg = new RegExp(regexPattern, 'i');
+      if (!regexTestInput || regexTestInput.trim() === '') {
+        return { valid: true, match: null };
+      }
+      return { valid: true, match: reg.test(regexTestInput) };
+    } catch (e) {
+      return { valid: false, error: e.message };
+    }
+  })();
 
   $: isSelectedForum = (() => {
     if (channelId === 'global') return false;
@@ -100,6 +190,7 @@
     minLength = 50;
     maxLength = 500;
     regexPattern = '';
+    regexTestInput = '';
     showModal = true;
   }
 
@@ -136,6 +227,7 @@
       regexPattern = p.pattern || '';
     }
 
+    regexTestInput = '';
     showModal = true;
   }
 
@@ -385,9 +477,71 @@
             <input id="max_len" type="number" bind:value={maxLength} min="1" />
           </div>
         {:else if ruleType === 'regex'}
-          <div class="form-group" style="margin-bottom:0;">
-            <label for="reg_pattern">Motif Expression Régulière (Regex)</label>
-            <input id="reg_pattern" type="text" bind:value={regexPattern} placeholder="Ex: ^https?:\/\/" />
+          <div>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <label for="reg_pattern">Motif Expression Régulière (Regex)</label>
+              <input id="reg_pattern" type="text" bind:value={regexPattern} placeholder="Ex: (?:https?:\/\/)?discord\.(?:gg|com\/invite)\/[a-zA-Z0-9_-]+" />
+              {#if regexValidation && !regexValidation.valid}
+                <small style="color:var(--danger, #ef4444); font-size:0.75rem; margin-top: 4px; display:block;">
+                  ⚠️ Expression régulière invalide : {regexValidation.error}
+                </small>
+              {/if}
+            </div>
+
+            <!-- Modèles / Presets cliquables -->
+            <div style="margin-bottom: 0.85rem;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.45rem;">
+                💡 Modèles prédéfinis courants (cliquez pour appliquer) :
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.45rem;">
+                {#each REGEX_PRESETS as preset}
+                  <button
+                    type="button"
+                    class="preset-card {regexPattern === preset.pattern ? 'active' : ''}"
+                    on:click={() => applyRegexPreset(preset)}
+                  >
+                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
+                      <span>{preset.icon}</span>
+                      <span>{preset.name}</span>
+                    </span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; line-height: 1.2;">
+                      {preset.desc}
+                    </span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+
+            <!-- Mini-testeur interactif en direct -->
+            <div style="background: rgba(0,0,0,0.2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 0.75rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.4rem; gap: 0.5rem; flex-wrap: wrap;">
+                <label for="reg_test" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom:0;">
+                  🧪 Tester votre filtre en direct :
+                </label>
+                {#if regexValidation && regexValidation.valid}
+                  {#if regexValidation.match === true}
+                    <span class="badge badge-danger" style="font-size:0.72rem; padding: 0.2rem 0.5rem;">
+                      🚨 Infraction détectée (bloqué)
+                    </span>
+                  {:else if regexValidation.match === false}
+                    <span class="badge badge-success" style="font-size:0.72rem; padding: 0.2rem 0.5rem;">
+                      ✅ Aucun match (autorisé)
+                    </span>
+                  {:else}
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">
+                      Tapez un texte ci-dessous pour tester
+                    </span>
+                  {/if}
+                {/if}
+              </div>
+              <input
+                id="reg_test"
+                type="text"
+                bind:value={regexTestInput}
+                placeholder="Ex: Rejoins mon discord https://discord.gg/xyz..."
+                style="font-size: 0.82rem; padding: 0.45rem 0.65rem;"
+              />
+            </div>
           </div>
         {/if}
       </div>
@@ -479,5 +633,26 @@
   .checkbox-pill:has(input:checked) {
     border-color: var(--primary);
     background: rgba(255, 107, 53, 0.08);
+  }
+
+  .preset-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.5rem 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+  }
+  .preset-card:hover {
+    border-color: var(--primary);
+    background: rgba(255, 107, 53, 0.08);
+  }
+  .preset-card.active {
+    border-color: var(--primary);
+    background: rgba(255, 107, 53, 0.14);
   }
 </style>
