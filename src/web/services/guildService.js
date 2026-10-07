@@ -162,7 +162,8 @@ async function fetchAutomodRules(guild) {
       action: r.action,
       scope: r.scope,
       monitoredTypes: r.monitoredTypes,
-      customReason: r.customReason
+      customReason: r.customReason,
+      muteDuration: r.muteDuration || 600
     };
   });
 }

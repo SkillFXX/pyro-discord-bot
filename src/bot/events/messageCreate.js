@@ -1,4 +1,4 @@
-const { ConfigHelper, AutomodRule, Warn, XPMultiplier } = require('../../database');
+const { ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
 const { getMemberRoleMultiplier, awardUserXP } = require('../utils/xpHelper');
@@ -314,7 +314,7 @@ async function handleAutomod(message, client) {
         actions = ['delete'];
       }
 
-      await applyAutomodAction(client, message, actions, reason, isThreadStart);
+      await applyAutomodAction(client, message, rule, actions, reason, isThreadStart);
       return true; // Stop processing immediately
     }
   }
@@ -323,81 +323,207 @@ async function handleAutomod(message, client) {
 }
 
 /**
- * Applies automod actions (delete, warn)
+ * Applies automod actions (delete, warn, mute, ban)
+ * @param {object} client - Discord client instance
+ * @param {import('discord.js').Message} message - Infringing message
+ * @param {object} rule - Triggered AutomodRule DB instance
+ * @param {string[]} actions - List of actions to execute ('delete', 'warn', 'mute', 'ban')
+ * @param {string} reason - Infraction reason
  * @param {boolean} isThreadStart - If true, 'delete' will delete the entire forum thread instead of just the message
  */
-async function applyAutomodAction(client, message, actions, reason, isThreadStart = false) {
-  const member = message.member;
+async function applyAutomodAction(client, message, rule, actions, reason, isThreadStart = false) {
+  let member = message.member;
   const guild = message.guild;
   const channel = message.channel;
-  const botMember = guild.members.me;
+  const botMember = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+
+  if (!member && message.author) {
+    member = await guild.members.fetch(message.author.id).catch(() => null);
+  }
 
   const shouldDelete = actions.includes('delete');
   const shouldWarn = actions.includes('warn');
+  const shouldMute = actions.includes('mute');
+  const shouldBan = actions.includes('ban');
 
   try {
-    // 1. Delete message (or entire forum thread if it's the first post) if configured
+    // 1. Delete message or thread if configured
+    let messageDeleted = false;
     if (shouldDelete) {
       if (isThreadStart && channel.isThread()) {
-        // Delete the whole forum thread (post), not just the message
         await channel.delete('[Automod] Contenu du post non conforme').catch(() => {});
+        messageDeleted = true;
       } else if (message.deletable) {
-        await message.delete();
+        await message.delete().catch(() => {});
+        messageDeleted = true;
       }
     }
 
+    if (!member) {
+      return;
+    }
+
     // 2. Warn user if configured
+    let warnRecord = null;
     if (shouldWarn) {
-      // Create warn entry
-      const warnRecord = await Warn.create({
-        userId: member.id,
-        moderatorId: botMember.id,
-        reason: `[Automod] ${reason}`,
-      });
+      try {
+        warnRecord = await Warn.create({
+          userId: member.id,
+          moderatorId: botMember.id,
+          reason: `[Automod] ${reason}`,
+        });
+      } catch (warnErr) {
+        console.error('[Automod] Erreur enregistrement Warn:', warnErr);
+      }
+    }
 
-      // Send DM notifying of the warn and deletion
+    // 3. Mute / Timeout user if configured
+    let muteApplied = false;
+    let muteDurationStr = '';
+    if (shouldMute) {
+      const isAlreadyMuted = member.communicationDisabledUntilTimestamp && member.communicationDisabledUntilTimestamp > Date.now();
+      if (!isAlreadyMuted) {
+        if (!member.moderatable) {
+          console.warn(`[Automod] Impossible d'exclure (timeout) ${member.user?.tag || member.id}: permissions insuffisantes ou rôle supérieur.`);
+          await logModerationAction(client, {
+            action: '⚠️ Erreur Automod (Hiérarchie Discord)',
+            target: member.user || member,
+            moderator: botMember.user,
+            reason: `Impossible de timeout ${member.user?.username || member.id} : rôle supérieur/égal au bot ou Administrateur (Infraction: ${reason}).`,
+          });
+        } else {
+          const rawSeconds = parseInt(rule?.muteDuration || 600, 10);
+          const safeSeconds = isNaN(rawSeconds) || rawSeconds < 10 ? 600 : Math.min(rawSeconds, 2419200);
+          const durationMs = safeSeconds * 1000;
+
+          muteDurationStr = safeSeconds >= 86400 
+            ? `${Math.round(safeSeconds / 86400)} jour(s)` 
+            : safeSeconds >= 3600 
+              ? `${Math.round(safeSeconds / 3600)} heure(s)` 
+              : `${Math.round(safeSeconds / 60)} minute(s)`;
+
+          try {
+            await member.timeout(durationMs, `[Automod] ${reason}`);
+            await Sanction.create({
+              userId: member.id,
+              moderatorId: botMember.id,
+              type: 'mute',
+              reason: `[Automod] ${reason}`,
+            });
+            muteApplied = true;
+          } catch (timeoutErr) {
+            console.error(`[Automod] Erreur timeout Discord:`, timeoutErr);
+            await logModerationAction(client, {
+              action: '⚠️ Erreur Timeout Automod',
+              target: member.user || member,
+              moderator: botMember.user,
+              reason: `Échec de l'exclusion temporaire pour ${member.user?.username || member.id} (${timeoutErr.message}) suite à l'automodération.`,
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Ban user check if configured
+    let banEligible = false;
+    if (shouldBan) {
+      if (!member.bannable) {
+        console.warn(`[Automod] Impossible de bannir ${member.user?.tag || member.id}: permissions insuffisantes ou rôle supérieur.`);
+        await logModerationAction(client, {
+          action: '⚠️ Erreur Automod (Hiérarchie Discord)',
+          target: member.user || member,
+          moderator: botMember.user,
+          reason: `Impossible de bannir ${member.user?.username || member.id} : rôle supérieur/égal au bot ou Administrateur (Infraction: ${reason}).`,
+        });
+      } else {
+        banEligible = true;
+      }
+    }
+
+    // 5. Send DM Notification (sent before ban so delivery succeeds)
+    const actionsTaken = [];
+    if (shouldDelete) actionsTaken.push('• Suppression de votre message');
+    if (warnRecord) actionsTaken.push(`• Avertissement (Warn #${warnRecord.id})`);
+    if (muteApplied) actionsTaken.push(`• Exclusion temporaire (Mute) : **${muteDurationStr}**`);
+    if (banEligible) actionsTaken.push('• Bannissement définitif du serveur');
+
+    if (actionsTaken.length > 0) {
+      let dmTitle = '🛡️ Message supprimé par l\'automodération';
+      let dmColor = embeds.COLORS.WARNING;
+
+      if (banEligible) {
+        dmTitle = '🔨 Bannissement Automatique (Automod)';
+        dmColor = embeds.COLORS.ERROR;
+      } else if (muteApplied) {
+        dmTitle = '🔇 Exclusion Automatique (Automod)';
+        dmColor = embeds.COLORS.ERROR;
+      } else if (warnRecord) {
+        dmTitle = '⚠️ Avertissement Automatique (Automod)';
+        dmColor = embeds.COLORS.ERROR;
+      }
+
       const dmEmbed = embeds.custom(
-        '⚠️ Avertissement & Suppression Automatique',
-        `Vous avez reçu un avertissement automatique sur le serveur **${guild.name}**.\n\n` +
-        `**Motif :** ${reason}\n` +
-        `**Salon :** #${channel.name}\n` +
-        `**Action :** Votre message a été supprimé et un avertissement (Warn #${warnRecord.id}) vous a été attribué.\n\n` +
-        `*Veuillez respecter le règlement du serveur pour éviter d'autres sanctions.*`,
-        embeds.COLORS.ERROR
-      );
-      await sendDM(member, dmEmbed);
-
-      // Log moderation action
-      await logModerationAction(client, {
-        action: '⚠️ Warn Automatique (Automod)',
-        target: member.user,
-        moderator: botMember.user,
-        reason: reason,
-        warnId: warnRecord.id,
-      });
-
-      // Check for thresholds
-      await checkWarnThresholds(client, member, botMember, `[Automod] ${reason}`);
-    } 
-    // 3. If delete only (not warned)
-    else if (shouldDelete) {
-      // Send DM notifying only of deletion
-      const dmEmbed = embeds.custom(
-        '🛡️ Message supprimé par l\'automodération',
-        `Votre message dans le salon **#${channel.name}** sur le serveur **${guild.name}** a été supprimé par notre système d'automodération.\n\n` +
+        dmTitle,
+        `Une infraction aux règles du serveur **${guild.name}** a été détectée dans le salon **#${channel.name}**.\n\n` +
         `**Motif :** ${reason}\n\n` +
-        `*Veuillez respecter les consignes du salon.*`,
-        embeds.COLORS.WARNING
+        `**Sanction(s) appliquée(s) :**\n${actionsTaken.join('\n')}\n\n` +
+        `*Veuillez respecter le règlement du serveur pour garantir une expérience agréable à tous.*`,
+        dmColor
       );
-      await sendDM(member, dmEmbed);
 
-      // Log moderation action
-      await logModerationAction(client, {
-        action: '🛡️ Automod - Message Supprimé',
-        target: member.user,
-        moderator: botMember.user,
-        reason: `Salon: ${channel} | ${reason}\nMessage original: \`\`\`${message.content.substring(0, 1000)}\`\`\``,
-      });
+      await sendDM(member, dmEmbed);
+    }
+
+    // 6. Execute Ban if eligible
+    let banApplied = false;
+    if (banEligible) {
+      try {
+        await member.ban({ reason: `[Automod] ${reason}` });
+        await Sanction.create({
+          userId: member.id,
+          moderatorId: botMember.id,
+          type: 'ban',
+          reason: `[Automod] ${reason}`,
+        });
+        banApplied = true;
+      } catch (banErr) {
+        console.error('[Automod] Erreur ban Discord:', banErr);
+        await logModerationAction(client, {
+          action: '⚠️ Erreur Bannissement Automod',
+          target: member.user || member,
+          moderator: botMember.user,
+          reason: `Échec du bannissement pour ${member.user?.username || member.id} (${banErr.message}) suite à l'automodération.`,
+        });
+      }
+    }
+
+    // 7. Log Moderation Action
+    const summaryActions = [];
+    if (shouldDelete) summaryActions.push('Suppression');
+    if (warnRecord) summaryActions.push(`Warn #${warnRecord.id}`);
+    if (muteApplied) summaryActions.push(`Mute (${muteDurationStr})`);
+    if (banApplied) summaryActions.push('Ban');
+
+    const logActionTitle = banApplied
+      ? '🔨 Automod - Bannissement'
+      : (muteApplied
+        ? `🔇 Automod - Mute (${muteDurationStr})`
+        : (warnRecord
+          ? `⚠️ Automod - Warn #${warnRecord.id}`
+          : '🛡️ Automod - Message Supprimé'));
+
+    await logModerationAction(client, {
+      action: logActionTitle,
+      target: member.user || member,
+      moderator: botMember.user,
+      reason: `Salon: ${channel} | ${reason}\nSanctions: ${summaryActions.join(', ')}\nMessage original: \`\`\`${message.content.substring(0, 1000)}\`\`\``,
+      duration: muteApplied ? muteDurationStr : null,
+      warnId: warnRecord ? warnRecord.id : null,
+    });
+
+    // 8. Trigger warn thresholds if warned
+    if (warnRecord && !banApplied) {
+      await checkWarnThresholds(client, member, botMember, `[Automod] ${reason}`);
     }
 
   } catch (error) {

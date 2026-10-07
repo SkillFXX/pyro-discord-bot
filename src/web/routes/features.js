@@ -269,7 +269,8 @@ function createFeaturesRouter(client) {
       duplicate_max, duplicate_interval, 
       words_list, 
       min_length, max_length, regex_pattern,
-      scope, monitoredTypes, customReason 
+      scope, monitoredTypes, customReason,
+      mute_duration 
     } = body;
     
     let actionsArray = [];
@@ -281,6 +282,11 @@ function createFeaturesRouter(client) {
       actionsArray = ['delete'];
     }
     const actionsJson = JSON.stringify(actionsArray);
+
+    const parsedMute = parseInt(mute_duration || 600, 10);
+    const safeMuteDuration = isNaN(parsedMute) || parsedMute < 10 
+      ? 600 
+      : Math.min(parsedMute, 2419200);
 
     let parameters = '{}';
     if (ruleType === 'spam') {
@@ -313,7 +319,8 @@ function createFeaturesRouter(client) {
       actions: actionsJson,
       scope: scope || 'all_messages',
       monitoredTypes: monitoredTypes || 'all',
-      customReason: customReason || null
+      customReason: customReason || null,
+      muteDuration: safeMuteDuration
     };
   }
 

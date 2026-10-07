@@ -20,6 +20,28 @@
   let actionWarn = false;
   let actionMute = false;
   let actionBan = false;
+  let muteDuration = 600;
+
+  function formatDuration(sec) {
+    if (!sec) return '10 minute(s)';
+    if (sec >= 604800 && sec % 604800 === 0) {
+      const weeks = sec / 604800;
+      return `${weeks} semaine${weeks > 1 ? 's' : ''}`;
+    }
+    if (sec >= 86400) return `${Math.floor(sec / 86400)} jour(s)`;
+    if (sec >= 3600) return `${Math.floor(sec / 3600)} heure(s)`;
+    if (sec >= 60) return `${Math.floor(sec / 60)} minute(s)`;
+    return `${sec} seconde(s)`;
+  }
+
+  function formatShortDuration(sec) {
+    if (!sec) return '10m';
+    if (sec >= 604800 && sec % 604800 === 0) return `${sec / 604800}sem`;
+    if (sec >= 86400) return `${Math.floor(sec / 86400)}j`;
+    if (sec >= 3600) return `${Math.floor(sec / 3600)}h`;
+    if (sec >= 60) return `${Math.floor(sec / 60)}m`;
+    return `${sec}s`;
+  }
 
   // Specific rule params
   let spamMax = 5;
@@ -69,6 +91,7 @@
     actionWarn = false;
     actionMute = false;
     actionBan = false;
+    muteDuration = 600;
     spamMax = 5;
     spamInterval = 5;
     duplicateMax = 3;
@@ -94,6 +117,7 @@
     actionWarn = actions.includes('warn');
     actionMute = actions.includes('mute');
     actionBan = actions.includes('ban');
+    muteDuration = rule.muteDuration || 600;
 
     const p = parseParams(rule);
     if (rule.ruleType === 'spam') {
@@ -130,6 +154,7 @@
       monitoredTypes,
       customReason,
       actions,
+      mute_duration: actionMute ? (parseInt(muteDuration, 10) || 600) : null,
       spam_max: spamMax,
       spam_interval: spamInterval,
       duplicate_max: duplicateMax,
@@ -229,7 +254,7 @@
             <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px;">
               {#each actions as act}
                 <span class="badge {act === 'mute' || act === 'ban' ? 'badge-danger' : act === 'warn' ? 'badge-warning' : 'badge-info'}">
-                  {act === 'delete' ? 'Suppr.' : act === 'warn' ? 'Warn' : act === 'mute' ? 'Mute' : 'Ban'}
+                  {act === 'delete' ? 'Suppr.' : act === 'warn' ? 'Warn' : act === 'mute' ? `Mute (${formatShortDuration(item.muteDuration || 600)})` : 'Ban'}
                 </span>
               {/each}
             </div>
@@ -393,6 +418,39 @@
             <span>Bannir</span>
           </label>
         </div>
+
+        {#if actionMute}
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
+            <label for="automod_mute_duration" style="display:block; margin-bottom: 0.35rem; font-size: 0.85rem; font-weight: 500;">
+              Durée de l'exclusion (Timeout)
+            </label>
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+              <input
+                id="automod_mute_duration"
+                type="number"
+                min="10"
+                max="2419200"
+                bind:value={muteDuration}
+                placeholder="600"
+                style="width: 140px;"
+              />
+              <span style="font-size: 0.85rem; color: var(--text-muted);">secondes ({formatDuration(muteDuration)})</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 60)}>1 min (60s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 300)}>5 min (300s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 600)}>10 min (600s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 3600)}>1 heure (3600s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 86400)}>1 jour (86400s)</button>
+              <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" on:click={() => (muteDuration = 604800)}>7 jours (604800s)</button>
+            </div>
+            {#if muteDuration > 2419200}
+              <div style="color: var(--danger, #ef4444); font-size: 0.75rem; margin-top: 0.35rem;">
+                ⚠️ Discord limite les exclusions temporaires à 28 jours maximum (2 419 200 secondes).
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <div style="display:flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">

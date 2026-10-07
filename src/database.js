@@ -154,6 +154,11 @@ const AutomodRule = sequelize.define('AutomodRule', {
     type: DataTypes.STRING, // 'all' | 'text' | 'attachments'
     defaultValue: 'all',
   },
+  muteDuration: {
+    type: DataTypes.INTEGER, // in seconds (for mutes), default 600 (10 min)
+    defaultValue: 600,
+    allowNull: true,
+  },
 });
 
 // 8. AutoRole: Roles given automatically to newcomers
@@ -727,6 +732,21 @@ async function ensureMessageLogColumns() {
 }
 
 /**
+ * Ensures newly added columns exist in SQLite AutomodRules table
+ */
+async function ensureAutomodColumns() {
+  try {
+    const [columns] = await sequelize.query('PRAGMA table_info(AutomodRules);');
+    const columnNames = (columns || []).map(c => c.name);
+    if (columnNames.length > 0 && !columnNames.includes('muteDuration')) {
+      await sequelize.query('ALTER TABLE AutomodRules ADD COLUMN muteDuration INTEGER DEFAULT 600;');
+    }
+  } catch (err) {
+    console.warn('[Database] AutomodRule column check notice:', err.message);
+  }
+}
+
+/**
  * Configure SQLite high-performance PRAGMAs:
  * - WAL mode (Write-Ahead Logging): allows concurrent reads during writes, prevents SQLITE_BUSY
  * - synchronous = NORMAL: faster writes while retaining durability in WAL mode
@@ -741,6 +761,7 @@ async function initDatabasePragmas() {
     await sequelize.query('PRAGMA temp_store = MEMORY;');
     await sequelize.query('PRAGMA foreign_keys = ON;');
     await ensureMessageLogColumns();
+    await ensureAutomodColumns();
     await ConfigHelper.preloadCache();
   } catch (err) {
     console.warn('[Database] Warning applying SQLite PRAGMAs:', err.message);
