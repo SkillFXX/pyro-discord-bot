@@ -117,7 +117,7 @@ async function checkWarnThresholds(client, member, moderator, reason, warnsAdded
           action: '⚠️ Erreur Sanction Auto (Hiérarchie Discord)',
           target: member.user || member,
           moderator: botMember.user,
-          reason: `Impossible de mute ${member.user?.username || member.id} : son rôle le plus élevé est supérieur ou égal à celui du bot, ou il dispose de la permission Administrateur (Seuil de ${thresholdAction.warnsCount} avertissements atteint, total actuel : ${warnCount} warns).`,
+          reason: `Impossible de mute ${member.user?.username || member.id} : son rôle le plus élevé est supérieur ou égal à celui du bot, ou il dispose de la permission Administrateur (Seuil de ${thresholdAction.warnsCount} avertissements atteint, total actuel : ${totalWarns} warns).`,
         });
         return;
       }
@@ -157,7 +157,7 @@ async function checkWarnThresholds(client, member, moderator, reason, warnsAdded
       const dmEmbed = embeds.custom(
         '🔇 Mute Automatique',
         `Vous avez été temporairement exclu (mute) du serveur **${member.guild.name}** pour une durée de **${durationStr}**.\n\n` +
-        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${warnCount}).\n` +
+        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${totalWarns}).\n` +
         `**Dernier motif :** ${reason}`,
         embeds.COLORS.ERROR
       );
@@ -179,7 +179,7 @@ async function checkWarnThresholds(client, member, moderator, reason, warnsAdded
           action: '⚠️ Erreur Sanction Auto (Hiérarchie Discord)',
           target: member.user || member,
           moderator: botMember.user,
-          reason: `Impossible de bannir ${member.user?.username || member.id} (permissions insuffisantes ou rôle supérieur) suite au seuil de ${thresholdAction.warnsCount} avertissements (total : ${warnCount} warns).`,
+          reason: `Impossible de bannir ${member.user?.username || member.id} (permissions insuffisantes ou rôle supérieur) suite au seuil de ${thresholdAction.warnsCount} avertissements (total : ${totalWarns} warns).`,
         });
         return;
       }
@@ -188,7 +188,7 @@ async function checkWarnThresholds(client, member, moderator, reason, warnsAdded
       const dmEmbed = embeds.custom(
         '🔨 Bannissement Automatique',
         `Vous avez été banni définitivement du serveur **${member.guild.name}**.\n\n` +
-        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${warnCount}).\n` +
+        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${totalWarns}).\n` +
         `**Dernier motif :** ${reason}`,
         embeds.COLORS.ERROR
       );

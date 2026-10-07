@@ -1,7 +1,7 @@
-const { UserXP, ConfigHelper, AutomodRule, Warn, Sanction, XPMultiplier } = require('../../database');
+const { ConfigHelper, AutomodRule, Warn, XPMultiplier } = require('../../database');
 const embeds = require('../utils/embeds');
 const { checkWarnThresholds, logModerationAction, sendDM } = require('../utils/moderationHelper');
-const { calculateLevelFromXP, getXPNeededForLevel, handleRoleRewards, getMemberRoleMultiplier, awardUserXP } = require('../utils/xpHelper');
+const { getMemberRoleMultiplier, awardUserXP } = require('../utils/xpHelper');
 const analyticsService = require('../../services/analyticsService');
 
 // Memory caches to avoid DB spam

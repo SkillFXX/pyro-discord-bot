@@ -35,50 +35,69 @@ const RANKED_TIERS = [
   { id: 22, name: 'Pro', color: '#A855F7' },
 ];
 
-// Local directory for official game assets
-const ASSETS_DIR = path.join(__dirname, '../assets/brawlstars');
-const localAssetCache = new Map();
-
 /**
- * Loads a local asset from src/assets/brawlstars with caching and extension fallback.
- * Supports .webp, .png, .svg, and .jpg
- * @param {string} name 
- * @returns {Promise<import('@napi-rs/canvas').Image|null>}
+ * Draws a clean vector trophy icon with golden gradient and badge.
+ * @param {object} ctx Canvas 2D context
+ * @param {number} x
+ * @param {number} y
+ * @param {number} size
  */
-async function getLocalAsset(name) {
-  if (!name) return null;
-  if (localAssetCache.has(name)) {
-    return localAssetCache.get(name);
-  }
+function drawTrophyIcon(ctx, x, y, size = 36) {
+  ctx.save();
+  ctx.translate(x, y);
+  const s = size / 36;
+  ctx.scale(s, s);
 
-  const extensions = ['.webp', '.png', '.svg', '.jpg'];
-  for (const ext of extensions) {
-    const fullPath = path.join(ASSETS_DIR, `${name}${ext}`);
-    if (fs.existsSync(fullPath)) {
-      try {
-        const img = await loadImage(fullPath);
-        localAssetCache.set(name, img);
-        return img;
-      } catch (e) {
-        console.warn(`[BrawlStarsService] Erreur lors du chargement de l'asset ${fullPath}:`, e.message);
-      }
-    }
-  }
+  // Background badge
+  ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+  ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(18, 18, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 
-  return null;
-}
+  // Cup gradient
+  const gold = ctx.createLinearGradient(10, 8, 26, 24);
+  gold.addColorStop(0, '#FDE047');
+  gold.addColorStop(0.5, '#F59E0B');
+  gold.addColorStop(1, '#D97706');
 
-/**
- * Draws an image fitted within a bounding box while preserving its aspect ratio.
- */
-function drawAssetIcon(ctx, img, targetX, targetY, targetWidth, targetHeight) {
-  if (!img || !img.width || !img.height) return;
-  const ratio = Math.min(targetWidth / img.width, targetHeight / img.height);
-  const w = img.width * ratio;
-  const h = img.height * ratio;
-  const x = targetX + (targetWidth - w) / 2;
-  const y = targetY + (targetHeight - h) / 2;
-  ctx.drawImage(img, x, y, w, h);
+  ctx.fillStyle = gold;
+  ctx.strokeStyle = '#B45309';
+  ctx.lineWidth = 1.2;
+
+  // Trophy Cup
+  ctx.beginPath();
+  ctx.moveTo(11, 10);
+  ctx.lineTo(25, 10);
+  ctx.lineTo(23, 19);
+  ctx.bezierCurveTo(22, 22, 20, 23, 18, 23);
+  ctx.bezierCurveTo(16, 23, 14, 22, 13, 19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Handles
+  ctx.strokeStyle = '#FBBF24';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(10, 14, 3, 1.5 * Math.PI, 0.5 * Math.PI, true);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(26, 14, 3, 1.5 * Math.PI, 0.5 * Math.PI, false);
+  ctx.stroke();
+
+  // Stem
+  ctx.fillStyle = '#D97706';
+  ctx.fillRect(16.5, 23, 3, 4);
+
+  // Base
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(12, 27, 12, 2.5);
+
+  ctx.restore();
 }
 
 /**
@@ -459,9 +478,8 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.lineWidth = 1;
   roundRect(ctx, 35, 25, width - 70, 95, 12, true, true);
 
-  // Official Trophy Icon in header
-  const trophyAsset = await getLocalAsset('trophy');
-  drawAssetIcon(ctx, trophyAsset, 50, 42, 36, 36);
+  // Trophy Icon in header
+  drawTrophyIcon(ctx, 50, 42, 36);
 
   // Header Title
   ctx.fillStyle = '#FFFFFF';

@@ -1,5 +1,5 @@
 <script>
-  import { Bot, Plus, Trash2, Pencil, ShieldAlert, CheckSquare, Settings } from '@lucide/svelte';
+  import { Bot, Plus, Trash2, Pencil, ShieldAlert } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Modal from '../components/Modal.svelte';

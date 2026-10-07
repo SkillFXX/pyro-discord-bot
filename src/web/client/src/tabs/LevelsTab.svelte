@@ -1,5 +1,5 @@
 <script>
-  import { Award, Zap, Shield, UserPlus, Trash2, Pencil, Plus, Save, Mic, Users, VolumeX, MicOff, ExternalLink } from '@lucide/svelte';
+  import { Award, Zap, UserPlus, Trash2, Pencil, Plus, Save, Mic, ExternalLink } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import Toggle from '../components/Toggle.svelte';
   import DataTable from '../components/DataTable.svelte';

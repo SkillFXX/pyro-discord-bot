@@ -11,8 +11,7 @@
     Save, 
     CheckCircle2, 
     AlertCircle, 
-    ExternalLink,
-    Shield
+    ExternalLink
   } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';

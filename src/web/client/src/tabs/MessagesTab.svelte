@@ -9,7 +9,6 @@
     Pencil, 
     Trash2, 
     RefreshCw, 
-    ExternalLink, 
     CheckCircle, 
     AlertCircle, 
     Clock, 
@@ -17,10 +16,7 @@
     X, 
     Hash, 
     Save, 
-    ChevronDown, 
-    ChevronUp, 
     HelpCircle,
-    Copy,
     Inbox
   } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
