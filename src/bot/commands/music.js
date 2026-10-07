@@ -194,20 +194,66 @@ module.exports = {
       }
 
       try {
+        const isUrl = /^https?:\/\//i.test(query.trim());
         const searchSource = (await ConfigHelper.get('music_search_provider')) || 'ytsearch';
-        const res = await player.search(
-          {
-            query,
-            source: searchSource,
-          },
-          interaction.user
-        );
+        let res = null;
+        let usedFallback = false;
+
+        try {
+          res = await player.search(
+            {
+              query,
+              source: searchSource,
+            },
+            interaction.user
+          );
+        } catch (searchErr) {
+          const isTimeoutOrNetwork = searchErr.name === 'TimeoutError' || searchErr.message?.includes('timeout') || searchErr.message?.includes('aborted');
+          // If YouTube search fails or times out, try SoundCloud as fallback
+          if (!isUrl && (searchSource === 'ytsearch' || searchSource === 'ytmsearch')) {
+            console.warn(`[Music] Recherche ${searchSource} échouée (${searchErr.message}), basculement automatique sur SoundCloud...`);
+            try {
+              res = await player.search(
+                {
+                  query,
+                  source: 'scsearch',
+                },
+                interaction.user
+              );
+              if (res && res.tracks && res.tracks.length > 0) {
+                usedFallback = true;
+              }
+            } catch (fallbackErr) {
+              throw searchErr;
+            }
+          } else {
+            throw searchErr;
+          }
+        }
+
+        // If search returned empty or error, and we haven't tried SoundCloud yet
+        if ((!res || !res.tracks || res.tracks.length === 0 || res.loadType === 'error') && !isUrl && (searchSource === 'ytsearch' || searchSource === 'ytmsearch')) {
+          try {
+            console.warn(`[Music] Aucun résultat avec ${searchSource}, essai SoundCloud...`);
+            const scRes = await player.search(
+              {
+                query,
+                source: 'scsearch',
+              },
+              interaction.user
+            );
+            if (scRes && scRes.tracks && scRes.tracks.length > 0 && scRes.loadType !== 'error') {
+              res = scRes;
+              usedFallback = true;
+            }
+          } catch (e) {}
+        }
 
         if (!res || !res.tracks || res.tracks.length === 0) {
           return interaction.editReply({
             embeds: [
               new EmbedBuilder()
-                .setDescription(`❌ Aucun morceau trouvé pour : \`${query}\`.`)
+                .setDescription(`❌ Aucun morceau trouvé pour : \`${query}\`.\n💡 *Astuce : Essayez avec le nom de l'artiste ou utilisez un lien SoundCloud/Spotify.*`)
                 .setColor('#E74C3C'),
             ],
           });
@@ -217,11 +263,13 @@ module.exports = {
           return interaction.editReply({
             embeds: [
               new EmbedBuilder()
-                .setDescription('❌ Une erreur est survenue lors de la recherche du titre.')
+                .setDescription(`❌ Une erreur est survenue lors de la recherche du titre.\n${res.exception?.message ? `\`${res.exception.message}\`` : ''}`)
                 .setColor('#E74C3C'),
             ],
           });
         }
+
+        const fallbackNote = usedFallback ? '\n\n🔄 *Recherche basculée automatiquement sur SoundCloud (YouTube bloqué sur ce serveur).*' : '';
 
         // Playlist loaded
         if (res.loadType === 'playlist') {
@@ -237,7 +285,7 @@ module.exports = {
             embeds: [
               new EmbedBuilder()
                 .setTitle('📑 Playlist Ajoutée')
-                .setDescription(`**[${playlistName}](${query})**\nAjout de **${res.tracks.length}** morceaux à la file d'attente.`)
+                .setDescription(`**[${playlistName}](${query})**\nAjout de **${res.tracks.length}** morceaux à la file d'attente.${fallbackNote}`)
                 .addFields(
                   { name: '⏳ Durée Totale', value: `\`${formatMs(totalDuration)}\``, inline: true },
                   { name: '👤 Demandé par', value: `<@${interaction.user.id}>`, inline: true },
@@ -259,7 +307,7 @@ module.exports = {
             embeds: [
               new EmbedBuilder()
                 .setTitle('🎶 Titre Lancé')
-                .setDescription(`**[${track.info.title}](${track.info.uri})**\nArtiste : \`${track.info.author || 'Inconnu'}\``)
+                .setDescription(`**[${track.info.title}](${track.info.uri})**\nArtiste : \`${track.info.author || 'Inconnu'}\`${fallbackNote}`)
                 .addFields(
                   { name: '⏳ Durée', value: track.info.isStream ? '🔴 En direct' : `\`${formatMs(track.info.duration || track.info.length)}\``, inline: true },
                   { name: '👤 Demandé par', value: `<@${interaction.user.id}>`, inline: true },
@@ -274,7 +322,7 @@ module.exports = {
             embeds: [
               new EmbedBuilder()
                 .setTitle('➕ Morceau Ajouté à la File')
-                .setDescription(`**[${track.info.title}](${track.info.uri})**\nArtiste : \`${track.info.author || 'Inconnu'}\``)
+                .setDescription(`**[${track.info.title}](${track.info.uri})**\nArtiste : \`${track.info.author || 'Inconnu'}\`${fallbackNote}`)
                 .addFields(
                   { name: '🔢 Position', value: `\`#${player.queue.tracks.length}\``, inline: true },
                   { name: '⏳ Durée', value: track.info.isStream ? '🔴 En direct' : `\`${formatMs(track.info.duration || track.info.length)}\``, inline: true },
@@ -287,8 +335,13 @@ module.exports = {
         }
       } catch (err) {
         console.error('[Music /play Error]:', err);
+        const isTimeout = err.name === 'TimeoutError' || err.message?.includes('timeout') || err.message?.includes('aborted');
+        let errorDesc = `❌ Erreur lors du chargement : ${err.message}`;
+        if (isTimeout) {
+          errorDesc = `⏳ **Le serveur Lavalink a mis trop de temps à répondre (Délai d'attente dépassé).**\n\nCela se produit généralement lorsque YouTube ralentit ou bloque l'adresse IP du serveur d'hébergement.\n\n💡 **Que faire :**\n• Essayez de rechercher avec un lien **SoundCloud** ou **Spotify**.\n• Définissez **SoundCloud** comme moteur par défaut dans le Dashboard web.\n• Vérifiez l'état de votre serveur Lavalink dans le Dashboard.`;
+        }
         return interaction.editReply({
-          embeds: [new EmbedBuilder().setDescription(`❌ Erreur lors du chargement : ${err.message}`).setColor('#E74C3C')],
+          embeds: [new EmbedBuilder().setDescription(errorDesc).setColor('#E74C3C')],
         });
       }
     }

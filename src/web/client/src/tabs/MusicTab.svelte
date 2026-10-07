@@ -226,12 +226,12 @@
         <div class="form-group">
           <label for="music_search_provider">Moteur de recherche par défaut</label>
           <select id="music_search_provider" bind:value={searchProvider} disabled={!musicEnabled}>
-            <option value="ytsearch">YouTube (Standard)</option>
+            <option value="scsearch">SoundCloud (Recommandé - Sans blocage IP)</option>
+            <option value="ytsearch">YouTube (Standard - Peut être bloqué)</option>
             <option value="ytmsearch">YouTube Music</option>
-            <option value="scsearch">SoundCloud</option>
             <option value="spsearch">Spotify</option>
           </select>
-          <small style="color:var(--text-muted); font-size:0.75rem;">Utilisé lorsque l'utilisateur tape un mot clé sans coller de lien URL direct.</small>
+          <small style="color:var(--text-muted); font-size:0.75rem;">Utilisé lorsque l'utilisateur tape un mot clé sans coller de lien direct. SoundCloud est recommandé pour éviter les blocages YouTube.</small>
         </div>
 
         <div class="form-group">
@@ -346,6 +346,14 @@
           <Info size={16} style="color: var(--primary);" /> Qu'est-ce que Lavalink ?
         </div>
         Lavalink est un serveur autonome Java optimisé dédié à l'extraction et au streaming audio en temps réel pour Discord. Il prend en charge YouTube, SoundCloud, Spotify, Apple Music et les flux Web radio sans consommer les ressources du bot Pyro. 
+      </div>
+
+      <!-- YouTube Blocking Advice -->
+      <div style="background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.28); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-top: 0.75rem; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+        <div style="display:flex; align-items:center; gap: 6px; font-weight: 600; color: #ffaa00; margin-bottom: 4px;">
+          <AlertCircle size={16} /> Blocage YouTube sur les serveurs d'hébergement
+        </div>
+        YouTube bloque fréquemment les serveurs hébergés en datacenter (erreur <code>AllClientsFailedException: This video requires login</code>). Si vous rencontrez ce problème avec des liens YouTube sur un nœud public gratuit, passez le moteur par défaut sur <strong>SoundCloud</strong> ci-dessus ou écoutez de la musique via SoundCloud / Spotify.
       </div>
     </Card>
 

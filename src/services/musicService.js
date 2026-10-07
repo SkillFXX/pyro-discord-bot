@@ -109,6 +109,8 @@ class MusicService {
             secure,
             retryAmount: 10,
             retryDelay: 8000,
+            requestTimeout: 25000,
+            requestSignalTimeoutMS: 25000,
           },
         ],
         sendToShard: (guildId, payload) => {
@@ -227,16 +229,84 @@ class MusicService {
 
     this.manager.on('trackError', async (player, track, payload) => {
       try {
-        console.warn(`[Music] Erreur lors de la lecture du morceau : ${track.info.title}`, payload);
+        console.warn(`[Music] Erreur lors de la lecture du morceau : ${track?.info?.title || 'Inconnu'}`, payload);
         const textChannel = this.client.channels.cache.get(player.textChannelId);
-        if (textChannel) {
-          const embed = new EmbedBuilder()
-            .setTitle('⚠️ Erreur de Lecture')
-            .setDescription(`Impossible de lire le morceau : **${track.info.title}** (${payload?.message || 'Erreur audio Lavalink'})\nPassage au morceau suivant...`)
-            .setColor('#E74C3C');
-          await textChannel.send({ embeds: [embed] }).catch(() => {});
+
+        const excMsg = payload?.exception?.message || '';
+        const excCause = payload?.exception?.cause || '';
+        const isYoutubeBlock =
+          excMsg.includes('AllClientsFailedException') ||
+          excCause.includes('AllClientsFailedException') ||
+          excMsg.includes('requires login') ||
+          excMsg.includes('No supported audio streams') ||
+          excMsg.includes('This video is unavailable');
+
+        // Automatic fallback to SoundCloud if YouTube blocked the stream
+        if (isYoutubeBlock && !track?.userData?.scFallbackAttempted && track?.info?.title) {
+          try {
+            const scQuery = `${track.info.title} ${track.info.author && track.info.author !== 'Inconnu' ? track.info.author : ''}`.trim();
+            const scRes = await player.search(
+              {
+                query: scQuery,
+                source: 'scsearch',
+              },
+              track.userData?.requester || { id: this.client.user.id, username: 'Pyro' }
+            );
+
+            if (scRes && scRes.tracks && scRes.tracks.length > 0) {
+              const fallbackTrack = scRes.tracks[0];
+              fallbackTrack.userData = {
+                ...(track.userData || {}),
+                scFallbackAttempted: true,
+              };
+
+              if (textChannel) {
+                const embed = new EmbedBuilder()
+                  .setTitle('🔄 Basculement automatique sur SoundCloud')
+                  .setDescription(
+                    `YouTube bloque la lecture directe sur ce serveur Lavalink (*protection bot / connexion requise*).\n\n` +
+                    `Lecture automatique de l'équivalent trouvé sur **SoundCloud** :\n` +
+                    `🎵 **[${fallbackTrack.info.title}](${fallbackTrack.info.uri})**`
+                  )
+                  .setColor('#FF7700')
+                  .setFooter({ text: '💡 Conseil : Choisissez SoundCloud par défaut dans le Dashboard pour éviter ce délai.' });
+                await textChannel.send({ embeds: [embed] }).catch(() => {});
+              }
+
+              player.queue.tracks.unshift(fallbackTrack);
+              await player.play();
+              return;
+            }
+          } catch (scErr) {
+            console.warn('[Music] Échec du fallback automatique SoundCloud :', scErr.message);
+          }
         }
-      } catch (e) {}
+
+        if (textChannel) {
+          if (isYoutubeBlock) {
+            const embed = new EmbedBuilder()
+              .setTitle('⚠️ Blocage YouTube Détecté')
+              .setDescription(
+                `Impossible de diffuser **${track?.info?.title || 'le morceau'}**.\n\n` +
+                `YouTube bloque les requêtes de ce serveur d'hébergement (*AllClientsFailedException / Connexion requise*).\n\n` +
+                `💡 **Solutions recommandées :**\n` +
+                `• Lancez un titre ou une playlist **SoundCloud** ou **Spotify**.\n` +
+                `• Dans le Dashboard web > **Musique**, définissez le moteur par défaut sur **SoundCloud**.\n` +
+                `• Ou connectez un serveur Lavalink privé configuré avec des cookies YouTube.`
+              )
+              .setColor('#E74C3C');
+            await textChannel.send({ embeds: [embed] }).catch(() => {});
+          } else {
+            const embed = new EmbedBuilder()
+              .setTitle('⚠️ Erreur de Lecture')
+              .setDescription(`Impossible de lire le morceau : **${track?.info?.title || 'Inconnu'}** (${payload?.message || payload?.exception?.message || 'Erreur audio Lavalink'})\nPassage au morceau suivant...`)
+              .setColor('#E74C3C');
+            await textChannel.send({ embeds: [embed] }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.error('[Music] Erreur dans le gestionnaire trackError :', e);
+      }
     });
   }
 
