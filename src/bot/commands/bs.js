@@ -13,16 +13,16 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('link')
-        .setDescription('Lier son compte Discord à un profil Brawl Stars.')
+        .setDescription('Lier son compte Discord (ou laisser le tag vide pour dissocier).')
         .addStringOption(option =>
           option
             .setName('tag')
-            .setDescription('Votre tag joueur Brawl Stars (ex: #2YQ0U9P9 ou 2YQ0U9P9)')
-            .setRequired(true))
+            .setDescription('Votre tag joueur Brawl Stars (ex: #2YQ0U9P9). Laissez vide pour dissocier.')
+            .setRequired(false))
         .addUserOption(option =>
           option
             .setName('membre')
-            .setDescription('(Admin uniquement) Lier le profil pour un autre membre')
+            .setDescription('(Admin uniquement) Membre Discord cible')
             .setRequired(false)))
 
     // Subcommand: profil
@@ -75,23 +75,72 @@ module.exports = {
     const accentColor = ConfigHelper.getSync('embed_color', embeds.COLORS.PRIMARY) || '#FF6B35';
 
     // ==========================================
-    // 1. SUBCOMMAND: LINK
+    // 1. SUBCOMMAND: LINK (ou UNLINK si tag vide)
     // ==========================================
     if (subcommand === 'link') {
       const inputTag = interaction.options.getString('tag');
       const targetUser = interaction.options.getUser('membre') || interaction.user;
 
-      // Check admin permission if linking for another user
+      // Check admin permission if linking or unlinking for another user
       if (targetUser.id !== interaction.user.id) {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
           return interaction.reply({
-            embeds: [embeds.error('Vous devez disposer de la permission `Gérer le serveur` pour lier le profil d\'un autre membre.')],
+            embeds: [embeds.error('Vous devez disposer de la permission `Gérer le serveur` pour gérer le profil d\'un autre membre.')],
             flags: MessageFlags.Ephemeral,
           });
         }
       }
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      // Si le tag n'est pas renseigné, on dissocie (unlink)
+      if (!inputTag || !inputTag.trim()) {
+        try {
+          const linkedUser = await BrawlStarsUser.findByPk(targetUser.id);
+          if (!linkedUser) {
+            const isSelf = targetUser.id === interaction.user.id;
+            const msg = isSelf
+              ? 'Vous n\'avez aucun compte Brawl Stars lié actuellement.'
+              : `${targetUser} n'a aucun compte Brawl Stars lié.`;
+            return interaction.editReply({ embeds: [embeds.warning(msg)] });
+          }
+
+          const tag = linkedUser.playerTag;
+
+          // Clean up managed Brawl Stars roles from member
+          const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+          if (guildMember) {
+            await brawlStarsService.syncUserRoles(client, guildMember, {
+              trophies: 0,
+              highestTrophies: 0,
+              rankedRank: 0,
+              highestRankedRank: 0,
+            });
+          }
+
+          // Remove from database
+          await BrawlStarsUser.destroy({ where: { userId: targetUser.id } });
+          await BrawlStarsTrophyLog.destroy({ where: { userId: targetUser.id } });
+
+          const isSelf = targetUser.id === interaction.user.id;
+          const desc = isSelf
+            ? `Votre compte Discord a bien été dissocié du profil Brawl Stars (\`${tag}\`). Les rôles associés ont été retirés.`
+            : `Le compte Brawl Stars (\`${tag}\`) de ${targetUser} a bien été dissocié. Les rôles associés ont été retirés.`;
+
+          const embed = embeds.custom(
+            '🔓 Compte Brawl Stars Dissocié',
+            desc,
+            embeds.COLORS.SUCCESS
+          );
+
+          return interaction.editReply({ embeds: [embed] });
+        } catch (err) {
+          console.error('[Command /bs link (unlink)] Erreur :', err);
+          return interaction.editReply({
+            embeds: [embeds.error(err.message || 'Erreur lors de la dissociation du compte.')],
+          });
+        }
+      }
 
       try {
         const cleanTag = brawlStarsService.normalizePlayerTag(inputTag);
@@ -331,3 +380,4 @@ module.exports = {
     }
   },
 };
+
