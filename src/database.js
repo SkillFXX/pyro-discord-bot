@@ -416,6 +416,10 @@ const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  highestRankedRank: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
   lastCheckedAt: {
     type: DataTypes.DATE,
     allowNull: true,

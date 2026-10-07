@@ -106,92 +106,42 @@ async function getApiKey() {
 }
 
 /**
- * Fetches recent battle log for a player from official Brawl Stars API.
- * @param {string} playerTag
- * @param {string} apiKey
- * @returns {Promise<object|null>}
- */
-async function fetchBattlelog(playerTag, apiKey) {
-  try {
-    const cleanTag = normalizePlayerTag(playerTag);
-    const encodedTag = encodeURIComponent(cleanTag);
-    const url = `https://api.brawlstars.com/v1/players/${encodedTag}/battlelog`;
-
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extracts the latest/highest Ranked mode tier index (1 to 22) from a player's battlelog.
- * In Brawl Stars API, ranked matches have battle.type: 'soloRanked' / 'teamRanked' / 'ranked'
- * and the participant brawler's trophies field contains the Ranked Tier ID (1 = Bronze I, ... 22 = Pro).
- * @param {object} battlelog
- * @param {string} playerTag
+ * Converts Ranked Elo points (or tier ID) into the corresponding Ranked Tier index (1..22).
+ * Supports both Ranked 2.0 (standard progression points) and direct tier indices.
+ * @param {number} elo
  * @returns {number}
  */
-function extractRankedTierFromBattlelog(battlelog, playerTag) {
-  if (!battlelog || !Array.isArray(battlelog.items)) return 0;
-  const cleanTag = normalizePlayerTag(playerTag);
+function convertEloToRankedTier(elo) {
+  if (typeof elo !== 'number' || isNaN(elo) || elo <= 0) return 0;
 
-  let latestRankedTier = 0;
-  let highestRankedTier = 0;
+  // If already a rank tier ID (1 to 22)
+  if (elo >= 1 && elo <= 22) return elo;
 
-  for (const item of battlelog.items) {
-    const battle = item.battle;
-    if (!battle) continue;
+  // Ranked points thresholds
+  if (elo >= 11250) return 22; // Pro
+  if (elo >= 10250) return 21; // Maître III (Master III)
+  if (elo >= 9250) return 20;  // Maître II (Master II)
+  if (elo >= 8250) return 19;  // Maître I (Master I)
+  if (elo >= 7500) return 18;  // Légendaire III
+  if (elo >= 6750) return 17;  // Légendaire II
+  if (elo >= 6000) return 16;  // Légendaire I
+  if (elo >= 5500) return 15;  // Mythique III
+  if (elo >= 5000) return 14;  // Mythique II
+  if (elo >= 4500) return 13;  // Mythique I
+  if (elo >= 4000) return 12;  // Diamant III
+  if (elo >= 3500) return 11;  // Diamant II
+  if (elo >= 3000) return 10;  // Diamant I
+  if (elo >= 2500) return 9;   // Or III
+  if (elo >= 2000) return 8;   // Or II
+  if (elo >= 1500) return 7;   // Or I
+  if (elo >= 1250) return 6;   // Argent III
+  if (elo >= 1000) return 5;   // Argent II
+  if (elo >= 750) return 4;    // Argent I
+  if (elo >= 500) return 3;    // Bronze III
+  if (elo >= 250) return 2;    // Bronze II
+  if (elo > 0) return 1;       // Bronze I
 
-    const battleType = (battle.type || '').toLowerCase();
-    const battleMode = (battle.mode || '').toLowerCase();
-    const isRanked = battleType.includes('ranked') || battleMode.includes('ranked');
-
-    if (!isRanked) continue;
-
-    let playerObj = null;
-
-    if (Array.isArray(battle.teams)) {
-      for (const team of battle.teams) {
-        if (Array.isArray(team)) {
-          const found = team.find(p => p && normalizePlayerTag(p.tag) === cleanTag);
-          if (found) {
-            playerObj = found;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!playerObj && Array.isArray(battle.players)) {
-      playerObj = battle.players.find(p => p && normalizePlayerTag(p.tag) === cleanTag);
-    }
-
-    if (!playerObj && battle.starPlayer && normalizePlayerTag(battle.starPlayer.tag) === cleanTag) {
-      playerObj = battle.starPlayer;
-    }
-
-    if (playerObj && playerObj.brawler && typeof playerObj.brawler.trophies === 'number') {
-      const tier = playerObj.brawler.trophies;
-      if (tier >= 1 && tier <= 30) {
-        if (latestRankedTier === 0) {
-          latestRankedTier = tier;
-        }
-        if (tier > highestRankedTier) {
-          highestRankedTier = tier;
-        }
-      }
-    }
-  }
-
-  return latestRankedTier || highestRankedTier || 0;
+  return 0;
 }
 
 /**
@@ -213,53 +163,50 @@ async function fetchPlayerData(playerTag) {
   const encodedTag = encodeURIComponent(cleanTag);
   const url = `https://api.brawlstars.com/v1/players/${encodedTag}`;
 
-  let playerRes;
-  let battlelog = null;
-
+  let response;
   try {
-    const [pRes, bLog] = await Promise.all([
-      fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
-        },
-      }),
-      fetchBattlelog(cleanTag, apiKey),
-    ]);
-    playerRes = pRes;
-    battlelog = bLog;
+    response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json',
+      },
+    });
   } catch (netErr) {
     throw new Error(`Erreur réseau lors de la communication avec l'API Brawl Stars : ${netErr.message}`);
   }
 
-  if (playerRes.status === 404) {
+  if (response.status === 404) {
     throw new Error(`Le joueur avec le tag **${cleanTag}** est introuvable. Vérifiez que le tag est correct.`);
   }
 
-  if (playerRes.status === 403) {
+  if (response.status === 403) {
     throw new Error('Accès refusé par l\'API Brawl Stars (Code 403). L\'adresse IP de ce serveur est **193.51.159.240**. Pensez à l\'autoriser dans votre clé sur https://developer.brawlstars.com/.');
   }
 
-  if (!playerRes.ok) {
-    throw new Error(`Erreur API Brawl Stars (${playerRes.status} ${playerRes.statusText})`);
+  if (!response.ok) {
+    throw new Error(`Erreur API Brawl Stars (${response.status} ${response.statusText})`);
   }
 
-  const data = await playerRes.json();
+  const data = await response.json();
 
-  // Extract Ranked Tier from battlelog or DB fallback
-  let rankedRank = extractRankedTierFromBattlelog(battlelog, cleanTag);
-  if (!rankedRank) {
-    try {
-      const existingUser = await BrawlStarsUser.findOne({ where: { playerTag: cleanTag } });
-      if (existingUser && existingUser.lastRankedRank) {
-        rankedRank = existingUser.lastRankedRank;
-      }
-    } catch (_) {}
-  }
+  // Extract Peak Ranked Elo & Tier from official player object
+  const rawElo = (
+    data.highestAllTimeRankedElo ??
+    data.highestRankedElo ??
+    data.rankedElo ??
+    data.highestRank ??
+    data.soloLeagueRank ??
+    0
+  );
 
-  data.rankedRank = rankedRank;
-  data.highestRank = rankedRank;
-  data.soloLeagueRank = rankedRank;
+  const bestRank = convertEloToRankedTier(Number(rawElo));
+
+  data.rankedElo = rawElo;
+  data.highestAllTimeRankedElo = data.highestAllTimeRankedElo || rawElo;
+  data.rankedRank = bestRank;
+  data.highestRank = bestRank;
+  data.highestRankedRank = bestRank;
+  data.soloLeagueRank = bestRank;
 
   return data;
 }
@@ -347,7 +294,7 @@ function getExpectedRoleIds(currentValue, rewards) {
 }
 
 /**
- * Synchronizes Brawl Stars roles for a Discord member based on their stats.
+ * Synchronizes Brawl Stars roles for a Discord member based on their stats (peak trophies and best rank).
  */
 async function syncUserRoles(client, member, playerData) {
   if (!member || !member.guild) return { added: [], removed: [] };
@@ -362,17 +309,29 @@ async function syncUserRoles(client, member, playerData) {
   ]);
 
   const currentTrophies = playerData.trophies || 0;
-  let currentRankedIndex = playerData.rankedRank || playerData.highestRank || playerData.soloLeagueRank || playerData.lastRankedRank || 0;
+  let bestRankedIndex = Math.max(
+    playerData.highestRankedRank || 0,
+    playerData.rankedRank || 0,
+    playerData.highestRank || 0,
+    playerData.soloLeagueRank || 0,
+    playerData.lastRankedRank || 0
+  );
 
-  if (!currentRankedIndex && member && member.id) {
-    const dbUser = await BrawlStarsUser.findByPk(member.id);
-    if (dbUser && dbUser.lastRankedRank) {
-      currentRankedIndex = dbUser.lastRankedRank;
-    }
+  if (member && member.id) {
+    try {
+      const dbUser = await BrawlStarsUser.findByPk(member.id);
+      if (dbUser) {
+        bestRankedIndex = Math.max(
+          bestRankedIndex,
+          dbUser.highestRankedRank || 0,
+          dbUser.lastRankedRank || 0
+        );
+      }
+    } catch (_) {}
   }
 
   const expectedTrophyRoles = getExpectedRoleIds(currentTrophies, trophyRewards);
-  const expectedRankedRoles = currentRankedIndex > 0 ? getExpectedRoleIds(currentRankedIndex, rankedRewards) : new Set();
+  const expectedRankedRoles = bestRankedIndex > 0 ? getExpectedRoleIds(bestRankedIndex, rankedRewards) : new Set();
 
   const allExpectedRoleIds = new Set([...expectedTrophyRoles, ...expectedRankedRoles]);
   const allManagedRoleIds = new Set([
@@ -640,8 +599,7 @@ module.exports = {
   normalizePlayerTag,
   getApiKey,
   fetchPlayerData,
-  fetchBattlelog,
-  extractRankedTierFromBattlelog,
+  convertEloToRankedTier,
   fetchSpotlightCard,
   validatePlayerTagViaSpotlight,
   getExpectedRoleIds,

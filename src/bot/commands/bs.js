@@ -107,7 +107,19 @@ module.exports = {
           }
         }
 
+        const existingUser = await BrawlStarsUser.findByPk(targetUser.id);
+        const bestRank = Math.max(
+          existingUser?.highestRankedRank || 0,
+          existingUser?.lastRankedRank || 0,
+          playerData?.highestRankedRank || 0,
+          playerData?.rankedRank || 0
+        );
+
         if (playerData) {
+          playerData.highestRankedRank = bestRank;
+          playerData.rankedRank = bestRank;
+          playerData.highestRank = bestRank;
+
           // Save or update user link with fresh official data
           await BrawlStarsUser.upsert({
             userId: targetUser.id,
@@ -115,14 +127,15 @@ module.exports = {
             playerName: playerData.name || 'Brawler',
             lastTrophies: playerData.trophies || 0,
             highestTrophies: playerData.highestTrophies || 0,
-            lastRankedRank: playerData.highestRank || playerData.soloLeagueRank || 0,
+            lastRankedRank: bestRank,
+            highestRankedRank: bestRank,
             lastCheckedAt: new Date(),
           });
 
           // Record trophy snapshot
           await brawlStarsService.recordTrophySnapshot(targetUser.id, cleanTag, playerData.trophies || 0);
 
-          // Sync guild roles based on trophies and ranked tiers
+          // Sync guild roles based on trophies and peak ranked tiers
           const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
           let roleSummary = 'Aucun nouveau rôle attribué.';
 
@@ -136,11 +149,15 @@ module.exports = {
             }
           }
 
+          const rankTierObj = brawlStarsService.RANKED_TIERS.find(t => t.id === bestRank);
+          const rankLabel = rankTierObj ? rankTierObj.name : (bestRank > 0 ? `Rang ${bestRank}` : 'Non classé');
+
           const linkEmbed = embeds.custom(
             '🎮 Compte Brawl Stars Lié !',
             `Le compte Discord de ${targetUser} a été lié avec succès au joueur Brawl Stars **${playerData.name}** (\`${cleanTag}\`).\n\n` +
             `**🏆 Trophées actuels :** ${Number(playerData.trophies || 0).toLocaleString('fr-FR')}\n` +
-            `**👑 Record :** ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')}\n` +
+            `**👑 Record de trophées :** ${Number(playerData.highestTrophies || 0).toLocaleString('fr-FR')}\n` +
+            `**🎖️ Meilleur rang Ranked :** ${rankLabel}\n` +
             `**⚔️ Victoires 3v3 :** ${Number(playerData['3vs3Victories'] || 0).toLocaleString('fr-FR')}\n\n` +
             `**Gestion des Rôles :**\n${roleSummary}`,
             embeds.COLORS.SUCCESS,
@@ -157,7 +174,8 @@ module.exports = {
             playerName: 'Brawler',
             lastTrophies: 0,
             highestTrophies: 0,
-            lastRankedRank: 0,
+            lastRankedRank: bestRank,
+            highestRankedRank: bestRank,
             lastCheckedAt: new Date(),
           });
 
