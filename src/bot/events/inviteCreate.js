@@ -1,9 +1,12 @@
 const loggerService = require('../../services/loggerService');
+const inviteService = require('../../services/inviteService');
 
 module.exports = {
   name: 'inviteCreate',
   async execute(invite, client) {
     try {
+      inviteService.onInviteCreate(invite);
+
       const inviter = invite.inviter ? `${invite.inviter} (\`${invite.inviter.tag}\`)` : 'Inconnu';
       const channel = invite.channel ? `${invite.channel} (\`#${invite.channel.name}\`)` : 'Inconnu';
       const expires = invite.expiresAt ? `<t:${Math.floor(invite.expiresTimestamp / 1000)}:R>` : 'Jamais';

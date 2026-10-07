@@ -1,9 +1,12 @@
 const loggerService = require('../../services/loggerService');
+const inviteService = require('../../services/inviteService');
 
 module.exports = {
   name: 'inviteDelete',
   async execute(invite, client) {
     try {
+      inviteService.onInviteDelete(invite);
+
       const channel = invite.channel ? `${invite.channel} (\`#${invite.channel.name}\`)` : 'Inconnu';
 
       await loggerService.log(client, 'log_discord_invites', {

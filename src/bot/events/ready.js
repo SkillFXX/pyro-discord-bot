@@ -46,6 +46,10 @@ module.exports = {
     const voiceXpService = require('../../services/voiceXpService');
     voiceXpService.start(client);
 
+    // Initialize Invite Tracking Service
+    const inviteService = require('../../services/inviteService');
+    await inviteService.init(client);
+
     // Send Boot / Startup Log
     try {
       const loggerService = require('../../services/loggerService');

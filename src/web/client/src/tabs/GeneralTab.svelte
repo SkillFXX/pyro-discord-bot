@@ -133,7 +133,7 @@
           bind:value={config.welcome_message_template}
           placeholder={"Bienvenue {user} sur {server} !"}
         />
-        <p class="help-text">Variables : <code>{'{user}'}</code>, <code>{'{username}'}</code>, <code>{'{server}'}</code>, <code>{'{memberCount}'}</code></p>
+        <p class="help-text">Variables : <code>{'{user}'}</code>, <code>{'{username}'}</code>, <code>{'{server}'}</code>, <code>{'{memberCount}'}</code>, <code>{'{inviter}'}</code>, <code>{'{invites}'}</code>, <code>{'{inviterUsername}'}</code>, <code>{'{inviteCode}'}</code></p>
       </div>
 
       <div class="form-group">
@@ -144,6 +144,7 @@
           bind:value={config.leave_message_template}
           placeholder={"{username} a quitté le serveur."}
         />
+        <p class="help-text">Variables : <code>{'{user}'}</code>, <code>{'{username}'}</code>, <code>{'{server}'}</code>, <code>{'{memberCount}'}</code>, <code>{'{inviter}'}</code>, <code>{'{invites}'}</code>, <code>{'{inviterUsername}'}</code></p>
       </div>
     </Card>
 

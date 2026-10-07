@@ -15,7 +15,30 @@ module.exports = {
     // Update member counter channel (rate-limit safe)
     memberCounterService.updateMemberCounter(guild).catch(() => {});
 
-    // Goodbye Message
+    // 1. Invite Tracking on Leave
+    let leaveInviteData = null;
+    try {
+      const inviteService = require('../../services/inviteService');
+      leaveInviteData = await inviteService.onMemberLeave(member);
+    } catch (invErr) {
+      console.error('[GuildMemberRemove] Erreur suivi invitation départ :', invErr);
+    }
+
+    const inviterMention = leaveInviteData?.inviter
+      ? `<@${leaveInviteData.inviter.id}>`
+      : (leaveInviteData?.inviterId ? `<@${leaveInviteData.inviterId}>` : 'Inconnu');
+
+    const inviterUsername = leaveInviteData?.inviter
+      ? (leaveInviteData.inviter.displayName || leaveInviteData.inviter.username)
+      : 'Inconnu';
+
+    const inviterTag = leaveInviteData?.inviter
+      ? (leaveInviteData.inviter.tag || leaveInviteData.inviter.username)
+      : 'Inconnu';
+
+    const invitesCount = (leaveInviteData?.totalInvites ?? 0).toString();
+
+    // 2. Goodbye Message
     try {
       const leaveChannelId = await ConfigHelper.get('leave_channel_id');
       const leaveMessageTemplate = await ConfigHelper.get('leave_message_template');
@@ -26,11 +49,17 @@ module.exports = {
           const username = member.user?.username || member.displayName || 'Un membre';
           const avatar = member.user?.displayAvatarURL ? member.user.displayAvatarURL({ dynamic: true }) : null;
 
-          // Replace placeholders (cannot use {user} as mention since they left, but we can do username)
+          // Replace placeholders
           const formattedMessage = leaveMessageTemplate
+            .replace(/{user}/g, username)
             .replace(/{username}/g, username)
             .replace(/{server}/g, guild.name)
-            .replace(/{memberCount}/g, guild.memberCount.toString());
+            .replace(/{memberCount}/g, guild.memberCount.toString())
+            .replace(/{inviter}/g, inviterMention)
+            .replace(/{inviterUsername}/g, inviterUsername)
+            .replace(/{inviterTag}/g, inviterTag)
+            .replace(/{invites}/g, invitesCount)
+            .replace(/{inviteCount}/g, invitesCount);
 
           const embed = embeds.custom(
             `📤 Départ du Serveur`,
@@ -47,7 +76,7 @@ module.exports = {
       console.error('[Leave Event] Erreur lors de l\'envoi du message de départ :', error);
     }
 
-    // Discord Logs : Membre Parti / Expulsé
+    // 3. Discord Logs : Membre Parti / Expulsé
     try {
       let isKick = false;
       let kicker = null;
@@ -69,6 +98,10 @@ module.exports = {
         }
       }
 
+      const inviteLeaveField = leaveInviteData?.inviterId ? [
+        { name: '🔗 Invité à l\'origine par', value: `${inviterMention} (A désormais **${invitesCount}** invites)`, inline: true }
+      ] : [];
+
       if (isKick) {
         await loggerService.log(client, 'log_discord_kicks', {
           title: '👢 Membre Expulsé (Kick)',
@@ -78,6 +111,7 @@ module.exports = {
           fields: [
             { name: '👤 Utilisateur', value: `${member.user?.tag || 'Inconnu'} (\`${member.id}\`)`, inline: true },
             { name: '🛡️ Expulsé par', value: kicker ? `${kicker.tag} (\`${kicker.id}\`)` : 'Inconnu', inline: true },
+            ...inviteLeaveField,
             { name: '📝 Motif', value: kickReason, inline: false },
           ],
           footer: { text: `Membre ID: ${member.id}` }
@@ -91,6 +125,7 @@ module.exports = {
           fields: [
             { name: '👤 Utilisateur', value: `${member.user?.tag || 'Inconnu'} (\`${member.id}\`)`, inline: true },
             { name: '👥 Membres Restants', value: `${guild.memberCount}`, inline: true },
+            ...inviteLeaveField,
           ],
           footer: { text: `Membre ID: ${member.id}` }
         });

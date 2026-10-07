@@ -15,7 +15,29 @@ module.exports = {
     // Update member counter channel (rate-limit safe)
     memberCounterService.updateMemberCounter(guild).catch(() => {});
 
-    // 1. Auto-Roles
+    // 1. Invite Tracking
+    let inviteData = {
+      inviter: null,
+      inviterMember: null,
+      inviteCode: null,
+      isVanity: false,
+      isFake: false,
+      totalInvites: 0,
+    };
+    try {
+      const inviteService = require('../../services/inviteService');
+      inviteData = await inviteService.findInviterOnJoin(member);
+    } catch (invErr) {
+      console.error('[GuildMemberAdd] Erreur suivi invitation :', invErr);
+    }
+
+    const inviterMention = inviteData.inviter ? `<@${inviteData.inviter.id}>` : (inviteData.isVanity ? 'URL Personnalisée' : 'Inconnu');
+    const inviterUsername = inviteData.inviter ? (inviteData.inviter.displayName || inviteData.inviter.username) : (inviteData.isVanity ? 'Vanity' : 'Inconnu');
+    const inviterTag = inviteData.inviter ? (inviteData.inviter.tag || inviteData.inviter.username) : (inviteData.isVanity ? 'Vanity' : 'Inconnu');
+    const invitesCount = (inviteData.totalInvites || 0).toString();
+    const inviteCodeStr = inviteData.inviteCode || (inviteData.isVanity ? 'Vanity' : 'Inconnu');
+
+    // 2. Auto-Roles
     try {
       const autoRoles = await AutoRole.findAll();
       if (autoRoles.length > 0) {
@@ -43,7 +65,7 @@ module.exports = {
       console.error('[Auto-Role] Erreur lors de l\'attribution des rôles automatiques :', error);
     }
 
-    // 2. Welcome Message
+    // 3. Welcome Message
     try {
       const welcomeChannelId = await ConfigHelper.get('welcome_channel_id');
       const welcomeMessageTemplate = await ConfigHelper.get('welcome_message_template');
@@ -56,7 +78,13 @@ module.exports = {
             .replace(/{user}/g, `${member}`)
             .replace(/{username}/g, member.user.username)
             .replace(/{server}/g, guild.name)
-            .replace(/{memberCount}/g, guild.memberCount.toString());
+            .replace(/{memberCount}/g, guild.memberCount.toString())
+            .replace(/{inviter}/g, inviterMention)
+            .replace(/{inviterUsername}/g, inviterUsername)
+            .replace(/{inviterTag}/g, inviterTag)
+            .replace(/{invites}/g, invitesCount)
+            .replace(/{inviteCount}/g, invitesCount)
+            .replace(/{inviteCode}/g, inviteCodeStr);
 
           const embed = embeds.custom(
             `👋 Nouveau Membre !`,
@@ -73,7 +101,7 @@ module.exports = {
       console.error('[Welcome Event] Erreur lors de l\'envoi du message de bienvenue :', error);
     }
 
-    // 3. Log Discord Member / Bot Join
+    // 4. Log Discord Member / Bot Join
     try {
       const accountCreatedAt = Math.floor(member.user.createdTimestamp / 1000);
       if (member.user.bot) {
@@ -90,6 +118,13 @@ module.exports = {
           footer: { text: `Bot ID: ${member.id}` }
         });
       } else {
+        let inviteFieldValue = '❓ Inconnue';
+        if (inviteData.inviter) {
+          inviteFieldValue = `${inviterMention} (\`${inviteCodeStr}\` • **${invitesCount}** invites)`;
+        } else if (inviteData.isVanity) {
+          inviteFieldValue = '🔗 URL Personnalisée (Vanity)';
+        }
+
         await loggerService.log(client, 'log_discord_member_join', {
           title: '📥 Nouveau Membre Arrivé',
           description: `${member} (\`${member.user.tag}\`) a rejoint le serveur.`,
@@ -99,6 +134,7 @@ module.exports = {
             { name: '👤 Utilisateur', value: `${member.user.tag} (\`${member.id}\`)`, inline: true },
             { name: '📅 Création du Compte', value: `<t:${accountCreatedAt}:R>`, inline: true },
             { name: '👥 Membres Totaux', value: `${guild.memberCount}`, inline: true },
+            { name: '🔗 Invitation', value: inviteFieldValue, inline: true },
           ],
           footer: { text: `Membre ID: ${member.id}` }
         });

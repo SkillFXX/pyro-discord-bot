@@ -545,6 +545,91 @@ const FormSubmission = sequelize.define('FormSubmission', {
   ],
 });
 
+// 20. UserInvite: Aggregated invite stats for an inviter per guild
+const UserInvite = sequelize.define('UserInvite', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  guildId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  regular: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  bonus: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  leaves: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  fake: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+}, {
+  indexes: [
+    { unique: true, fields: ['guildId', 'userId'] },
+    { fields: ['guildId'] },
+    { fields: ['userId'] },
+  ],
+});
+
+// 21. MemberInvite: Origin record for each member on a guild (who invited them, invite code, date)
+const MemberInvite = sequelize.define('MemberInvite', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  guildId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  inviterId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  inviteCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  isVanity: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isFake: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  joinedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+  leftAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+}, {
+  indexes: [
+    { unique: true, fields: ['guildId', 'userId'] },
+    { fields: ['guildId', 'inviterId'] },
+  ],
+});
+
 // In-memory cache for fast and synchronous access
 const configMemoryCache = new Map();
 
@@ -718,6 +803,8 @@ module.exports = {
   BrawlStarsTrophyLog,
   CustomMessage,
   FormSubmission,
+  UserInvite,
+  MemberInvite,
   ConfigHelper,
   LOG_CONFIG_KEYS,
 };
