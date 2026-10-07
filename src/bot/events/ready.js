@@ -50,6 +50,10 @@ module.exports = {
     const inviteService = require('../../services/inviteService');
     await inviteService.init(client);
 
+    // Initialize Lavalink Music Service
+    const musicService = require('../../services/musicService');
+    await musicService.init(client);
+
     // Send Boot / Startup Log
     try {
       const loggerService = require('../../services/loggerService');

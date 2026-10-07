@@ -19,6 +19,7 @@ export const dashboardData = writable({
   roleXpMultipliers: [],
   logConfigKeys: [],
   brawlStarsRewards: [],
+  musicStatus: null,
 });
 
 function getHeaders() {
@@ -44,6 +45,7 @@ export async function loadDashboardData() {
         roles: data.roles || [],
         members: data.members || [],
         config: data.config || {},
+        musicStatus: data.musicStatus || null,
         autoRoles: data.autoRoles || [],
         warnActions: data.warnActions || [],
         roleRewards: data.roleRewards || [],
@@ -666,6 +668,32 @@ export async function deleteFormSubmission(formId, subId) {
     showToast('Erreur lors de la suppression', 'error');
   }
   return false;
+}
+
+// Music Helpers
+export async function testLavalinkNode(credentials) {
+  try {
+    const res = await fetch('/api/music/test-node', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(credentials),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function fetchMusicStatus() {
+  try {
+    const res = await fetch('/api/music/status', { headers: getHeaders() });
+    if (res.ok) {
+      const musicStatus = await res.json();
+      dashboardData.update((d) => ({ ...d, musicStatus }));
+      return musicStatus;
+    }
+  } catch (e) {}
+  return null;
 }
 
 

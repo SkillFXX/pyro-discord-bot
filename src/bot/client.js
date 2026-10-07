@@ -25,4 +25,11 @@ const client = new Client({
 // Collections for commands
 client.commands = new Collection();
 
+// Forward raw Discord gateway packets to Lavalink for voice server & state updates
+client.on('raw', (d) => {
+  if (client.lavalink) {
+    client.lavalink.sendRawData(d);
+  }
+});
+
 module.exports = client;

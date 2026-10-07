@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn, Gamepad2, MessageSquarePlus } from '@lucide/svelte';
+  import { Settings, Palette, Shield, Bot, Award, Ticket, Scroll, ChartNoAxesColumn, Gamepad2, MessageSquarePlus, Music } from '@lucide/svelte';
   import { auth } from '../stores/auth';
 
   export let currentTab = 'general';
@@ -69,6 +69,17 @@
         { id: 'brawlstars-api', label: 'Clé API Brawl Stars' },
         { id: 'brawlstars-trophies', label: 'Paliers Trophées' },
         { id: 'brawlstars-ranked', label: 'Paliers Ranked' },
+      ],
+    },
+    {
+      id: 'music',
+      label: 'Musique',
+      icon: Music,
+      sections: [
+        { id: 'music-settings', label: 'Paramètres Généraux' },
+        { id: 'music-lavalink', label: 'Serveur Lavalink' },
+        { id: 'music-permissions', label: 'Permissions & Salons' },
+        { id: 'music-guide', label: 'Commandes /music' },
       ],
     },
     {

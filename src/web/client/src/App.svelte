@@ -21,6 +21,7 @@
   import TicketsTab from './tabs/TicketsTab.svelte';
   import LogsTab from './tabs/LogsTab.svelte';
   import AnalyticsTab from './tabs/AnalyticsTab.svelte';
+  import MusicTab from './tabs/MusicTab.svelte';
 
   let currentTab = 'general';
   let currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
@@ -87,6 +88,8 @@
           <LevelsTab />
         {:else if currentTab === 'gaming' && $auth.permissions?.isAdmin}
           <GamingTab />
+        {:else if currentTab === 'music' && $auth.permissions?.isAdmin}
+          <MusicTab />
         {:else if currentTab === 'tickets' && $auth.permissions?.isAdmin}
           <TicketsTab />
         {:else if currentTab === 'logs' && $auth.permissions?.isAdmin}

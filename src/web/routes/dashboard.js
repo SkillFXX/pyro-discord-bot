@@ -35,6 +35,9 @@ function createDashboardRouter(client, distDir) {
         'xp_voice_enabled', 'xp_voice_gain', 'xp_voice_interval_seconds', 'xp_voice_min_members', 'xp_voice_ignore_muted', 'xp_voice_ignore_deafened',
         'xp_public_leaderboard', 'xp_leaderboard_search',
         'brawlstars_api_key',
+        'music_enabled', 'music_lavalink_host', 'music_lavalink_port', 'music_lavalink_pass',
+        'music_lavalink_secure', 'music_allowed_roles', 'music_allowed_channels',
+        'music_default_volume', 'music_search_provider', 'music_247',
         ...logKeys
       ];
 
@@ -51,6 +54,8 @@ function createDashboardRouter(client, distDir) {
         id: client.user ? client.user.id : ''
       };
 
+      const musicService = require('../../services/musicService');
+
       res.json({
         guildId: process.env.GUILD_ID,
         serverName: guildContext.guildName,
@@ -61,6 +66,7 @@ function createDashboardRouter(client, distDir) {
         user: req.session.user || null,
         permissions: req.session.permissions || null,
         config: isAdmin ? config : {},
+        musicStatus: isAdmin ? musicService.getStatus() : null,
         logConfigKeys: isAdmin ? LOG_CONFIG_KEYS : [],
         ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [], roleXpMultipliers: [], brawlStarsRewards: [] })
       });

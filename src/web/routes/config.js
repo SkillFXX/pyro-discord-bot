@@ -93,6 +93,43 @@ async function handleConfigSave(section, body, client) {
     if (body.brawlstars_api_key !== undefined) {
       await ConfigHelper.set('brawlstars_api_key', (body.brawlstars_api_key || '').trim());
     }
+  } else if (section === 'music') {
+    if (body.music_enabled !== undefined) {
+      await ConfigHelper.set('music_enabled', body.music_enabled === true || body.music_enabled === 'true');
+    }
+    if (body.music_lavalink_host !== undefined) {
+      await ConfigHelper.set('music_lavalink_host', (body.music_lavalink_host || '').trim());
+    }
+    if (body.music_lavalink_port !== undefined) {
+      await ConfigHelper.set('music_lavalink_port', parseInt(body.music_lavalink_port || 2333, 10));
+    }
+    if (body.music_lavalink_pass !== undefined) {
+      await ConfigHelper.set('music_lavalink_pass', body.music_lavalink_pass || '');
+    }
+    if (body.music_lavalink_secure !== undefined) {
+      await ConfigHelper.set('music_lavalink_secure', body.music_lavalink_secure === true || body.music_lavalink_secure === 'true');
+    }
+    if (body.music_allowed_roles !== undefined) {
+      const roles = Array.isArray(body.music_allowed_roles) ? body.music_allowed_roles : [];
+      await ConfigHelper.set('music_allowed_roles', roles);
+    }
+    if (body.music_allowed_channels !== undefined) {
+      const channels = Array.isArray(body.music_allowed_channels) ? body.music_allowed_channels : [];
+      await ConfigHelper.set('music_allowed_channels', channels);
+    }
+    if (body.music_default_volume !== undefined) {
+      const vol = Math.min(100, Math.max(1, parseInt(body.music_default_volume || 80, 10)));
+      await ConfigHelper.set('music_default_volume', vol);
+    }
+    if (body.music_search_provider !== undefined) {
+      await ConfigHelper.set('music_search_provider', body.music_search_provider || 'ytsearch');
+    }
+    if (body.music_247 !== undefined) {
+      await ConfigHelper.set('music_247', body.music_247 === true || body.music_247 === 'true');
+    }
+
+    const musicService = require('../../services/musicService');
+    await musicService.reconfigure(client);
   }
 }
 
@@ -113,8 +150,31 @@ function createConfigRouter(client) {
     }
   });
 
+  // Test Lavalink node connection endpoint
+  router.post('/api/music/test-node', requireAdmin, async (req, res) => {
+    try {
+      const { host, port, pass, secure } = req.body;
+      const musicService = require('../../services/musicService');
+      const result = await musicService.testNode({
+        host: (host || '').trim(),
+        port: parseInt(port || 2333, 10),
+        pass: pass || '',
+        secure: secure === true || secure === 'true',
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get live music status
+  router.get('/api/music/status', requireAdmin, (req, res) => {
+    const musicService = require('../../services/musicService');
+    res.json(musicService.getStatus());
+  });
+
   // Legacy route aliases for full backwards compatibility
-  const legacySections = ['general', 'logs', 'customization', 'tickets', 'xp', 'gaming'];
+  const legacySections = ['general', 'logs', 'customization', 'tickets', 'xp', 'gaming', 'music'];
   for (const sec of legacySections) {
     router.post(`/dashboard/${sec}`, requireAdmin, async (req, res) => {
       try {

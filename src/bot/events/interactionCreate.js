@@ -53,6 +53,11 @@ module.exports = {
       if (customId.startsWith('custom_form_open_')) {
         return handleCustomFormButton(interaction);
       }
+
+      if (customId.startsWith('music_')) {
+        const musicService = require('../../services/musicService');
+        return musicService.handleButtonInteraction(interaction);
+      }
       return;
     }
 
