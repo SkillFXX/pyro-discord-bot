@@ -34,6 +34,7 @@ function createDashboardRouter(client, distDir) {
         'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',
         'xp_voice_enabled', 'xp_voice_gain', 'xp_voice_interval_seconds', 'xp_voice_min_members', 'xp_voice_ignore_muted', 'xp_voice_ignore_deafened',
         'xp_public_leaderboard', 'xp_leaderboard_search',
+        'brawlstars_api_key',
         ...logKeys
       ];
 
@@ -61,7 +62,7 @@ function createDashboardRouter(client, distDir) {
         permissions: req.session.permissions || null,
         config: isAdmin ? config : {},
         logConfigKeys: isAdmin ? LOG_CONFIG_KEYS : [],
-        ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [], roleXpMultipliers: [] })
+        ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [], roleXpMultipliers: [], brawlStarsRewards: [] })
       });
     } catch (error) {
       console.error('[API Dashboard Init] Error:', error);

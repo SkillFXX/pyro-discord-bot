@@ -29,7 +29,10 @@ const RANKED_TIERS = [
   { id: 16, name: 'Légendaire I', color: '#FF8C00' },
   { id: 17, name: 'Légendaire II', color: '#FF8C00' },
   { id: 18, name: 'Légendaire III', color: '#FF8C00' },
-  { id: 19, name: 'Maître', color: '#FF0055' },
+  { id: 19, name: 'Maître I (Master I)', color: '#FF0055' },
+  { id: 20, name: 'Maître II (Master II)', color: '#FF0055' },
+  { id: 21, name: 'Maître III (Master III)', color: '#FF0055' },
+  { id: 22, name: 'Pro', color: '#A855F7' },
 ];
 
 // Local directory for official game assets

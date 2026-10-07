@@ -18,6 +18,7 @@ export const dashboardData = writable({
   xpMultipliers: [],
   roleXpMultipliers: [],
   logConfigKeys: [],
+  brawlStarsRewards: [],
 });
 
 function getHeaders() {
@@ -50,6 +51,7 @@ export async function loadDashboardData() {
         xpMultipliers: data.xpMultipliers || [],
         roleXpMultipliers: data.roleXpMultipliers || [],
         logConfigKeys: data.logConfigKeys || [],
+        brawlStarsRewards: data.brawlStarsRewards || [],
       });
     } else if (res.status === 401) {
       auth.set({ authenticated: false, loading: false, csrfToken: '', user: null, permissions: null, discordConfigured: false });

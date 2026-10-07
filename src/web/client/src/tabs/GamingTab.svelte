@@ -47,7 +47,10 @@
     { id: 16, name: 'Légendaire I' },
     { id: 17, name: 'Légendaire II' },
     { id: 18, name: 'Légendaire III' },
-    { id: 19, name: 'Maître' },
+    { id: 19, name: 'Maître I (Master I)' },
+    { id: 20, name: 'Maître II (Master II)' },
+    { id: 21, name: 'Maître III (Master III)' },
+    { id: 22, name: 'Pro' },
   ];
 
   // API Key Form State
@@ -55,6 +58,12 @@
   let savingKey = false;
   let testingKey = false;
   let keyTestStatus = null; // { valid: boolean, message: string }
+  let apiKeyInitialized = false;
+
+  $: if ($dashboardData.config?.brawlstars_api_key !== undefined && !apiKeyInitialized) {
+    apiKeyInput = $dashboardData.config.brawlstars_api_key || '';
+    apiKeyInitialized = true;
+  }
 
   // Sync state
   let syncing = false;
@@ -82,25 +91,6 @@
   let editRankedThreshold = 1;
   let editRankedRoleId = '';
   let editRankedReplace = 'false';
-
-  // Role search filters
-  let trophyRoleSearch = '';
-  let rankedRoleSearch = '';
-  let editTrophyRoleSearch = '';
-  let editRankedRoleSearch = '';
-
-  $: filteredTrophyRoles = ($dashboardData.roles || []).filter((r) =>
-    !trophyRoleSearch || r.name.toLowerCase().includes(trophyRoleSearch.toLowerCase())
-  );
-  $: filteredRankedRoles = ($dashboardData.roles || []).filter((r) =>
-    !rankedRoleSearch || r.name.toLowerCase().includes(rankedRoleSearch.toLowerCase())
-  );
-  $: filteredEditTrophyRoles = ($dashboardData.roles || []).filter((r) =>
-    !editTrophyRoleSearch || r.name.toLowerCase().includes(editTrophyRoleSearch.toLowerCase())
-  );
-  $: filteredEditRankedRoles = ($dashboardData.roles || []).filter((r) =>
-    !editRankedRoleSearch || r.name.toLowerCase().includes(editRankedRoleSearch.toLowerCase())
-  );
 
   $: allRewards = $dashboardData.brawlStarsRewards || [];
   $: trophyRewards = allRewards.filter((r) => r.type === 'trophies').sort((a, b) => a.threshold - b.threshold);
@@ -172,7 +162,6 @@
     editTrophyThreshold = item.threshold;
     editTrophyRoleId = item.roleId;
     editTrophyReplace = item.replacePreviousRole ? 'true' : 'false';
-    editTrophyRoleSearch = '';
     showEditTrophyModal = true;
   }
 
@@ -219,7 +208,6 @@
     editRankedThreshold = item.threshold;
     editRankedRoleId = item.roleId;
     editRankedReplace = item.replacePreviousRole ? 'true' : 'false';
-    editRankedRoleSearch = '';
     showEditRankedModal = true;
   }
 
@@ -344,25 +332,10 @@
         </div>
 
         <div class="form-group role-form-group">
-          <div class="label-with-search">
-            <label for="trophy-role">
-              Rôle à Attribuer
-              {#if ($dashboardData.roles || []).length > 0}
-                <span class="role-count-hint">({filteredTrophyRoles.length}/{$dashboardData.roles.length})</span>
-              {/if}
-            </label>
-            {#if ($dashboardData.roles || []).length > 6}
-              <input
-                type="text"
-                class="role-filter-input"
-                placeholder="Filtrer..."
-                bind:value={trophyRoleSearch}
-              />
-            {/if}
-          </div>
+          <label for="trophy-role">Rôle à Attribuer</label>
           <select id="trophy-role" bind:value={trophyRoleId} required>
             <option value="" disabled selected>Sélectionner un rôle...</option>
-            {#each filteredTrophyRoles as role}
+            {#each $dashboardData.roles || [] as role}
               <option value={role.id}>{role.name}</option>
             {/each}
           </select>
@@ -455,25 +428,10 @@
         </div>
 
         <div class="form-group role-form-group">
-          <div class="label-with-search">
-            <label for="ranked-role">
-              Rôle à Attribuer
-              {#if ($dashboardData.roles || []).length > 0}
-                <span class="role-count-hint">({filteredRankedRoles.length}/{$dashboardData.roles.length})</span>
-              {/if}
-            </label>
-            {#if ($dashboardData.roles || []).length > 6}
-              <input
-                type="text"
-                class="role-filter-input"
-                placeholder="Filtrer..."
-                bind:value={rankedRoleSearch}
-              />
-            {/if}
-          </div>
+          <label for="ranked-role">Rôle à Attribuer</label>
           <select id="ranked-role" bind:value={rankedRoleId} required>
             <option value="" disabled selected>Sélectionner un rôle...</option>
-            {#each filteredRankedRoles as role}
+            {#each $dashboardData.roles || [] as role}
               <option value={role.id}>{role.name}</option>
             {/each}
           </select>
@@ -563,24 +521,9 @@
     </div>
 
     <div class="form-group" style="margin-bottom: 1rem;">
-      <div class="label-with-search">
-        <label for="edit-trophy-role">
-          Rôle à Attribuer
-          {#if ($dashboardData.roles || []).length > 0}
-            <span class="role-count-hint">({filteredEditTrophyRoles.length}/{$dashboardData.roles.length})</span>
-          {/if}
-        </label>
-        {#if ($dashboardData.roles || []).length > 6}
-          <input
-            type="text"
-            class="role-filter-input"
-            placeholder="Filtrer..."
-            bind:value={editTrophyRoleSearch}
-          />
-        {/if}
-      </div>
+      <label for="edit-trophy-role">Rôle à Attribuer</label>
       <select id="edit-trophy-role" bind:value={editTrophyRoleId} required>
-        {#each filteredEditTrophyRoles as role}
+        {#each $dashboardData.roles || [] as role}
           <option value={role.id}>{role.name}</option>
         {/each}
       </select>
@@ -618,24 +561,9 @@
     </div>
 
     <div class="form-group" style="margin-bottom: 1rem;">
-      <div class="label-with-search">
-        <label for="edit-ranked-role">
-          Rôle à Attribuer
-          {#if ($dashboardData.roles || []).length > 0}
-            <span class="role-count-hint">({filteredEditRankedRoles.length}/{$dashboardData.roles.length})</span>
-          {/if}
-        </label>
-        {#if ($dashboardData.roles || []).length > 6}
-          <input
-            type="text"
-            class="role-filter-input"
-            placeholder="Filtrer..."
-            bind:value={editRankedRoleSearch}
-          />
-        {/if}
-      </div>
+      <label for="edit-ranked-role">Rôle à Attribuer</label>
       <select id="edit-ranked-role" bind:value={editRankedRoleId} required>
-        {#each filteredEditRankedRoles as role}
+        {#each $dashboardData.roles || [] as role}
           <option value={role.id}>{role.name}</option>
         {/each}
       </select>
@@ -785,48 +713,12 @@
     margin-bottom: 0 !important;
   }
 
-  .label-with-search {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    min-height: 22px;
-  }
-
-  .label-with-search label {
-    margin-bottom: 0 !important;
-  }
-
-  .role-count-hint {
-    font-size: 0.74rem;
-    color: var(--text-muted);
-    font-weight: 400;
-    margin-left: 4px;
-  }
-
-  .role-filter-input {
-    width: 120px !important;
-    height: 22px !important;
-    padding: 1px 6px !important;
-    font-size: 0.75rem !important;
-    border-radius: 4px !important;
-    background: var(--surface-3, rgba(255, 255, 255, 0.05)) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text-primary) !important;
-    box-sizing: border-box !important;
-  }
-
-  .role-filter-input:focus {
-    border-color: var(--primary, #FF6B35) !important;
-    outline: none !important;
-  }
-
   .btn-spacer-label {
     display: block;
     font-size: 0.8rem;
     visibility: hidden;
     user-select: none;
-    min-height: 22px;
+    min-height: 20px;
     margin-bottom: 0;
   }
 
@@ -836,7 +728,7 @@
     justify-content: flex-end;
   }
 
-  .reward-form-container input:not(.role-filter-input),
+  .reward-form-container input,
   .reward-form-container select,
   .reward-form-container .inline-form-btn {
     height: 42px !important;
