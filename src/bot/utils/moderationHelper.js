@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { ConfigHelper, Warn, WarnAction, Sanction } = require('../../database');
 const embeds = require('./embeds');
 const { PermissionFlagsBits } = require('discord.js');
@@ -64,45 +65,76 @@ async function logModerationAction(client, { action, target, moderator, reason, 
 }
 
 /**
- * Checks if a member reached any threshold for automatic punishment
+ * Checks if adding one or more warns just crossed any automatic punishment thresholds.
+ * @param {object} client - Discord client instance
+ * @param {import('discord.js').GuildMember} member - Target guild member
+ * @param {import('discord.js').GuildMember|import('discord.js').User} moderator - Moderator or Bot
+ * @param {string} reason - Warn reason
+ * @param {number} [warnsAdded=1] - Number of warns just created in this action
  */
-async function checkWarnThresholds(client, member, moderator, reason) {
+async function checkWarnThresholds(client, member, moderator, reason, warnsAdded = 1) {
   try {
-    // Count warns
-    const warnCount = await Warn.count({ where: { userId: member.id } });
-    
-    // Find if there is a WarnAction configuration for this count
-    const thresholdAction = await WarnAction.findByPk(warnCount);
-    if (!thresholdAction) return;
+    if (!member || !member.guild) return;
 
-    const botMember = member.guild.members.me;
+    // Total warns currently on the user
+    const totalWarns = await Warn.count({ where: { userId: member.id } });
+    if (totalWarns === 0) return;
+
+    const previousWarnCount = Math.max(0, totalWarns - warnsAdded);
+    
+    // Only find thresholds that were *newly crossed* by this addition:
+    // previousWarnCount < warnsCount <= totalWarns
+    // (e.g. going from 2 to 3 warns crosses threshold 3, but going from 3 to 4 warns will NOT re-trigger threshold 3)
+    const newlyCrossedActions = await WarnAction.findAll({
+      where: {
+        warnsCount: {
+          [Op.gt]: previousWarnCount,
+          [Op.lte]: totalWarns,
+        },
+      },
+      order: [['warnsCount', 'DESC']],
+    });
+
+    if (newlyCrossedActions.length === 0) return;
+
+    // Take the highest threshold crossed in this transition
+    const thresholdAction = newlyCrossedActions[0];
+
+    const botMember = member.guild.members.me || (await member.guild.members.fetchMe().catch(() => null));
+    if (!botMember) return;
 
     if (thresholdAction.action === 'mute') {
-      // Discord native timeout max is 28 days (2419200 seconds / 2419200000 ms)
-      const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
-      const requestedMs = (thresholdAction.duration || 86400) * 1000;
-      const durationMs = Math.min(requestedMs, MAX_TIMEOUT_MS);
-      
-      // Native timeout (v14)
+      // Check if member is already timed out
+      const isAlreadyMuted = member.communicationDisabledUntilTimestamp && member.communicationDisabledUntilTimestamp > Date.now();
+      if (isAlreadyMuted) {
+        return;
+      }
+
+      // Check Discord hierarchy permission
       if (!member.moderatable) {
+        console.warn(`[Moderation] Impossible d'exclure temporairement (mute) ${member.user?.tag || member.id}: rôle supérieur/égal au bot ou Administrateur.`);
         await logModerationAction(client, {
-          action: '⚠️ Erreur Sanction Auto',
-          target: member.user,
+          action: '⚠️ Erreur Sanction Auto (Hiérarchie Discord)',
+          target: member.user || member,
           moderator: botMember.user,
-          reason: `Impossible de mute ${member.user.username} (permissions insuffisantes ou rôle supérieur) suite au warn #${warnCount}.`,
+          reason: `Impossible de mute ${member.user?.username || member.id} : son rôle le plus élevé est supérieur ou égal à celui du bot, ou il dispose de la permission Administrateur (Seuil de ${thresholdAction.warnsCount} avertissements atteint, total actuel : ${warnCount} warns).`,
         });
         return;
       }
 
+      const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
+      const requestedMs = (thresholdAction.duration || 86400) * 1000;
+      const durationMs = Math.min(requestedMs, MAX_TIMEOUT_MS);
+
       try {
-        await member.timeout(durationMs, `Sanction Automatique (${warnCount} avertissements) : ${reason}`);
+        await member.timeout(durationMs, `Sanction Automatique (Seuil ${thresholdAction.warnsCount} avertissements atteint) : ${reason}`);
       } catch (timeoutErr) {
-        console.error(`[Moderation] Erreur timeout Discord pour ${member.user.tag}:`, timeoutErr);
+        console.error(`[Moderation] Erreur timeout Discord pour ${member.user?.tag || member.id}:`, timeoutErr);
         await logModerationAction(client, {
           action: '⚠️ Erreur Timeout Discord',
-          target: member.user,
+          target: member.user || member,
           moderator: botMember.user,
-          reason: `Échec de l'exclusion temporaire pour ${member.user.username} (${timeoutErr.message}) suite au warn #${warnCount}.`,
+          reason: `Échec de l'exclusion temporaire pour ${member.user?.username || member.id} (${timeoutErr.message}) suite au seuil de ${thresholdAction.warnsCount} avertissements.`,
         });
         return;
       }
@@ -112,7 +144,7 @@ async function checkWarnThresholds(client, member, moderator, reason) {
         userId: member.id,
         moderatorId: botMember.id,
         type: 'mute',
-        reason: `Sanction Automatique (${warnCount} avertissements) : ${reason}`,
+        reason: `Sanction Automatique (Seuil ${thresholdAction.warnsCount} avertissements atteint) : ${reason}`,
       });
 
       // DM
@@ -125,28 +157,29 @@ async function checkWarnThresholds(client, member, moderator, reason) {
       const dmEmbed = embeds.custom(
         '🔇 Mute Automatique',
         `Vous avez été temporairement exclu (mute) du serveur **${member.guild.name}** pour une durée de **${durationStr}**.\n\n` +
-        `**Raison :** Atteinte du seuil de ${warnCount} avertissements.\n` +
-        `**Dernier avertissement :** ${reason}`,
+        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${warnCount}).\n` +
+        `**Dernier motif :** ${reason}`,
         embeds.COLORS.ERROR
       );
       await sendDM(member, dmEmbed);
 
       // Log
       await logModerationAction(client, {
-        action: `🔇 Mute Automatique (Seuil ${warnCount} Warns)`,
-        target: member.user,
+        action: `🔇 Mute Automatique (Seuil ${thresholdAction.warnsCount} Warns)`,
+        target: member.user || member,
         moderator: botMember.user,
-        reason: `Mute automatique suite à l'avertissement #${warnCount} (${reason})`,
+        reason: `Mute automatique suite à l'atteinte du seuil de ${thresholdAction.warnsCount} avertissements (${reason})`,
         duration: durationStr,
       });
 
     } else if (thresholdAction.action === 'ban') {
       if (!member.bannable) {
+        console.warn(`[Moderation] Impossible de bannir ${member.user?.tag || member.id}: permissions insuffisantes ou rôle supérieur.`);
         await logModerationAction(client, {
-          action: '⚠️ Erreur Sanction Auto',
-          target: member.user,
+          action: '⚠️ Erreur Sanction Auto (Hiérarchie Discord)',
+          target: member.user || member,
           moderator: botMember.user,
-          reason: `Impossible de bannir ${member.user.username} (permissions insuffisantes) suite au warn #${warnCount}.`,
+          reason: `Impossible de bannir ${member.user?.username || member.id} (permissions insuffisantes ou rôle supérieur) suite au seuil de ${thresholdAction.warnsCount} avertissements (total : ${warnCount} warns).`,
         });
         return;
       }
@@ -155,28 +188,28 @@ async function checkWarnThresholds(client, member, moderator, reason) {
       const dmEmbed = embeds.custom(
         '🔨 Bannissement Automatique',
         `Vous avez été banni définitivement du serveur **${member.guild.name}**.\n\n` +
-        `**Raison :** Atteinte du seuil de ${warnCount} avertissements.\n` +
-        `**Dernier avertissement :** ${reason}`,
+        `**Raison :** Atteinte du seuil de ${thresholdAction.warnsCount} avertissements (total actuel : ${warnCount}).\n` +
+        `**Dernier motif :** ${reason}`,
         embeds.COLORS.ERROR
       );
       await sendDM(member, dmEmbed);
 
-      await member.ban({ reason: `Sanction Automatique (${warnCount} avertissements) : ${reason}` });
+      await member.ban({ reason: `Sanction Automatique (Seuil ${thresholdAction.warnsCount} avertissements atteint) : ${reason}` });
 
       // Create sanction entry
       await Sanction.create({
         userId: member.id,
         moderatorId: botMember.id,
         type: 'ban',
-        reason: `Sanction Automatique (${warnCount} avertissements) : ${reason}`,
+        reason: `Sanction Automatique (Seuil ${thresholdAction.warnsCount} avertissements atteint) : ${reason}`,
       });
 
       // Log
       await logModerationAction(client, {
-        action: `🔨 Bannissement Automatique (Seuil ${warnCount} Warns)`,
-        target: member.user,
+        action: `🔨 Bannissement Automatique (Seuil ${thresholdAction.warnsCount} Warns)`,
+        target: member.user || member,
         moderator: botMember.user,
-        reason: `Bannissement automatique suite à l'avertissement #${warnCount} (${reason})`,
+        reason: `Bannissement automatique suite au seuil de ${thresholdAction.warnsCount} avertissements (${reason})`,
       });
     }
   } catch (error) {
