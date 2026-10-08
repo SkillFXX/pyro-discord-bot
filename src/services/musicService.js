@@ -472,18 +472,54 @@ class MusicService {
 
   /**
    * Test connection to a Lavalink server via HTTP REST /version endpoint.
+   * Includes strict SSRF validation for host, port and protocol.
    */
   async testNode({ host, port, pass, secure }) {
-    const protocol = secure ? 'https:' : 'http:';
-    const url = `${protocol}//${host}:${port}/version`;
+    const rawHost = String(host || '').trim();
+    const rawPort = parseInt(port, 10);
+    const isSecure = secure === true || secure === 'true';
+
+    // Strict validation of hostname (domain, IPv4, IPv6 or localhost)
+    const HOST_REGEX = /^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$|^localhost$|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$|^\[[0-9a-fA-F:]+\]$/;
+
+    if (!rawHost || !HOST_REGEX.test(rawHost)) {
+      return {
+        success: false,
+        error: 'Nom d\'hôte (host) invalide. Veuillez renseigner un nom de domaine ou une adresse IP valide.',
+      };
+    }
+
+    if (isNaN(rawPort) || rawPort < 1 || rawPort > 65535) {
+      return {
+        success: false,
+        error: 'Port invalide. Le port doit être un entier compris entre 1 et 65535.',
+      };
+    }
+
+    // Build and validate target URL safely
+    const protocol = isSecure ? 'https:' : 'http:';
+    let targetUrl;
+    try {
+      targetUrl = new URL(`${protocol}//${rawHost}:${rawPort}/version`);
+      if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+        throw new Error('Protocole invalide.');
+      }
+      targetUrl.pathname = '/version';
+    } catch (urlErr) {
+      return {
+        success: false,
+        error: `URL invalide : ${urlErr.message}`,
+      };
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4500);
 
     const startTime = Date.now();
     try {
-      const res = await fetch(url, {
+      const res = await fetch(targetUrl.href, {
         signal: controller.signal,
-        headers: { Authorization: pass || 'youshallnotpass' },
+        headers: { Authorization: String(pass || 'youshallnotpass') },
       });
       clearTimeout(timeout);
       const ping = Date.now() - startTime;
