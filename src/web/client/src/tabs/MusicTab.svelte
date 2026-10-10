@@ -14,7 +14,6 @@
     AlertCircle, 
     RefreshCw, 
     Save, 
-    Headphones, 
     Sliders, 
     Info, 
     Plus, 
@@ -165,48 +164,13 @@
 </script>
 
 <div class="tab-content-wrapper">
-  <!-- Page Title & Status Row -->
+  <!-- Page Title -->
   <div class="page-title-row">
     <div>
-      <h2><Music size={24} class="title-icon" /> Lecteur de Musique Lavalink</h2>
+      <h2><Music size={24} class="title-icon" /> Lecteur de Musique</h2>
       <p class="section-desc">
-        Diffusez de la musique en haute qualité dans vos salons vocaux grâce à Lavalink. Personnalisez les permissions, la file d'attente et les salons autorisés.
+        Configurez votre serveur audio Lavalink, les réglages de lecture et les salons vocaux autorisés.
       </p>
-    </div>
-
-    <!-- Live Status Pill -->
-    <div style="display:flex; align-items:center; gap: 0.75rem;">
-      <button 
-        type="button" 
-        class="btn btn-secondary btn-sm" 
-        on:click={fetchMusicStatus} 
-        title="Actualiser l'état du serveur Lavalink"
-      >
-        <RefreshCw size={14} />
-      </button>
-
-      {#if !musicEnabled}
-        <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.85rem; padding: 0.4rem 0.75rem;">
-          ⚪ Système Désactivé
-        </span>
-      {:else if musicStatus?.nodeStatus === 'connected'}
-        <span class="badge badge-success" style="font-size: 0.85rem; padding: 0.4rem 0.75rem; display:inline-flex; align-items:center; gap: 6px;">
-          <span class="status-dot-pulse"></span>
-          🟢 Lavalink Connecté {musicStatus.playersCount > 0 ? `(${musicStatus.playersCount} salon(s))` : ''}
-        </span>
-      {:else if musicStatus?.nodeStatus === 'connecting'}
-        <span class="badge badge-warning" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;">
-          🟡 Connexion en cours...
-        </span>
-      {:else if musicStatus?.nodeStatus === 'error'}
-        <span class="badge badge-danger" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;" title={musicStatus.lastError || ''}>
-          🔴 Erreur Nœud Lavalink
-        </span>
-      {:else}
-        <span class="badge badge-danger" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;">
-          🟠 Déconnecté
-        </span>
-      {/if}
     </div>
   </div>
 
@@ -265,6 +229,43 @@
 
     <!-- 2. Lavalink Server Connection Card -->
     <Card id="music-lavalink" title="Serveur Audio Lavalink" subtitle="Coordonnées de connexion vers votre nœud Lavalink v4" icon={Server}>
+      <div slot="actions" style="display:flex; align-items:center; gap: 0.5rem;">
+        <button 
+          type="button" 
+          class="btn btn-secondary btn-sm" 
+          on:click={fetchMusicStatus} 
+          title="Actualiser l'état du serveur Lavalink"
+        >
+          <RefreshCw size={13} />
+        </button>
+
+        {#if !musicEnabled}
+          <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.78rem; padding: 0.35rem 0.65rem;">
+            Désactivé
+          </span>
+        {:else if musicStatus?.nodeStatus === 'connected'}
+          <span class="badge badge-success" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; display:inline-flex; align-items:center; gap: 6px;">
+            <span class="status-dot-pulse"></span>
+            Connecté {musicStatus.playersCount > 0 ? `(${musicStatus.playersCount} salon${musicStatus.playersCount > 1 ? 's' : ''})` : ''}
+          </span>
+        {:else if musicStatus?.nodeStatus === 'connecting'}
+          <span class="badge badge-warning" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; display:inline-flex; align-items:center; gap: 6px;">
+            <span class="status-dot-warning"></span>
+            Connexion en cours...
+          </span>
+        {:else if musicStatus?.nodeStatus === 'error'}
+          <span class="badge badge-danger" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; display:inline-flex; align-items:center; gap: 6px;" title={musicStatus.lastError || ''}>
+            <span class="status-dot-danger"></span>
+            Erreur du nœud
+          </span>
+        {:else}
+          <span class="badge badge-danger" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; display:inline-flex; align-items:center; gap: 6px;">
+            <span class="status-dot-danger"></span>
+            Déconnecté
+          </span>
+        {/if}
+      </div>
+
       <div class="grid-2">
         <div class="form-group">
           <label for="music_lavalink_host">Hôte (Host / IP / Domaine)</label>
@@ -363,7 +364,7 @@
         <!-- DJ Roles Selection -->
         <div>
           <label style="display:block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
-            🎧 Rôles avec Contrôle DJ (Skip, Stop, Pause, Volume...)
+            Rôles avec Contrôle DJ (Skip, Stop, Pause, Volume...)
           </label>
           <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;">
             Si aucun rôle n'est spécifié, tous les membres présents dans le salon vocal peuvent contrôler la musique.
@@ -387,7 +388,7 @@
           <div style="display:flex; flex-wrap:wrap; gap: 6px; min-height: 38px; padding: 0.4rem; background: rgba(0,0,0,0.15); border: 1px dashed var(--border); border-radius: var(--radius-sm); align-items:center;">
             {#if allowedRoles.length === 0}
               <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; padding: 2px 6px;">
-                🌐 Tous les membres peuvent contrôler la musique
+                Tous les membres peuvent contrôler la musique
               </span>
             {:else}
               {#each allowedRoles as roleId}
@@ -405,7 +406,7 @@
         <!-- Allowed Voice Channels Selection -->
         <div>
           <label style="display:block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
-            🔊 Salons Vocaux Autorisés pour la Musique
+            Salons Vocaux Autorisés pour la Musique
           </label>
           <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;">
             Si aucun salon n'est sélectionné, la musique peut être lancée dans tous les salons vocaux du serveur.
@@ -416,7 +417,7 @@
               <option value="">-- Choisir un salon vocal --</option>
               {#each (channels.voice || []) as v}
                 {#if !allowedChannels.includes(v.id)}
-                  <option value={v.id}>🔊 {v.name}</option>
+                  <option value={v.id}>{v.name}</option>
                 {/if}
               {/each}
             </select>
@@ -429,7 +430,7 @@
           <div style="display:flex; flex-wrap:wrap; gap: 6px; min-height: 38px; padding: 0.4rem; background: rgba(0,0,0,0.15); border: 1px dashed var(--border); border-radius: var(--radius-sm); align-items:center;">
             {#if allowedChannels.length === 0}
               <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; padding: 2px 6px;">
-                🔊 Tous les salons vocaux sont autorisés
+                Tous les salons vocaux sont autorisés
               </span>
             {:else}
               {#each allowedChannels as chanId}
@@ -442,52 +443,6 @@
               {/each}
             {/if}
           </div>
-        </div>
-      </div>
-    </Card>
-
-    <!-- 4. Commands Guide Card -->
-    <Card id="music-guide" title="Commandes Slash Disponibles (/music)" subtitle="Aperçu des commandes utilisables sur Discord" icon={Headphones}>
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; font-size: 0.82rem;">
-        <div class="cmd-pill">
-          <code>/music play &lt;titre/lien&gt;</code>
-          <span>Lance une musique ou importe une playlist YouTube/Spotify</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music skip [nombre]</code>
-          <span>Passe au morceau suivant dans la file d'attente</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music queue [page]</code>
-          <span>Affiche les titres en attente avec pagination</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music nowplaying</code>
-          <span>Affiche le morceau actuel avec boutons interactifs</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music pause / resume</code>
-          <span>Met en pause ou reprend la lecture audio</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music stop</code>
-          <span>Arrête la musique, vide la file et quitte le salon</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music volume &lt;1-100&gt;</code>
-          <span>Ajuste le niveau sonore du bot en temps réel</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music shuffle</code>
-          <span>Mélange aléatoirement l'ordre des musiques</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music loop &lt;mode&gt;</code>
-          <span>Répéter le morceau actuel ou toute la file d'attente</span>
-        </div>
-        <div class="cmd-pill">
-          <code>/music remove &lt;position&gt;</code>
-          <span>Retire un titre précis de la file d'attente</span>
         </div>
       </div>
     </Card>
@@ -521,31 +476,29 @@
     opacity: 1;
   }
 
-  .cmd-pill {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.6rem 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .cmd-pill code {
-    font-weight: 600;
-    color: var(--primary);
-  }
-  .cmd-pill span {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-  }
-
   .status-dot-pulse {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     background: #2ecc71;
     border-radius: 50%;
     display: inline-block;
-    box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.6);
+  }
+
+  .status-dot-warning {
+    width: 7px;
+    height: 7px;
+    background: #f1c40f;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .status-dot-danger {
+    width: 7px;
+    height: 7px;
+    background: #e74c3c;
+    border-radius: 50%;
+    display: inline-block;
   }
 
   :global(.spin) {
