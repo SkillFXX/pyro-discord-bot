@@ -20,7 +20,7 @@ docker_images:
   'Node.js 22': 'ghcr.io/pelican-eggs/yolks:nodejs_22'
 file_denylist: {  }
 startup_commands:
-  'Lancer Pyro Bot': 'if [ -d .git ] && [ "${AUTO_UPDATE}" = "1" ]; then git reset --hard HEAD && git pull && npm install && npm run build; elif [ ! -d src/web/dist ]; then npm install && npm run build; fi; node src/index.js'
+  'Lancer Pyro Bot': 'bash start.sh'
 config:
   files: {  }
   startup:
@@ -71,7 +71,7 @@ scripts:
       DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
       PORT=${SERVER_PORT}
       SESSION_SECRET=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
-      COOKIE_SECURE=${COOKIE_SECURE:-false}
+      COOKIE_SECURE=${COOKIE_SECURE:-0}
       NODE_ENV=production
       ENVEOF
 
@@ -137,9 +137,9 @@ variables:
   -
     sort: 6
     name: 'Sécurité des cookies (COOKIE_SECURE)'
-    description: "false si le dashboard est accédé en HTTP direct (IP:PORT), true si vous utilisez un reverse proxy HTTPS avec certificat SSL."
+    description: "0 si le dashboard est accédé en HTTP direct (IP:PORT), 1 si vous utilisez un reverse proxy HTTPS avec certificat SSL."
     env_variable: COOKIE_SECURE
-    default_value: "false"
+    default_value: "0"
     user_viewable: true
     user_editable: true
     rules:

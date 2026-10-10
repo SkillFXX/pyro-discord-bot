@@ -1,5 +1,5 @@
 const { LavalinkManager } = require('lavalink-client');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
 const { ConfigHelper } = require('../database');
 const embeds = require('../bot/utils/embeds');
 
@@ -372,7 +372,7 @@ class MusicService {
     if (!voiceChannel) {
       return interaction.reply({
         content: '❌ Vous devez être connecté dans un salon vocal pour utiliser les contrôles de musique.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -380,14 +380,14 @@ class MusicService {
     if (!player) {
       return interaction.reply({
         content: '❌ Aucune musique n\'est actuellement en cours de lecture.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     if (player.voiceChannelId !== voiceChannel.id) {
       return interaction.reply({
         content: `❌ Vous devez être dans le même salon vocal que le bot (<#${player.voiceChannelId}>) pour contrôler la musique.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -395,7 +395,7 @@ class MusicService {
     if (!hasPermission) {
       return interaction.reply({
         content: '❌ Vous n\'avez pas la permission de contrôler la musique (Rôle DJ requis).',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -404,34 +404,34 @@ class MusicService {
     if (customId === 'music_toggle_pause') {
       if (player.paused) {
         await player.resume();
-        return interaction.reply({ content: '▶️ **Musique reprise.**', ephemeral: true });
+        return interaction.reply({ content: '▶️ **Musique reprise.**', flags: MessageFlags.Ephemeral });
       } else {
         await player.pause();
-        return interaction.reply({ content: '⏸️ **Musique mise en pause.**', ephemeral: true });
+        return interaction.reply({ content: '⏸️ **Musique mise en pause.**', flags: MessageFlags.Ephemeral });
       }
     }
 
     if (customId === 'music_skip') {
       if (player.queue.tracks.length > 0) {
         await player.skip(0, false);
-        return interaction.reply({ content: '⏭️ **Morceau passé.**', ephemeral: true });
+        return interaction.reply({ content: '⏭️ **Morceau passé.**', flags: MessageFlags.Ephemeral });
       } else {
         await player.stopPlaying();
-        return interaction.reply({ content: '⏹️ **File terminée, lecture arrêtée.**', ephemeral: true });
+        return interaction.reply({ content: '⏹️ **File terminée, lecture arrêtée.**', flags: MessageFlags.Ephemeral });
       }
     }
 
     if (customId === 'music_stop') {
       await player.destroy('stopped_by_button');
-      return interaction.reply({ content: '⏹️ **Musique arrêtée et déconnexion du salon vocal.**', ephemeral: true });
+      return interaction.reply({ content: '⏹️ **Musique arrêtée et déconnexion du salon vocal.**', flags: MessageFlags.Ephemeral });
     }
 
     if (customId === 'music_shuffle') {
       if (player.queue.tracks.length < 2) {
-        return interaction.reply({ content: '❌ Il faut au moins 2 morceaux dans la file d\'attente pour mélanger.', ephemeral: true });
+        return interaction.reply({ content: '❌ Il faut au moins 2 morceaux dans la file d\'attente pour mélanger.', flags: MessageFlags.Ephemeral });
       }
       await player.queue.shuffle();
-      return interaction.reply({ content: '🔀 **File d\'attente mélangée avec succès !**', ephemeral: true });
+      return interaction.reply({ content: '🔀 **File d\'attente mélangée avec succès !**', flags: MessageFlags.Ephemeral });
     }
 
     if (customId === 'music_loop') {
@@ -448,7 +448,7 @@ class MusicService {
       }
 
       await player.setRepeatMode(nextMode);
-      return interaction.reply({ content: `🔁 **Mode de répétition : ${label}**`, ephemeral: true });
+      return interaction.reply({ content: `🔁 **Mode de répétition : ${label}**`, flags: MessageFlags.Ephemeral });
     }
   }
 
