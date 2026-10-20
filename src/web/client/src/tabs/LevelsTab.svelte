@@ -4,6 +4,7 @@
   import Toggle from '../components/Toggle.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Modal from '../components/Modal.svelte';
+  import CardEditor from '../components/CardEditor.svelte';
   import {
     dashboardData,
     saveConfig,
@@ -258,6 +259,14 @@
             {/each}
           </select>
         </div>
+      </div>
+
+      <div style="margin-top: 1.25rem;">
+        <CardEditor 
+          type="levelup" 
+          title="Carte Graphique de Montée de Niveau (Level Up)" 
+          subtitle="Bannière visuelle envoyée lors du passage d'un palier de niveau" 
+        />
       </div>
 
       <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">

@@ -15,7 +15,8 @@
       sections: [
         { id: 'general-counter', label: 'Compteur de Membres' },
         { id: 'general-voice', label: 'Salons Vocaux' },
-        { id: 'general-messages', label: 'Bienvenue & Départ' },
+        { id: 'general-welcome', label: 'Bienvenue & Arrivées' },
+        { id: 'general-leave', label: 'Départs & Au revoir' },
       ],
     },
     {

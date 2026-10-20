@@ -38,19 +38,21 @@ module.exports = {
 
     const invitesCount = (leaveInviteData?.totalInvites ?? 0).toString();
 
-    // 2. Goodbye Message
+    // 2. Goodbye Message & Custom Card
     try {
       const leaveChannelId = await ConfigHelper.get('leave_channel_id');
-      const leaveMessageTemplate = await ConfigHelper.get('leave_message_template');
+      const leaveMessageTemplate = await ConfigHelper.get('leave_message_template') || '{username} a quitté le serveur.';
+      const cardGeneratorService = require('../../services/cardGeneratorService');
+      const isCardEnabled = await cardGeneratorService.isEnabled('leave');
 
-      if (leaveChannelId && leaveMessageTemplate) {
+      if (leaveChannelId && (leaveMessageTemplate || isCardEnabled)) {
         const channel = await guild.channels.fetch(leaveChannelId).catch(() => null);
         if (channel) {
           const username = member.user?.username || member.displayName || 'Un membre';
-          const avatar = member.user?.displayAvatarURL ? member.user.displayAvatarURL({ dynamic: true }) : null;
+          const avatar = member.user?.displayAvatarURL ? member.user.displayAvatarURL({ extension: 'png', size: 256 }) : null;
 
           // Replace placeholders
-          const formattedMessage = leaveMessageTemplate
+          const formattedMessage = (leaveMessageTemplate || '')
             .replace(/{user}/g, username)
             .replace(/{username}/g, username)
             .replace(/{server}/g, guild.name)
@@ -61,15 +63,44 @@ module.exports = {
             .replace(/{invites}/g, invitesCount)
             .replace(/{inviteCount}/g, invitesCount);
 
-          const embed = embeds.custom(
-            `📤 Départ du Serveur`,
-            formattedMessage,
-            embeds.COLORS.ERROR,
-            null,
-            avatar
-          );
+          const files = [];
+          let cardConfig = null;
+          if (isCardEnabled) {
+            cardConfig = await cardGeneratorService.getConfig('leave');
+            const cardBuffer = await cardGeneratorService.generateCard('leave', {
+              member,
+              username,
+              userMention: `@${username}`,
+              userTag: member.user?.tag || username,
+              serverName: guild.name,
+              memberCount: guild.memberCount,
+              inviter: inviterMention,
+              inviterUsername,
+              inviterTag,
+              invitesCount,
+              avatarUrl: avatar || 'https://cdn.discordapp.com/embed/avatars/0.png',
+            });
+            if (cardBuffer) {
+              const { AttachmentBuilder } = require('discord.js');
+              files.push(new AttachmentBuilder(cardBuffer, { name: 'leave-card.png' }));
+            }
+          }
 
-          await channel.send({ embeds: [embed] });
+          if (cardConfig?.sendMode === 'standalone') {
+            await channel.send({ content: formattedMessage, files });
+          } else {
+            const embed = embeds.custom(
+              `📤 Départ du Serveur`,
+              formattedMessage,
+              embeds.COLORS.ERROR,
+              null,
+              avatar
+            );
+            if (files.length > 0) {
+              embed.setImage('attachment://leave-card.png');
+            }
+            await channel.send({ embeds: [embed], files });
+          }
         }
       }
     } catch (error) {

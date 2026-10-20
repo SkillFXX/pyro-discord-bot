@@ -65,16 +65,18 @@ module.exports = {
       console.error('[Auto-Role] Erreur lors de l\'attribution des rôles automatiques :', error);
     }
 
-    // 3. Welcome Message
+    // 3. Welcome Message & Custom Card
     try {
       const welcomeChannelId = await ConfigHelper.get('welcome_channel_id');
-      const welcomeMessageTemplate = await ConfigHelper.get('welcome_message_template');
+      const welcomeMessageTemplate = await ConfigHelper.get('welcome_message_template') || 'Bienvenue {user} sur {server} !';
+      const cardGeneratorService = require('../../services/cardGeneratorService');
+      const isCardEnabled = await cardGeneratorService.isEnabled('welcome');
 
-      if (welcomeChannelId && welcomeMessageTemplate) {
+      if (welcomeChannelId && (welcomeMessageTemplate || isCardEnabled)) {
         const channel = await guild.channels.fetch(welcomeChannelId).catch(() => null);
         if (channel) {
           // Replace placeholders
-          const formattedMessage = welcomeMessageTemplate
+          const formattedMessage = (welcomeMessageTemplate || '')
             .replace(/{user}/g, `${member}`)
             .replace(/{username}/g, member.user.username)
             .replace(/{server}/g, guild.name)
@@ -86,15 +88,44 @@ module.exports = {
             .replace(/{inviteCount}/g, invitesCount)
             .replace(/{inviteCode}/g, inviteCodeStr);
 
-          const embed = embeds.custom(
-            `👋 Nouveau Membre !`,
-            formattedMessage,
-            embeds.COLORS.SUCCESS,
-            null,
-            member.user.displayAvatarURL({ dynamic: true })
-          );
+          const files = [];
+          let cardConfig = null;
+          if (isCardEnabled) {
+            cardConfig = await cardGeneratorService.getConfig('welcome');
+            const cardBuffer = await cardGeneratorService.generateCard('welcome', {
+              member,
+              username: member.user.username,
+              userMention: `${member}`,
+              userTag: member.user.tag || member.user.username,
+              serverName: guild.name,
+              memberCount: guild.memberCount,
+              inviter: inviterMention,
+              inviterUsername,
+              inviterTag,
+              invitesCount,
+              avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+            });
+            if (cardBuffer) {
+              const { AttachmentBuilder } = require('discord.js');
+              files.push(new AttachmentBuilder(cardBuffer, { name: 'welcome-card.png' }));
+            }
+          }
 
-          await channel.send({ content: `${member}`, embeds: [embed] });
+          if (cardConfig?.sendMode === 'standalone') {
+            await channel.send({ content: formattedMessage || `${member}`, files });
+          } else {
+            const embed = embeds.custom(
+              `👋 Nouveau Membre !`,
+              formattedMessage,
+              embeds.COLORS.SUCCESS,
+              null,
+              member.user.displayAvatarURL({ dynamic: true })
+            );
+            if (files.length > 0) {
+              embed.setImage('attachment://welcome-card.png');
+            }
+            await channel.send({ content: `${member}`, embeds: [embed], files });
+          }
         }
       }
     } catch (error) {

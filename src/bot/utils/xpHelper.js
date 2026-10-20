@@ -224,14 +224,49 @@ async function awardUserXP({ client, member, xpAmount, source = 'message', textC
 
     if (channelToAnnounce) {
       const embeds = require('./embeds');
-      const levelEmbed = embeds.custom(
-        '🎉 Passage de Niveau !',
-        `Félicitations ${member}, tu viens de passer au **Niveau ${newLevel}** ! 🚀`,
-        embeds.COLORS.SUCCESS,
-        null,
-        member.user.displayAvatarURL({ dynamic: true })
-      );
-      await channelToAnnounce.send({ embeds: [levelEmbed] }).catch(() => null);
+      const cardGeneratorService = require('../../services/cardGeneratorService');
+      const isCardEnabled = await cardGeneratorService.isEnabled('levelup');
+
+      const files = [];
+      let cardConfig = null;
+      if (isCardEnabled) {
+        cardConfig = await cardGeneratorService.getConfig('levelup');
+        const cardBuffer = await cardGeneratorService.generateCard('levelup', {
+          member,
+          username: member.user?.username || member.displayName,
+          userMention: `${member}`,
+          userTag: member.user?.tag || member.user?.username,
+          serverName: guild.name,
+          memberCount: guild.memberCount,
+          level: newLevel,
+          oldLevel,
+          xp: newXP,
+          avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+        });
+        if (cardBuffer) {
+          const { AttachmentBuilder } = require('discord.js');
+          files.push(new AttachmentBuilder(cardBuffer, { name: 'levelup-card.png' }));
+        }
+      }
+
+      if (cardConfig?.sendMode === 'standalone') {
+        await channelToAnnounce.send({
+          content: `🎉 Félicitations ${member}, tu viens de passer au **Niveau ${newLevel}** ! 🚀`,
+          files,
+        }).catch(() => null);
+      } else {
+        const levelEmbed = embeds.custom(
+          '🎉 Passage de Niveau !',
+          `Félicitations ${member}, tu viens de passer au **Niveau ${newLevel}** ! 🚀`,
+          embeds.COLORS.SUCCESS,
+          null,
+          member.user.displayAvatarURL({ dynamic: true })
+        );
+        if (files.length > 0) {
+          levelEmbed.setImage('attachment://levelup-card.png');
+        }
+        await channelToAnnounce.send({ content: `${member}`, embeds: [levelEmbed], files }).catch(() => null);
+      }
     }
 
     // 2. Centralized Logger

@@ -696,5 +696,70 @@ export async function fetchMusicStatus() {
   return null;
 }
 
+// Visual Card Editor Helpers
+export async function fetchCardConfig(type) {
+  try {
+    const res = await fetch(`/api/cards/${type}`, { headers: getHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      return data.config;
+    }
+  } catch (e) {
+    console.error('Error fetching card config:', e);
+  }
+  return null;
+}
+
+export async function saveCardConfig(type, config) {
+  try {
+    const res = await fetch(`/api/cards/${type}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(config),
+    });
+    if (res.ok) {
+      showToast('Carte sauvegardée avec succès !', 'success');
+      dashboardData.update((d) => {
+        const currentCards = d.cards || {};
+        return {
+          ...d,
+          cards: {
+            ...currentCards,
+            [type]: config,
+          },
+        };
+      });
+      return true;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Erreur lors de la sauvegarde de la carte', 'error');
+    }
+  } catch (e) {
+    showToast('Erreur de connexion', 'error');
+  }
+  return false;
+}
+
+export async function testSendCard(type, channelId, config) {
+  try {
+    const res = await fetch(`/api/cards/${type}/test-send`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ channelId, config }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`Carte envoyée dans #${data.channelName || 'salon'} !`, 'success');
+      return true;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Erreur lors de l\'envoi du test', 'error');
+    }
+  } catch (e) {
+    showToast('Erreur lors du test', 'error');
+  }
+  return false;
+}
+
 
 

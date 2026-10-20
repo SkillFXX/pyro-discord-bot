@@ -2,6 +2,7 @@
   import { dashboardData, saveConfig } from '../stores/data';
   import Card from '../components/Card.svelte';
   import { Settings, Save, MessageSquare, Volume2, Users } from '@lucide/svelte';
+  import CardEditor from '../components/CardEditor.svelte';
 
   let config = {};
   $: config = { ...$dashboardData.config };
@@ -101,32 +102,20 @@
       </div>
     </Card>
 
-    <!-- Welcome & Leave Messages -->
-    <Card id="general-messages" title="Messages de Bienvenue & Départ" subtitle="Annonces automatiques lors des arrivées et départs" icon={MessageSquare}>
-      <div class="grid-2">
-        <div class="form-group">
-          <label for="welcome_channel_id">Salon de Bienvenue</label>
-          <select id="welcome_channel_id" bind:value={config.welcome_channel_id}>
-            <option value="">-- Désactivé --</option>
-            {#each channels.text.filter(c => !c.forum) as c}
-              <option value={c.id}># {c.name}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="leave_channel_id">Salon de Départ</label>
-          <select id="leave_channel_id" bind:value={config.leave_channel_id}>
-            <option value="">-- Désactivé --</option>
-            {#each channels.text.filter(c => !c.forum) as c}
-              <option value={c.id}># {c.name}</option>
-            {/each}
-          </select>
-        </div>
+    <!-- 3. Welcome Message & Card Section -->
+    <Card id="general-welcome" title="Arrivées & Message de Bienvenue" subtitle="Salon d'annonce, message texte et bannière graphique d'accueil" icon={MessageSquare}>
+      <div class="form-group">
+        <label for="welcome_channel_id">Salon de Bienvenue</label>
+        <select id="welcome_channel_id" bind:value={config.welcome_channel_id}>
+          <option value="">-- Désactivé --</option>
+          {#each channels.text.filter(c => !c.forum) as c}
+            <option value={c.id}># {c.name}</option>
+          {/each}
+        </select>
       </div>
 
       <div class="form-group">
-        <label for="welcome_message_template">Template Message de Bienvenue</label>
+        <label for="welcome_message_template">Message de Bienvenue (ou Description de l'Embed)</label>
         <input
           type="text"
           id="welcome_message_template"
@@ -136,8 +125,28 @@
         <p class="help-text">Variables : <code>{'{user}'}</code>, <code>{'{username}'}</code>, <code>{'{server}'}</code>, <code>{'{memberCount}'}</code>, <code>{'{inviter}'}</code>, <code>{'{invites}'}</code>, <code>{'{inviterUsername}'}</code>, <code>{'{inviteCode}'}</code></p>
       </div>
 
+      <!-- Welcome Visual Card Editor directly under welcome message -->
+      <CardEditor 
+        type="welcome" 
+        title="Bannière Graphique de Bienvenue" 
+        subtitle="Image personnalisée générée et envoyée automatiquement à l'arrivée d'un membre" 
+      />
+    </Card>
+
+    <!-- 4. Leave Message & Card Section -->
+    <Card id="general-leave" title="Départs & Message d'Au revoir" subtitle="Salon d'annonce, message texte et bannière graphique de départ" icon={MessageSquare}>
       <div class="form-group">
-        <label for="leave_message_template">Template Message de Départ</label>
+        <label for="leave_channel_id">Salon de Départ</label>
+        <select id="leave_channel_id" bind:value={config.leave_channel_id}>
+          <option value="">-- Désactivé --</option>
+          {#each channels.text.filter(c => !c.forum) as c}
+            <option value={c.id}># {c.name}</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="leave_message_template">Message de Départ (ou Description de l'Embed)</label>
         <input
           type="text"
           id="leave_message_template"
@@ -146,6 +155,13 @@
         />
         <p class="help-text">Variables : <code>{'{user}'}</code>, <code>{'{username}'}</code>, <code>{'{server}'}</code>, <code>{'{memberCount}'}</code>, <code>{'{inviter}'}</code>, <code>{'{invites}'}</code>, <code>{'{inviterUsername}'}</code></p>
       </div>
+
+      <!-- Leave Visual Card Editor directly under leave message -->
+      <CardEditor 
+        type="leave" 
+        title="Bannière Graphique d'Au revoir" 
+        subtitle="Image personnalisée générée et envoyée lors du départ d'un membre" 
+      />
     </Card>
 
     <button type="submit" class="btn btn-primary" style="width:260px;" disabled={saving}>

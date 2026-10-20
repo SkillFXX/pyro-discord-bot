@@ -55,6 +55,13 @@ function createDashboardRouter(client, distDir) {
       };
 
       const musicService = require('../../services/musicService');
+      const cardGeneratorService = require('../../services/cardGeneratorService');
+
+      const cards = isAdmin ? {
+        welcome: await cardGeneratorService.getConfig('welcome'),
+        leave: await cardGeneratorService.getConfig('leave'),
+        levelup: await cardGeneratorService.getConfig('levelup'),
+      } : null;
 
       res.json({
         guildId: process.env.GUILD_ID,
@@ -66,6 +73,7 @@ function createDashboardRouter(client, distDir) {
         user: req.session.user || null,
         permissions: req.session.permissions || null,
         config: isAdmin ? config : {},
+        cards,
         musicStatus: isAdmin ? musicService.getStatus() : null,
         logConfigKeys: isAdmin ? LOG_CONFIG_KEYS : [],
         ...(isAdmin ? lists : { autoRoles: [], warnActions: [], roleRewards: [], automodRules: [], xpMultipliers: [], roleXpMultipliers: [], brawlStarsRewards: [] })
