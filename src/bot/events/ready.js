@@ -54,6 +54,10 @@ module.exports = {
     const musicService = require('../../services/musicService');
     await musicService.init(client);
 
+    // Initialize Brawl Stars Periodic Snapshot & Role Sync (every 4 hours)
+    const brawlStarsService = require('../../services/brawlStarsService');
+    brawlStarsService.initPeriodicSync(client);
+
     // Send Boot / Startup Log
     try {
       const loggerService = require('../../services/loggerService');

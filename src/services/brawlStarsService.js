@@ -457,7 +457,20 @@ function roundRect(ctx, x, y, width, height, radius, fill = false, stroke = fals
 }
 
 /**
- * Generates a smooth bezier curve chart showing trophy evolution day-by-day.
+ * Formats a Date object to YYYY-MM-DD in local time.
+ */
+function getLocalDateKey(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Generates a smooth, regular day-by-day bezier curve chart showing trophy evolution.
+ * Handles gaps between days with carry-forward, collapses multiple intra-day snapshots
+ * into daily end-of-day values, and supports intra-day mode when only one day of data exists.
  */
 async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accentColor = '#FF6B35') {
   const width = 1100;
@@ -486,12 +499,8 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.font = 'bold 24px sans-serif';
   ctx.fillText(`Évolution des Trophées — ${playerName}`, 100, 62);
 
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '14px monospace';
-  ctx.fillText(`${playerTag} • Période : ${days} derniers jours`, 100, 90);
-
-  // Handle case with insufficient data points (< 2)
-  if (!logs || logs.length < 2) {
+  // Handle case with no data
+  if (!logs || logs.length === 0) {
     ctx.fillStyle = '#94A3B8';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
@@ -501,15 +510,110 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
     return canvas.toBuffer('image/png');
   }
 
-  const trophyValues = logs.map(l => l.trophies);
+  // Sort logs chronologically ASC
+  const sorted = [...logs].sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+
+  // Group snapshots by calendar day to keep the latest snapshot of each day
+  const logsByDay = new Map();
+  for (const log of sorted) {
+    const dayKey = getLocalDateKey(log.recordedAt);
+    logsByDay.set(dayKey, log);
+  }
+
+  const uniqueDays = Array.from(logsByDay.keys());
+  let points = [];
+  let periodSubtitle = '';
+
+  // Chart bounds
+  const chartX = 85;
+  const chartY = 165;
+  const chartW = width - 130;
+  const chartH = height - 240;
+
+  if (uniqueDays.length < 2) {
+    // If only 1 snapshot exists overall, cannot draw a line
+    if (sorted.length < 2) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Données insuffisantes pour tracer une courbe d\'évolution.', width / 2, height / 2);
+      ctx.font = '13px sans-serif';
+      ctx.fillText('Revenez plus tard : le bot enregistre automatiquement vos trophées au fil du temps.', width / 2, height / 2 + 30);
+      return canvas.toBuffer('image/png');
+    }
+
+    // Intraday mode: multiple snapshots on the same single day
+    const minTime = new Date(sorted[0].recordedAt).getTime();
+    const maxTime = new Date(sorted[sorted.length - 1].recordedAt).getTime();
+    const timeRange = maxTime - minTime || 1;
+
+    periodSubtitle = `Aujourd'hui (${sorted.length} relevés)`;
+    points = sorted.map(l => {
+      const t = new Date(l.recordedAt).getTime();
+      return {
+        trophies: l.trophies,
+        date: new Date(l.recordedAt),
+        tRel: (t - minTime) / timeRange,
+        label: new Date(l.recordedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      };
+    });
+  } else {
+    // Multi-day mode: regular calendar timeline (1 point per day, evenly spaced)
+    const firstLogDate = new Date(sorted[0].recordedAt);
+    firstLogDate.setHours(0, 0, 0, 0);
+
+    const lastLogDate = new Date(sorted[sorted.length - 1].recordedAt);
+    lastLogDate.setHours(0, 0, 0, 0);
+
+    const requestedStartDate = new Date(lastLogDate.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    const actualStartDate = new Date(Math.max(firstLogDate.getTime(), requestedStartDate.getTime()));
+
+    let currentTrophies = sorted[0].trophies;
+    for (const l of sorted) {
+      if (new Date(l.recordedAt) <= actualStartDate) {
+        currentTrophies = l.trophies;
+      }
+    }
+
+    const curr = new Date(actualStartDate);
+    const dailyPoints = [];
+
+    while (curr <= lastLogDate) {
+      const key = getLocalDateKey(curr);
+      if (logsByDay.has(key)) {
+        currentTrophies = logsByDay.get(key).trophies;
+      }
+      dailyPoints.push({
+        date: new Date(curr),
+        trophies: currentTrophies,
+        label: new Date(curr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+      });
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    const totalDays = dailyPoints.length;
+    periodSubtitle = `${totalDays} derniers jours`;
+    points = dailyPoints.map((d, index) => ({
+      ...d,
+      tRel: totalDays > 1 ? index / (totalDays - 1) : 0,
+    }));
+  }
+
+  // Header Subtitle
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '14px monospace';
+  ctx.fillText(`${playerTag} • Période : ${periodSubtitle}`, 100, 90);
+
+  // Trophy min/max/delta metrics
+  const trophyValues = points.map(p => p.trophies);
   const minTrophies = Math.min(...trophyValues);
   const maxTrophies = Math.max(...trophyValues);
-  const startTrophies = trophyValues[0];
-  const endTrophies = trophyValues[trophyValues.length - 1];
+  const startTrophies = points[0].trophies;
+  const endTrophies = points[points.length - 1].trophies;
   const delta = endTrophies - startTrophies;
 
-  const deltaText = delta >= 0 ? `+${delta.toLocaleString('fr-FR')}` : `${delta.toLocaleString('fr-FR')}`;
-  const deltaColor = delta >= 0 ? '#10B981' : '#EF4444';
+  const deltaText = delta > 0 ? `+${delta.toLocaleString('fr-FR')}` : `${delta.toLocaleString('fr-FR')}`;
+  const deltaColor = delta > 0 ? '#10B981' : (delta < 0 ? '#EF4444' : '#94A3B8');
 
   ctx.textAlign = 'right';
   ctx.font = 'bold 22px sans-serif';
@@ -521,12 +625,7 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.fillText(`Min: ${minTrophies.toLocaleString('fr-FR')} • Max: ${maxTrophies.toLocaleString('fr-FR')}`, width - 55, 90);
   ctx.textAlign = 'left';
 
-  // Chart bounds
-  const chartX = 85;
-  const chartY = 165;
-  const chartW = width - 130;
-  const chartH = height - 240;
-
+  // Value bounds & Range
   const valMargin = Math.max(50, Math.round((maxTrophies - minTrophies) * 0.15));
   const chartMin = Math.max(0, minTrophies - valMargin);
   const chartMax = maxTrophies + valMargin;
@@ -552,14 +651,13 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   }
   ctx.textAlign = 'left';
 
-  // Points
-  const points = logs.map((log, index) => {
-    const px = chartX + (index / (logs.length - 1)) * chartW;
-    const py = chartY + chartH - ((log.trophies - chartMin) / valRange) * chartH;
-    return { x: px, y: py, trophies: log.trophies, date: new Date(log.recordedAt) };
+  // Compute pixel positions for all points
+  points.forEach(p => {
+    p.x = chartX + p.tRel * chartW;
+    p.y = chartY + chartH - ((p.trophies - chartMin) / valRange) * chartH;
   });
 
-  // Smooth Bezier Curve
+  // Smooth Bezier Curve with monotonic clamping to prevent wobbles on flat plateaus
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
 
@@ -569,10 +667,15 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
     const p2 = points[i + 1];
     const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
 
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    let cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    let cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p1.y, p2.y);
+    cp1y = Math.max(minY, Math.min(maxY, cp1y));
+    cp2y = Math.max(minY, Math.min(maxY, cp2y));
 
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
@@ -581,7 +684,7 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.lineWidth = 3.5;
   ctx.stroke();
 
-  // Gradient under curve
+  // Gradient area fill under curve
   ctx.lineTo(points[points.length - 1].x, chartY + chartH);
   ctx.lineTo(points[0].x, chartY + chartH);
   ctx.closePath();
@@ -592,28 +695,39 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.fillStyle = areaGrad;
   ctx.fill();
 
-  // Points
+  // Draw points/dots
   points.forEach((p, idx) => {
     const isSpecial = idx === 0 || idx === points.length - 1 || p.trophies === maxTrophies || p.trophies === minTrophies;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, isSpecial ? 5.5 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = accentColor;
-    ctx.stroke();
+    const prev = points[idx - 1];
+    const next = points[idx + 1];
+    const isChange = (prev && prev.trophies !== p.trophies) || (next && next.trophies !== p.trophies);
+
+    if (points.length <= 35 || isSpecial || isChange) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isSpecial ? 5.5 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = accentColor;
+      ctx.stroke();
+    }
   });
 
-  // Date Labels along X Axis
+  // Date Labels along X Axis (evenly spaced, non-overlapping, unique dates)
   ctx.fillStyle = '#64748B';
   ctx.font = '11px sans-serif';
   ctx.textAlign = 'center';
 
-  const labelStep = Math.max(1, Math.floor(points.length / 6));
-  for (let i = 0; i < points.length; i += labelStep) {
-    const p = points[i];
-    const dateStr = p.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    ctx.fillText(dateStr, p.x, chartY + chartH + 22);
+  const maxIdx = points.length - 1;
+  const labelCount = Math.min(6, maxIdx);
+  const labelIndices = new Set();
+  for (let i = 0; i <= labelCount; i++) {
+    labelIndices.add(Math.round((i / labelCount) * maxIdx));
+  }
+
+  for (const idx of labelIndices) {
+    const p = points[idx];
+    ctx.fillText(p.label, p.x, chartY + chartH + 22);
   }
 
   // Footer
@@ -623,6 +737,75 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
   ctx.fillText('Pyro Bot • Suivi des Trophées Brawl Stars', width / 2, height - 20);
 
   return canvas.toBuffer('image/png');
+}
+
+/**
+ * Periodically synchronizes all linked Brawl Stars accounts in the background.
+ * Fetches fresh player stats, records a trophy snapshot, and updates guild roles.
+ */
+async function syncAllLinkedUsers(client) {
+  try {
+    const apiKey = await getApiKey();
+    if (!apiKey) return;
+
+    const linkedUsers = await BrawlStarsUser.findAll();
+    if (!linkedUsers || linkedUsers.length === 0) return;
+
+    const guildId = process.env.GUILD_ID;
+    const guild = client?.guilds?.cache?.get(guildId);
+
+    let count = 0;
+    for (const u of linkedUsers) {
+      try {
+        const freshData = await fetchPlayerData(u.playerTag);
+        if (freshData) {
+          await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0);
+          const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
+          await u.update({
+            playerName: freshData.name || u.playerName,
+            lastTrophies: freshData.trophies || 0,
+            highestTrophies: freshData.highestTrophies || 0,
+            lastRankedRank: peakRank,
+            highestRankedRank: peakRank,
+            lastCheckedAt: new Date(),
+          });
+
+          if (guild) {
+            const member = await guild.members.fetch(u.userId).catch(() => null);
+            if (member) {
+              await syncUserRoles(client, member, freshData);
+            }
+          }
+          count++;
+        }
+      } catch (_) {}
+      // Small delay between requests to respect API rate limits
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } catch (err) {
+    console.warn('[BrawlStarsService] Erreur lors de la synchronisation périodique :', err.message);
+  }
+}
+
+/**
+ * Starts the periodic background sync service for Brawl Stars accounts.
+ * Runs once after a short initial delay, then every 4 hours.
+ */
+let syncInterval = null;
+function initPeriodicSync(client, intervalMs = 4 * 60 * 60 * 1000) {
+  if (syncInterval) {
+    clearInterval(syncInterval);
+  }
+
+  // Initial sync after 30 seconds
+  setTimeout(() => {
+    syncAllLinkedUsers(client).catch(() => {});
+  }, 30000).unref();
+
+  // Recurring sync every 4 hours
+  syncInterval = setInterval(() => {
+    syncAllLinkedUsers(client).catch(() => {});
+  }, intervalMs).unref();
 }
 
 module.exports = {
@@ -637,4 +820,6 @@ module.exports = {
   syncUserRoles,
   recordTrophySnapshot,
   generateTrophyGraph,
+  syncAllLinkedUsers,
+  initPeriodicSync,
 };

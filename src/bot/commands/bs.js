@@ -341,6 +341,23 @@ module.exports = {
           order: [['recordedAt', 'ASC']],
         });
 
+        // Query the most recent baseline snapshot before startDate to know starting trophies
+        const baselineLog = await BrawlStarsTrophyLog.findOne({
+          where: {
+            userId: targetUser.id,
+            playerTag: linkedUser.playerTag,
+            recordedAt: { [Op.lt]: startDate },
+          },
+          order: [['recordedAt', 'DESC']],
+        });
+
+        if (baselineLog) {
+          logs.unshift({
+            trophies: baselineLog.trophies,
+            recordedAt: startDate,
+          });
+        }
+
         // Generate smoothed graph canvas
         const graphBuffer = await brawlStarsService.generateTrophyGraph(
           linkedUser.playerName || targetUser.username,
@@ -350,11 +367,20 @@ module.exports = {
           accentColor
         );
 
+        let periodDesc = `les **${days} derniers jours**`;
+        if (logs.length > 0) {
+          const firstDate = new Date(logs[0].recordedAt);
+          const daysDiff = Math.max(1, Math.ceil((Date.now() - firstDate.getTime()) / (24 * 60 * 60 * 1000)));
+          if (daysDiff < days) {
+            periodDesc = daysDiff === 1 ? `**aujourd'hui**` : `les **${daysDiff} derniers jours**`;
+          }
+        }
+
         const attachment = new AttachmentBuilder(graphBuffer, { name: `trophy-evolution-${linkedUser.playerTag.replace('#', '')}.png` });
 
         const embed = embeds.custom(
           `📈 Évolution des Trophées — ${linkedUser.playerName || targetUser.username}`,
-          `Période : les **${days} derniers jours** • Tag : \`${linkedUser.playerTag}\``,
+          `Période : ${periodDesc} • Tag : \`${linkedUser.playerTag}\``,
           accentColor,
           null,
           null,

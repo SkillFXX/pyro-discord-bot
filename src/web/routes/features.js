@@ -526,6 +526,7 @@ function createFeaturesRouter(client) {
           const member = await guild.members.fetch(u.userId).catch(() => null);
           if (member) {
             const freshData = await brawlStarsService.fetchPlayerData(u.playerTag);
+            await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0);
             await brawlStarsService.syncUserRoles(client, member, freshData);
             const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
             await u.update({
