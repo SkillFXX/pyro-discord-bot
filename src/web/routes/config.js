@@ -93,6 +93,17 @@ async function handleConfigSave(section, body, client) {
     if (body.brawlstars_api_key !== undefined) {
       await ConfigHelper.set('brawlstars_api_key', (body.brawlstars_api_key || '').trim());
     }
+    if (body.brawlstars_top_trophies_growth_role_id !== undefined) {
+      await ConfigHelper.set('brawlstars_top_trophies_growth_role_id', body.brawlstars_top_trophies_growth_role_id || '');
+    }
+    if (body.brawlstars_top_ranked_growth_role_id !== undefined) {
+      await ConfigHelper.set('brawlstars_top_ranked_growth_role_id', body.brawlstars_top_ranked_growth_role_id || '');
+    }
+    // Re-sync weekly growth roles when role configuration changes
+    try {
+      const brawlStarsService = require('../../services/brawlStarsService');
+      await brawlStarsService.syncWeeklyGrowthRoles(client);
+    } catch (_) {}
   } else if (section === 'music') {
     if (body.music_enabled !== undefined) {
       await ConfigHelper.set('music_enabled', body.music_enabled === true || body.music_enabled === 'true');

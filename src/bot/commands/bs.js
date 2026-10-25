@@ -1,4 +1,13 @@
-const { SlashCommandBuilder, AttachmentBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { 
+  SlashCommandBuilder, 
+  AttachmentBuilder, 
+  MessageFlags, 
+  PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType
+} = require('discord.js');
 const { Op } = require('sequelize');
 const { BrawlStarsUser, BrawlStarsTrophyLog, ConfigHelper } = require('../../database');
 const brawlStarsService = require('../../services/brawlStarsService');
@@ -68,7 +77,25 @@ module.exports = {
           option
             .setName('membre')
             .setDescription('Le membre à inspecter (défaut: vous)')
-            .setRequired(false))),
+            .setRequired(false)))
+
+    // Subcommand: top
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('top')
+        .setDescription('Afficher les classements Brawl Stars (Trophées, Ranked et Évolutions de la semaine).')
+        .addStringOption(option =>
+          option
+            .setName('categorie')
+            .setDescription('Catégorie de classement à afficher (défaut : Vue d\'ensemble)')
+            .setRequired(false)
+            .addChoices(
+              { name: '🌐 Vue d\'ensemble (Tous les tops)', value: 'overview' },
+              { name: '🏆 Top Trophées', value: 'trophies' },
+              { name: '🎖️ Top Ranked', value: 'ranked' },
+              { name: '📈 Meilleure Évolution Trophées (Semaine)', value: 'gain_trophies' },
+              { name: '⚡ Meilleure Évolution Ranked (Semaine)', value: 'gain_ranked' },
+            ))),
 
   async execute(interaction, client) {
     const subcommand = interaction.options.getSubcommand();
@@ -163,20 +190,30 @@ module.exports = {
           playerData.rankedRank = bestRank;
           playerData.highestRank = bestRank;
 
-          // Save or update user link with fresh official data
+          const currentWeek = brawlStarsService.getIsoWeekKey();
+          const trophies = playerData.trophies || 0;
+          const isSameWeek = existingUser?.weekKey === currentWeek;
+
+          // Save or update user link with fresh official data.
+          // If newly linking mid-week, initialize weekly baseline at current trophies/ranked so weekly gain starts at 0.
           await BrawlStarsUser.upsert({
             userId: targetUser.id,
             playerTag: cleanTag,
             playerName: playerData.name || 'Brawler',
-            lastTrophies: playerData.trophies || 0,
+            lastTrophies: trophies,
             highestTrophies: playerData.highestTrophies || 0,
             lastRankedRank: bestRank,
             highestRankedRank: bestRank,
+            weekKey: currentWeek,
+            weekStartTrophies: isSameWeek ? (existingUser.weekStartTrophies ?? trophies) : trophies,
+            weekStartRankedRank: isSameWeek ? (existingUser.weekStartRankedRank ?? bestRank) : bestRank,
+            weeklyTrophyGain: isSameWeek ? (trophies - (existingUser.weekStartTrophies ?? trophies)) : 0,
+            weeklyRankedGain: isSameWeek ? (bestRank - (existingUser.weekStartRankedRank ?? bestRank)) : 0,
             lastCheckedAt: new Date(),
           });
 
-          // Record trophy snapshot
-          await brawlStarsService.recordTrophySnapshot(targetUser.id, cleanTag, playerData.trophies || 0);
+          // Record trophy & ranked snapshot
+          await brawlStarsService.recordTrophySnapshot(targetUser.id, cleanTag, trophies, bestRank);
 
           // Sync guild roles based on trophies and peak ranked tiers
           const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
@@ -326,7 +363,9 @@ module.exports = {
         // Fetch fresh player data to ensure current point is fresh
         try {
           const freshData = await brawlStarsService.fetchPlayerData(linkedUser.playerTag);
-          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, freshData.trophies || 0);
+          const freshRank = freshData.highestRankedRank ?? linkedUser.highestRankedRank ?? 0;
+          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, freshData.trophies || 0, freshRank);
+          await brawlStarsService.updateUserWeeklyStats(linkedUser, freshData.trophies || 0, freshRank);
           linkedUser.playerName = freshData.name || linkedUser.playerName;
         } catch (_) {}
 
@@ -396,6 +435,211 @@ module.exports = {
         console.error('[Command /bs graph] Erreur :', err);
         return interaction.editReply({
           embeds: [embeds.error(err.message || 'Une erreur est survenue lors de la génération du graphique d\'évolution.')],
+        });
+      }
+    }
+
+    // ==========================================
+    // 4. SUBCOMMAND: TOP
+    // ==========================================
+    else if (subcommand === 'top') {
+      const initialCategory = interaction.options.getString('categorie') || 'overview';
+      await interaction.deferReply();
+
+      try {
+        const leaderboards = await brawlStarsService.getLeaderboards(interaction.guild);
+        const trophyGrowthRoleId = await ConfigHelper.get('brawlstars_top_trophies_growth_role_id');
+        const rankedGrowthRoleId = await ConfigHelper.get('brawlstars_top_ranked_growth_role_id');
+
+        if (!leaderboards || leaderboards.totalPlayers === 0) {
+          const emptyEmbed = embeds.custom(
+            '🏆 Classement Brawl Stars',
+            'Aucun membre de ce serveur n\'a encore lié son compte Brawl Stars.\n\n' +
+            '👉 Utilisez la commande `/bs link <votre_tag>` pour lier votre profil et participer aux classements du serveur !',
+            accentColor
+          );
+          return interaction.editReply({ embeds: [emptyEmbed] });
+        }
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const formatRankNum = (idx) => medals[idx] || `**#${idx + 1}**`;
+        const getRankLabel = (tierId) => {
+          const tier = brawlStarsService.RANKED_TIERS.find(t => t.id === tierId);
+          return tier ? tier.name : (tierId > 0 ? `Rang ${tierId}` : 'Non classé');
+        };
+
+        const renderEmbed = (category) => {
+          let embed;
+
+          if (category === 'trophies') {
+            const list = leaderboards.topTrophies.slice(0, 10);
+            const lines = list.map((p, idx) => {
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) • \`${p.playerTag}\`\n┗ **${p.trophies.toLocaleString('fr-FR')}** 🏆`;
+            });
+            embed = embeds.custom(
+              '🏆 Classement : Top Trophées',
+              `Top des joueurs les plus hauts en trophées sur le serveur (${leaderboards.totalPlayers} joueurs liés) :\n\n` +
+              lines.join('\n\n'),
+              '#F59E0B'
+            );
+          } else if (category === 'ranked') {
+            const list = leaderboards.topRanked.slice(0, 10);
+            const lines = list.map((p, idx) => {
+              const peakLabel = p.highestRankedRank > p.rankedRank ? ` *(Record: ${getRankLabel(p.highestRankedRank)})*` : '';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) • \`${p.playerTag}\`\n┗ Rang : **${getRankLabel(p.rankedRank)}**${peakLabel} • ${p.trophies.toLocaleString('fr-FR')} 🏆`;
+            });
+            embed = embeds.custom(
+              '🎖️ Classement : Top Ranked',
+              `Top des joueurs les plus hauts en Ranked (Power League) sur le serveur :\n\n` +
+              lines.join('\n\n'),
+              '#A855F7'
+            );
+          } else if (category === 'gain_trophies') {
+            const list = leaderboards.topTrophyGain.slice(0, 10);
+            const roleMention = trophyGrowthRoleId ? `<@&${trophyGrowthRoleId}>` : null;
+            const lines = list.map((p, idx) => {
+              const gainSign = p.weeklyTrophyGain > 0 ? '+' : '';
+              const gainFormatted = `${gainSign}${p.weeklyTrophyGain.toLocaleString('fr-FR')} 🏆`;
+              const isWinner = idx === 0 && p.weeklyTrophyGain > 0;
+              const crownBadge = isWinner && roleMention ? ` 👑 *Détient le rôle ${roleMention}*` : '';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) : **${gainFormatted}**${crownBadge}\n┗ Début semaine : *${p.weekStartTrophies.toLocaleString('fr-FR')}* ➔ Actuel : **${p.trophies.toLocaleString('fr-FR')}** 🏆`;
+            });
+            embed = embeds.custom(
+              '📈 Meilleure Évolution Trophées (Semaine en cours)',
+              `Progression en trophées enregistrée depuis lundi (${leaderboards.weekKey}) :\n\n` +
+              lines.join('\n\n') +
+              (roleMention ? `\n\n⭐ **Rôle Hebdomadaire attribué au n°1 :** ${roleMention}` : ''),
+              '#10B981'
+            );
+          } else if (category === 'gain_ranked') {
+            const list = leaderboards.topRankedGain.slice(0, 10);
+            const roleMention = rankedGrowthRoleId ? `<@&${rankedGrowthRoleId}>` : null;
+            const lines = list.map((p, idx) => {
+              const gainSign = p.weeklyRankedGain > 0 ? '+' : '';
+              const isWinner = idx === 0 && p.weeklyRankedGain > 0;
+              const crownBadge = isWinner && roleMention ? ` 👑 *Détient le rôle ${roleMention}*` : '';
+              const diffText = p.weeklyRankedGain !== 0 
+                ? `${gainSign}${p.weeklyRankedGain} division(s)`
+                : `Stable (0)`;
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) : **${diffText}**${crownBadge}\n┗ Début semaine : *${getRankLabel(p.weekStartRankedRank)}* ➔ Actuel : **${getRankLabel(p.rankedRank)}**`;
+            });
+            embed = embeds.custom(
+              '⚡ Meilleure Évolution Ranked (Semaine en cours)',
+              `Progression en Ranked enregistrée depuis lundi (${leaderboards.weekKey}) :\n\n` +
+              lines.join('\n\n') +
+              (roleMention ? `\n\n⭐ **Rôle Hebdomadaire attribué au n°1 :** ${roleMention}` : ''),
+              '#3B82F6'
+            );
+          } else {
+            // Overview (Global)
+            const top3Trophies = leaderboards.topTrophies.slice(0, 3).map((p, idx) => 
+              `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${p.trophies.toLocaleString('fr-FR')}** 🏆`
+            ).join('\n') || '*Aucun joueur*';
+
+            const top3Ranked = leaderboards.topRanked.slice(0, 3).map((p, idx) => 
+              `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${getRankLabel(p.rankedRank)}**`
+            ).join('\n') || '*Aucun joueur*';
+
+            const top3TrophyGain = leaderboards.topTrophyGain.slice(0, 3).map((p, idx) => {
+              const sign = p.weeklyTrophyGain > 0 ? '+' : '';
+              const crown = idx === 0 && p.weeklyTrophyGain > 0 && trophyGrowthRoleId ? ' 👑' : '';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${sign}${p.weeklyTrophyGain.toLocaleString('fr-FR')}** 🏆${crown}`;
+            }).join('\n') || '*Aucune progression*';
+
+            const top3RankedGain = leaderboards.topRankedGain.slice(0, 3).map((p, idx) => {
+              const sign = p.weeklyRankedGain > 0 ? '+' : '';
+              const crown = idx === 0 && p.weeklyRankedGain > 0 && rankedGrowthRoleId ? ' 👑' : '';
+              const diffText = p.weeklyRankedGain !== 0 ? `${sign}${p.weeklyRankedGain} rang(s)` : 'Stable';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${diffText}** (${getRankLabel(p.rankedRank)})${crown}`;
+            }).join('\n') || '*Aucune progression*';
+
+            embed = embeds.custom(
+              '🎮 Classements Brawl Stars — Vue d\'ensemble',
+              `Statistiques globales et progressions de la semaine (**${leaderboards.weekKey}**) :\n\n` +
+              `🏆 **Top 3 Trophées**\n${top3Trophies}\n\n` +
+              `🎖️ **Top 3 Ranked**\n${top3Ranked}\n\n` +
+              `📈 **Top 3 Évolution Trophées (Semaine)**\n${top3TrophyGain}\n\n` +
+              `⚡ **Top 3 Évolution Ranked (Semaine)**\n${top3RankedGain}`,
+              accentColor
+            );
+          }
+
+          embed.setFooter({
+            text: `Semaine ${leaderboards.weekKey} • ${leaderboards.totalPlayers} joueurs liés • Cliquez sur les boutons pour explorer`,
+          });
+          return embed;
+        };
+
+        const buildActionRow = (currentCat) => {
+          return new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('bs_top_overview')
+              .setLabel('Vue Globale')
+              .setEmoji('🌐')
+              .setStyle(currentCat === 'overview' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId('bs_top_trophies')
+              .setLabel('Trophées')
+              .setEmoji('🏆')
+              .setStyle(currentCat === 'trophies' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId('bs_top_ranked')
+              .setLabel('Ranked')
+              .setEmoji('🎖️')
+              .setStyle(currentCat === 'ranked' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId('bs_top_gain_trophies')
+              .setLabel('Évol. Trophées')
+              .setEmoji('📈')
+              .setStyle(currentCat === 'gain_trophies' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId('bs_top_gain_ranked')
+              .setLabel('Évol. Ranked')
+              .setEmoji('⚡')
+              .setStyle(currentCat === 'gain_ranked' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+          );
+        };
+
+        let currentCategory = initialCategory;
+        const reply = await interaction.editReply({
+          embeds: [renderEmbed(currentCategory)],
+          components: [buildActionRow(currentCategory)],
+        });
+
+        // Interactive collector for category navigation buttons
+        const collector = reply.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          time: 300_000, // 5 minutes
+        });
+
+        collector.on('collect', async (btnInt) => {
+          const mapping = {
+            bs_top_overview: 'overview',
+            bs_top_trophies: 'trophies',
+            bs_top_ranked: 'ranked',
+            bs_top_gain_trophies: 'gain_trophies',
+            bs_top_gain_ranked: 'gain_ranked',
+          };
+          const nextCategory = mapping[btnInt.customId];
+          if (nextCategory) {
+            currentCategory = nextCategory;
+            await btnInt.update({
+              embeds: [renderEmbed(currentCategory)],
+              components: [buildActionRow(currentCategory)],
+            }).catch(() => {});
+          }
+        });
+
+        collector.on('end', async () => {
+          const disabledRow = buildActionRow(currentCategory);
+          disabledRow.components.forEach(btn => btn.setDisabled(true));
+          await reply.edit({ components: [disabledRow] }).catch(() => {});
+        });
+
+      } catch (err) {
+        console.error('[Command /bs top] Erreur :', err);
+        return interaction.editReply({
+          embeds: [embeds.error(err.message || 'Une erreur est survenue lors de la récupération des classements.')],
         });
       }
     }

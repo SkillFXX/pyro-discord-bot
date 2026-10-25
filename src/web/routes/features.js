@@ -526,9 +526,10 @@ function createFeaturesRouter(client) {
           const member = await guild.members.fetch(u.userId).catch(() => null);
           if (member) {
             const freshData = await brawlStarsService.fetchPlayerData(u.playerTag);
-            await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0);
-            await brawlStarsService.syncUserRoles(client, member, freshData);
             const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
+            await brawlStarsService.updateUserWeeklyStats(u, freshData.trophies || 0, peakRank);
+            await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank);
+            await brawlStarsService.syncUserRoles(client, member, freshData);
             await u.update({
               playerName: freshData.name || u.playerName,
               lastTrophies: freshData.trophies || 0,
@@ -542,7 +543,15 @@ function createFeaturesRouter(client) {
         } catch (_) {}
       }
 
-      return res.json({ success: true, syncedCount, totalUsers: linkedUsers.length });
+      // Sync weekly evolution roles (Top 1 Trophies Growth & Top 1 Ranked Growth)
+      const weeklyRolesResult = await brawlStarsService.syncWeeklyGrowthRoles(client);
+
+      return res.json({ 
+        success: true, 
+        syncedCount, 
+        totalUsers: linkedUsers.length,
+        weeklyRoles: weeklyRolesResult 
+      });
     } catch (err) {
       console.error('[Features] Erreur sync Brawl Stars :', err);
       return res.status(500).json({ error: 'Erreur serveur lors de la synchronisation des rôles.' });

@@ -35,6 +35,7 @@ function createDashboardRouter(client, distDir) {
         'xp_voice_enabled', 'xp_voice_gain', 'xp_voice_interval_seconds', 'xp_voice_min_members', 'xp_voice_ignore_muted', 'xp_voice_ignore_deafened',
         'xp_public_leaderboard', 'xp_leaderboard_search',
         'brawlstars_api_key',
+        'brawlstars_top_trophies_growth_role_id', 'brawlstars_top_ranked_growth_role_id',
         'music_enabled', 'music_lavalink_host', 'music_lavalink_port', 'music_lavalink_pass',
         'music_lavalink_secure', 'music_allowed_roles', 'music_allowed_channels',
         'music_default_volume', 'music_search_provider', 'music_247',

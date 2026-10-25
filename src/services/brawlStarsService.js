@@ -409,7 +409,7 @@ async function syncUserRoles(client, member, playerData = null) {
 /**
  * Records a trophy snapshot for history tracking.
  */
-async function recordTrophySnapshot(userId, playerTag, trophies) {
+async function recordTrophySnapshot(userId, playerTag, trophies, rankedRank = 0) {
   try {
     const cleanTag = normalizePlayerTag(playerTag);
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
@@ -422,7 +422,7 @@ async function recordTrophySnapshot(userId, playerTag, trophies) {
       order: [['recordedAt', 'DESC']],
     });
 
-    if (recent && recent.trophies === trophies) {
+    if (recent && recent.trophies === trophies && (recent.rankedRank ?? 0) === (rankedRank || 0)) {
       return;
     }
 
@@ -430,10 +430,246 @@ async function recordTrophySnapshot(userId, playerTag, trophies) {
       userId,
       playerTag: cleanTag,
       trophies,
+      rankedRank: rankedRank || 0,
       recordedAt: new Date(),
     });
   } catch (err) {
     console.warn('[BrawlStarsService] Erreur snapshot trophées :', err.message);
+  }
+}
+
+/**
+ * Returns ISO week key string, e.g. "2026-W43".
+ */
+function getIsoWeekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/**
+ * Returns Monday 00:00:00.000 for the week of the given date.
+ */
+function getStartOfWeek(d = new Date()) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+/**
+ * Ensures user's weekly starting baseline and progression gain are up to date.
+ */
+async function updateUserWeeklyStats(user, currentTrophies, currentRankedRank) {
+  try {
+    const currentWeek = getIsoWeekKey();
+    const cleanTrophies = typeof currentTrophies === 'number' ? currentTrophies : (user.lastTrophies || 0);
+    const cleanRank = typeof currentRankedRank === 'number' ? currentRankedRank : (user.lastRankedRank || 0);
+
+    if (user.weekKey !== currentWeek || user.weekStartTrophies === null || user.weekStartTrophies === undefined) {
+      const startOfWeek = getStartOfWeek();
+      let baseline = await BrawlStarsTrophyLog.findOne({
+        where: {
+          userId: user.userId,
+          recordedAt: { [Op.lte]: startOfWeek },
+        },
+        order: [['recordedAt', 'DESC']],
+      });
+
+      if (!baseline) {
+        baseline = await BrawlStarsTrophyLog.findOne({
+          where: { userId: user.userId },
+          order: [['recordedAt', 'ASC']],
+        });
+      }
+
+      user.weekStartTrophies = baseline ? (baseline.trophies ?? cleanTrophies) : cleanTrophies;
+      user.weekStartRankedRank = (baseline && typeof baseline.rankedRank === 'number' && baseline.rankedRank > 0)
+        ? baseline.rankedRank
+        : cleanRank;
+      user.weekKey = currentWeek;
+    }
+
+    // Safety guard: A player linking mid-week with high stats must NEVER have a baseline of 0
+    if (user.weekStartTrophies === 0 && cleanTrophies > 0) {
+      const firstEverLog = await BrawlStarsTrophyLog.findOne({
+        where: { userId: user.userId },
+        order: [['recordedAt', 'ASC']],
+      });
+      user.weekStartTrophies = firstEverLog ? firstEverLog.trophies : cleanTrophies;
+    }
+
+    if (user.weekStartRankedRank === 0 && cleanRank > 0) {
+      const firstEverLog = await BrawlStarsTrophyLog.findOne({
+        where: { userId: user.userId },
+        order: [['recordedAt', 'ASC']],
+      });
+      user.weekStartRankedRank = (firstEverLog && firstEverLog.rankedRank > 0) ? firstEverLog.rankedRank : cleanRank;
+    }
+
+    user.lastTrophies = cleanTrophies;
+    user.lastRankedRank = cleanRank;
+    user.weeklyTrophyGain = cleanTrophies - (user.weekStartTrophies ?? cleanTrophies);
+    user.weeklyRankedGain = cleanRank - (user.weekStartRankedRank ?? cleanRank);
+    user.lastCheckedAt = new Date();
+    await user.save();
+    return user;
+  } catch (err) {
+    console.warn('[BrawlStarsService] Erreur mise à jour stats hebdo :', err.message);
+    return user;
+  }
+}
+
+/**
+ * Fetches all linked guild members and returns sorted leaderboards:
+ * - topTrophies: sorted by trophies DESC
+ * - topRanked: sorted by rankedRank DESC, then trophies DESC
+ * - topTrophyGain: sorted by weeklyTrophyGain DESC
+ * - topRankedGain: sorted by weeklyRankedGain DESC
+ */
+async function getLeaderboards(guild) {
+  const linkedUsers = await BrawlStarsUser.findAll();
+  const currentWeek = getIsoWeekKey();
+
+  const guildUsers = [];
+  for (const u of linkedUsers) {
+    let member = null;
+    if (guild) {
+      member = guild.members.cache.get(u.userId) || await guild.members.fetch(u.userId).catch(() => null);
+    }
+    if (member) {
+      if (u.weekKey !== currentWeek || (u.weekStartTrophies === 0 && u.lastTrophies > 0)) {
+        await updateUserWeeklyStats(u, u.lastTrophies, u.lastRankedRank);
+      }
+      guildUsers.push({
+        user: u,
+        member,
+        userId: u.userId,
+        playerName: u.playerName || member.displayName || 'Brawler',
+        playerTag: u.playerTag,
+        trophies: u.lastTrophies || 0,
+        rankedRank: u.lastRankedRank || 0,
+        highestRankedRank: u.highestRankedRank || 0,
+        weeklyTrophyGain: u.weeklyTrophyGain || 0,
+        weeklyRankedGain: u.weeklyRankedGain || 0,
+        weekStartTrophies: u.weekStartTrophies || 0,
+        weekStartRankedRank: u.weekStartRankedRank || 0,
+      });
+    }
+  }
+
+  const topTrophies = [...guildUsers].sort((a, b) => b.trophies - a.trophies);
+  const topRanked = [...guildUsers].sort((a, b) => {
+    if (b.rankedRank !== a.rankedRank) return b.rankedRank - a.rankedRank;
+    return b.trophies - a.trophies;
+  });
+  const topTrophyGain = [...guildUsers].sort((a, b) => b.weeklyTrophyGain - a.weeklyTrophyGain);
+  const topRankedGain = [...guildUsers].sort((a, b) => {
+    if (b.weeklyRankedGain !== a.weeklyRankedGain) return b.weeklyRankedGain - a.weeklyRankedGain;
+    return b.weeklyTrophyGain - a.weeklyTrophyGain;
+  });
+
+  return {
+    topTrophies,
+    topRanked,
+    topTrophyGain,
+    topRankedGain,
+    totalPlayers: guildUsers.length,
+    weekKey: currentWeek,
+  };
+}
+
+/**
+ * Automatically attributes weekly progression roles to the #1 in trophy growth and ranked growth.
+ * Removes the role from any former holder.
+ */
+async function syncWeeklyGrowthRoles(client) {
+  try {
+    const trophyGrowthRoleId = await ConfigHelper.get('brawlstars_top_trophies_growth_role_id');
+    const rankedGrowthRoleId = await ConfigHelper.get('brawlstars_top_ranked_growth_role_id');
+
+    if (!trophyGrowthRoleId && !rankedGrowthRoleId) {
+      return { skipped: true, reason: 'Aucun rôle d\'évolution configuré.' };
+    }
+
+    const guildId = process.env.GUILD_ID;
+    const guild = client?.guilds?.cache?.get(guildId) || client?.guilds?.cache?.first();
+    if (!guild) {
+      return { skipped: true, reason: 'Serveur Discord introuvable.' };
+    }
+
+    const leaderboards = await getLeaderboards(guild);
+
+    let trophyWinner = null;
+    let rankedWinner = null;
+    let trophyRoleName = null;
+    let rankedRoleName = null;
+
+    // 1. Trophy Growth Role
+    if (trophyGrowthRoleId) {
+      const role = guild.roles.cache.get(trophyGrowthRoleId);
+      if (role) {
+        trophyRoleName = role.name;
+        // Winner is index 0 with positive gain
+        const candidate = leaderboards.topTrophyGain[0];
+        if (candidate && candidate.weeklyTrophyGain > 0) {
+          trophyWinner = candidate;
+        }
+
+        // Remove from everyone who is not the winner
+        for (const [memberId, member] of role.members) {
+          if (!trophyWinner || memberId !== trophyWinner.userId) {
+            await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Trophées').catch(() => {});
+          }
+        }
+
+        // Add to winner
+        if (trophyWinner && trophyWinner.member && !trophyWinner.member.roles.cache.has(role.id)) {
+          await trophyWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Trophées de la Semaine').catch(() => {});
+        }
+      }
+    }
+
+    // 2. Ranked Growth Role
+    if (rankedGrowthRoleId) {
+      const role = guild.roles.cache.get(rankedGrowthRoleId);
+      if (role) {
+        rankedRoleName = role.name;
+        // Winner is index 0 with positive gain
+        const candidate = leaderboards.topRankedGain[0];
+        if (candidate && candidate.weeklyRankedGain > 0) {
+          rankedWinner = candidate;
+        }
+
+        // Remove from everyone who is not the winner
+        for (const [memberId, member] of role.members) {
+          if (!rankedWinner || memberId !== rankedWinner.userId) {
+            await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Ranked').catch(() => {});
+          }
+        }
+
+        // Add to winner
+        if (rankedWinner && rankedWinner.member && !rankedWinner.member.roles.cache.has(role.id)) {
+          await rankedWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Ranked de la Semaine').catch(() => {});
+        }
+      }
+    }
+
+    return {
+      success: true,
+      trophyWinner: trophyWinner ? { userId: trophyWinner.userId, name: trophyWinner.playerName, gain: trophyWinner.weeklyTrophyGain } : null,
+      rankedWinner: rankedWinner ? { userId: rankedWinner.userId, name: rankedWinner.playerName, gain: rankedWinner.weeklyRankedGain } : null,
+      trophyRoleName,
+      rankedRoleName,
+    };
+  } catch (err) {
+    console.error('[BrawlStarsService] Erreur synchronisation rôles évolution hebdomadaire :', err);
+    return { success: false, error: err.message };
   }
 }
 
@@ -759,8 +995,9 @@ async function syncAllLinkedUsers(client) {
       try {
         const freshData = await fetchPlayerData(u.playerTag);
         if (freshData) {
-          await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0);
           const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
+          await updateUserWeeklyStats(u, freshData.trophies || 0, peakRank);
+          await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank);
           await u.update({
             playerName: freshData.name || u.playerName,
             lastTrophies: freshData.trophies || 0,
@@ -781,6 +1018,11 @@ async function syncAllLinkedUsers(client) {
       } catch (_) {}
       // Small delay between requests to respect API rate limits
       await new Promise(r => setTimeout(r, 300));
+    }
+
+    // Automatically sync weekly growth roles (Top 1 Trophies Growth & Top 1 Ranked Growth)
+    if (client) {
+      await syncWeeklyGrowthRoles(client);
     }
   } catch (err) {
     console.warn('[BrawlStarsService] Erreur lors de la synchronisation périodique :', err.message);
@@ -820,6 +1062,11 @@ module.exports = {
   syncUserRoles,
   recordTrophySnapshot,
   generateTrophyGraph,
+  getIsoWeekKey,
+  getStartOfWeek,
+  updateUserWeeklyStats,
+  getLeaderboards,
+  syncWeeklyGrowthRoles,
   syncAllLinkedUsers,
   initPeriodicSync,
 };

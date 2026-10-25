@@ -70,6 +70,7 @@
         { id: 'brawlstars-api', label: 'Clé API Brawl Stars' },
         { id: 'brawlstars-trophies', label: 'Paliers Trophées' },
         { id: 'brawlstars-ranked', label: 'Paliers Ranked' },
+        { id: 'brawlstars-weekly', label: 'Rôles Top Évolution' },
       ],
     },
     {

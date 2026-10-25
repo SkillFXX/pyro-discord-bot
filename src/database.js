@@ -425,6 +425,26 @@ const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  weekKey: {
+    type: DataTypes.STRING(32),
+    defaultValue: '',
+  },
+  weekStartTrophies: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  weekStartRankedRank: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  weeklyTrophyGain: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  weeklyRankedGain: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
   lastCheckedAt: {
     type: DataTypes.DATE,
     allowNull: true,
@@ -453,6 +473,10 @@ const BrawlStarsTrophyLog = sequelize.define('BrawlStarsTrophyLog', {
   trophies: {
     type: DataTypes.INTEGER,
     allowNull: false,
+  },
+  rankedRank: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
   },
   recordedAt: {
     type: DataTypes.DATE,
@@ -747,6 +771,43 @@ async function ensureAutomodColumns() {
 }
 
 /**
+ * Ensures newly added columns exist in SQLite BrawlStarsUsers and BrawlStarsTrophyLogs tables
+ */
+async function ensureBrawlStarsColumns() {
+  try {
+    const [userCols] = await sequelize.query('PRAGMA table_info(BrawlStarsUsers);');
+    const userColNames = (userCols || []).map(c => c.name);
+    if (userColNames.length > 0) {
+      if (!userColNames.includes('weekKey')) {
+        await sequelize.query("ALTER TABLE BrawlStarsUsers ADD COLUMN weekKey VARCHAR(32) DEFAULT '';");
+      }
+      if (!userColNames.includes('weekStartTrophies')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN weekStartTrophies INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('weekStartRankedRank')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN weekStartRankedRank INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('weeklyTrophyGain')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN weeklyTrophyGain INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('weeklyRankedGain')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN weeklyRankedGain INTEGER DEFAULT 0;');
+      }
+    }
+
+    const [logCols] = await sequelize.query('PRAGMA table_info(BrawlStarsTrophyLogs);');
+    const logColNames = (logCols || []).map(c => c.name);
+    if (logColNames.length > 0) {
+      if (!logColNames.includes('rankedRank')) {
+        await sequelize.query('ALTER TABLE BrawlStarsTrophyLogs ADD COLUMN rankedRank INTEGER DEFAULT 0;');
+      }
+    }
+  } catch (err) {
+    console.warn('[Database] Brawl Stars column check notice:', err.message);
+  }
+}
+
+/**
  * Configure SQLite high-performance PRAGMAs:
  * - WAL mode (Write-Ahead Logging): allows concurrent reads during writes, prevents SQLITE_BUSY
  * - synchronous = NORMAL: faster writes while retaining durability in WAL mode
@@ -762,6 +823,7 @@ async function initDatabasePragmas() {
     await sequelize.query('PRAGMA foreign_keys = ON;');
     await ensureMessageLogColumns();
     await ensureAutomodColumns();
+    await ensureBrawlStarsColumns();
     await ConfigHelper.preloadCache();
   } catch (err) {
     console.warn('[Database] Warning applying SQLite PRAGMAs:', err.message);
