@@ -41,6 +41,7 @@ async function handleConfigSave(section, body, client) {
   } else if (section === 'tickets') {
     const ticketFields = [
       'ticket_category_id', 'ticket_staff_role_id',
+      'ticket_channel_name',
       'ticket_panel_title', 'ticket_panel_message',
       'ticket_embed_title', 'ticket_embed_message'
     ];

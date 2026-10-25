@@ -29,6 +29,7 @@ function createDashboardRouter(client, distDir) {
         'welcome_message_template', 'leave_message_template',
         'member_counter_channel_id', 'member_counter_template',
         'ticket_category_id', 'ticket_staff_role_id',
+        'ticket_channel_name',
         'ticket_panel_title', 'ticket_panel_message',
         'ticket_embed_title', 'ticket_embed_message',
         'xp_enabled', 'xp_min_gain', 'xp_max_gain', 'xp_cooldown_seconds', 'xp_announcement_channel_id',

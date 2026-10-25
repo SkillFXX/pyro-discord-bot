@@ -1,5 +1,5 @@
 <script>
-  import { Ticket, Send, Save, MessageSquare, LayoutTemplate, Tag } from '@lucide/svelte';
+  import { Ticket, Send, Save, MessageSquare, LayoutTemplate, Tag, Hash } from '@lucide/svelte';
   import Card from '../components/Card.svelte';
   import { dashboardData, saveConfig, deployTicketMessage } from '../stores/data';
 
@@ -7,6 +7,7 @@
   let deploying = false;
   let deployChannelId = '';
 
+  const defaultChannelName = 'ticket-{username}-{id4}';
   const defaultPanelTitle = '🎫 Support - Ouvrir un Ticket';
   const defaultPanelMessage = "Besoin d'aide ? Vous rencontrez un problème ?\nCliquez sur le bouton ci-dessous pour ouvrir un ticket et entrer en contact avec notre équipe.";
 
@@ -15,6 +16,25 @@
 
   $: config = $dashboardData.config || {};
   $: embedColor = config.embed_color || 'var(--accent, #ff6b35)';
+
+  function formatChannelNamePreview(template) {
+    const raw = template || defaultChannelName;
+    return raw
+      .toLowerCase()
+      .replace(/{user}/gi, 'utilisateurexemple')
+      .replace(/{username}/gi, 'utilisateurexemple')
+      .replace(/{id}/gi, '123456789012345678')
+      .replace(/{id4}/gi, '5678')
+      .replace(/{count}/gi, '42')
+      .replace(/{count4}/gi, '0042')
+      .replace(/{subject}/gi, 'assistance')
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^a-z0-9\-\u00a0-\uFFFF]/gi, '')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'ticket-utilisateurexemple-5678';
+  }
+
+  $: channelNamePreview = formatChannelNamePreview(config.ticket_channel_name || defaultChannelName);
 
   $: panelTitlePreview = config.ticket_panel_title || defaultPanelTitle;
   $: panelMessagePreview = config.ticket_panel_message || defaultPanelMessage;
@@ -56,11 +76,23 @@
     }));
   }
 
+  function insertChannelVariable(variable) {
+    const current = config.ticket_channel_name ?? defaultChannelName;
+    dashboardData.update((d) => ({
+      ...d,
+      config: {
+        ...d.config,
+        ticket_channel_name: current ? `${current}-${variable}` : variable,
+      },
+    }));
+  }
+
   async function handleSave() {
     savingConfig = true;
     await saveConfig('tickets', {
       ticket_category_id: config.ticket_category_id || '',
       ticket_staff_role_id: config.ticket_staff_role_id || '',
+      ticket_channel_name: config.ticket_channel_name || '',
       ticket_panel_title: config.ticket_panel_title || '',
       ticket_panel_message: config.ticket_panel_message || '',
       ticket_embed_title: config.ticket_embed_title || '',
@@ -114,6 +146,39 @@
             {/each}
           </select>
           <small class="help-text">Ce rôle bénéficiera des permissions d'accès et d'écriture dans chaque ticket créé.</small>
+        </div>
+      </div>
+
+      <div class="channel-name-config">
+        <div class="form-group" style="margin-bottom: 0;">
+          <div class="label-with-preview">
+            <label for="ticket_channel_name">Format du Nom des Salons de Ticket</label>
+            <span class="channel-preview-badge">
+              <Hash size={13} style="vertical-align: middle; margin-right: 3px;" />
+              {channelNamePreview}
+            </span>
+          </div>
+          <input
+            id="ticket_channel_name"
+            type="text"
+            bind:value={config.ticket_channel_name}
+            placeholder={defaultChannelName}
+          />
+          <small class="help-text">
+            Structure du nom du salon textuel créé sur Discord. Les espaces et caractères spéciaux sont automatiquement normalisés en minuscules et tirets.
+          </small>
+
+          <div class="variables-section" style="margin-top: 0.65rem;">
+            <span class="var-title"><Tag size={12} style="vertical-align: middle; margin-right: 4px;" /> Variables cliquables :</span>
+            <div class="var-chips">
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{username}')}>{'{username}'}</button>
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{id4}')}>{'{id4}'}</button>
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{count4}')}>{'{count4}'}</button>
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{count}')}>{'{count}'}</button>
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{subject}')}>{'{subject}'}</button>
+              <button type="button" class="var-chip" on:click={() => insertChannelVariable('{id}')}>{'{id}'}</button>
+            </div>
+          </div>
         </div>
       </div>
     </Card>
@@ -472,5 +537,37 @@
     border-color: var(--accent);
     color: var(--accent);
     background: var(--surface-hover);
+  }
+
+  .channel-name-config {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .label-with-preview {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .label-with-preview label {
+    margin-bottom: 0;
+  }
+
+  .channel-preview-badge {
+    background: rgba(88, 101, 242, 0.15);
+    color: #5865f2;
+    border: 1px solid rgba(88, 101, 242, 0.35);
+    font-family: monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
   }
 </style>

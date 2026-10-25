@@ -97,7 +97,7 @@ async function handleTicketModalSubmit(interaction, client) {
     }
 
     // Create the channel
-    const channelName = `ticket-${user.username.substring(0, 15)}-${user.id.substring(user.id.length - 4)}`;
+    const channelName = await generateTicketChannelName(user, subject);
     const ticketChannel = await guild.channels.create({
       name: channelName,
       type: ChannelType.GuildText,
@@ -404,10 +404,92 @@ async function deleteTicket(interaction, client) {
   }, 5000);
 }
 
+/**
+ * Sanitizes a string to conform to Discord text channel naming rules.
+ */
+function sanitizeChannelName(name) {
+  if (!name) return 'ticket';
+
+  let cleaned = name.toLowerCase().trim();
+  // Replace spaces and underscores with hyphens
+  cleaned = cleaned.replace(/[\s_]+/g, '-');
+  // Keep alphanumeric characters, hyphens, and safe unicode (emojis/accents)
+  cleaned = cleaned.replace(/[^a-z0-9\-\u00a0-\uFFFF]/gi, '');
+  // Collapse consecutive hyphens
+  cleaned = cleaned.replace(/-+/g, '-');
+  // Strip leading and trailing hyphens
+  cleaned = cleaned.replace(/^-+|-+$/g, '');
+
+  if (cleaned.length > 100) {
+    cleaned = cleaned.substring(0, 100).replace(/-+$/, '');
+  }
+
+  return cleaned || 'ticket';
+}
+
+/**
+ * Gets and increments the sequential ticket counter.
+ */
+async function getNextTicketCount() {
+  try {
+    const val = parseInt((await ConfigHelper.get('ticket_counter')) || '0', 10);
+    const next = isNaN(val) ? 1 : val + 1;
+    await ConfigHelper.set('ticket_counter', String(next));
+    return next;
+  } catch (err) {
+    console.warn('[TicketHelper] Erreur incrémentation ticket_counter :', err);
+    return Math.floor(Math.random() * 9000) + 1000;
+  }
+}
+
+/**
+ * Generates a channel name according to configured template or override.
+ */
+async function generateTicketChannelName(user, subject = '', customNameOverride = null) {
+  if (customNameOverride && customNameOverride.trim()) {
+    return sanitizeChannelName(customNameOverride.trim());
+  }
+
+  const template = (await ConfigHelper.get('ticket_channel_name')) || 'ticket-{username}-{id4}';
+
+  const idStr = String(user.id || '');
+  const id4 = idStr.length >= 4 ? idStr.substring(idStr.length - 4) : idStr;
+  const rawUsername = user.username || user.displayName || 'user';
+  const cleanUsername = rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 15) || 'user';
+
+  let formatted = template
+    .replace(/{user}/gi, cleanUsername)
+    .replace(/{username}/gi, cleanUsername)
+    .replace(/{id}/gi, idStr)
+    .replace(/{id4}/gi, id4);
+
+  if (/{count4}/gi.test(formatted) || /{count}/gi.test(formatted)) {
+    const count = await getNextTicketCount();
+    const count4 = String(count).padStart(4, '0');
+    formatted = formatted
+      .replace(/{count4}/gi, count4)
+      .replace(/{count}/gi, String(count));
+  }
+
+  if (/{subject}/gi.test(formatted)) {
+    const cleanSubject = (subject || 'demande')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 15)
+      .replace(/^-+|-+$/g, '') || 'demande';
+    formatted = formatted.replace(/{subject}/gi, cleanSubject);
+  }
+
+  return sanitizeChannelName(formatted);
+}
+
 module.exports = {
   showTicketModal,
   handleTicketModalSubmit,
   closeTicket,
   reopenTicket,
   deleteTicket,
+  generateTicketChannelName,
+  sanitizeChannelName,
 };
