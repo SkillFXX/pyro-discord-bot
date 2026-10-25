@@ -526,7 +526,8 @@ function createFeaturesRouter(client) {
           const member = await guild.members.fetch(u.userId).catch(() => null);
           if (member) {
             const freshData = await brawlStarsService.fetchPlayerData(u.playerTag);
-            await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0);
+            const currentRankedPoints = freshData.currentRankedPoints || 0;
+            await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, currentRankedPoints);
             await brawlStarsService.syncUserRoles(client, member, freshData);
             const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
             await u.update({
@@ -535,6 +536,8 @@ function createFeaturesRouter(client) {
               highestTrophies: freshData.highestTrophies || 0,
               lastRankedRank: peakRank,
               highestRankedRank: peakRank,
+              lastRankedPoints: currentRankedPoints,
+              highestRankedPoints: Math.max(u.highestRankedPoints || 0, currentRankedPoints),
               lastCheckedAt: new Date(),
             });
             syncedCount++;

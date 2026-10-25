@@ -425,6 +425,14 @@ const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  lastRankedPoints: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  highestRankedPoints: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
   lastCheckedAt: {
     type: DataTypes.DATE,
     allowNull: true,
@@ -453,6 +461,11 @@ const BrawlStarsTrophyLog = sequelize.define('BrawlStarsTrophyLog', {
   trophies: {
     type: DataTypes.INTEGER,
     allowNull: false,
+  },
+  rankedPoints: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
   },
   recordedAt: {
     type: DataTypes.DATE,

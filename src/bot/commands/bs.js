@@ -56,7 +56,16 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('graph')
-        .setDescription('Afficher un graphique avec courbe lissée de l\'évolution des trophées jour par jour.')
+        .setDescription('Afficher un graphique d\'évolution (Trophées généraux ou Points Ranked).')
+        .addStringOption(option =>
+          option
+            .setName('type')
+            .setDescription('Type de graphique (Trophées généraux ou Points Ranked)')
+            .setRequired(false)
+            .addChoices(
+              { name: '🏆 Trophées généraux', value: 'trophies' },
+              { name: '🎖️ Points Ranked (Compétitif)', value: 'ranked' }
+            ))
         .addIntegerOption(option =>
           option
             .setName('jours')
@@ -308,6 +317,7 @@ module.exports = {
     // 3. SUBCOMMAND: GRAPH
     // ==========================================
     else if (subcommand === 'graph') {
+      const graphType = interaction.options.getString('type') || 'trophies';
       const targetUser = interaction.options.getUser('membre') || interaction.user;
       const days = interaction.options.getInteger('jours') || 30;
 
@@ -326,7 +336,8 @@ module.exports = {
         // Fetch fresh player data to ensure current point is fresh
         try {
           const freshData = await brawlStarsService.fetchPlayerData(linkedUser.playerTag);
-          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, freshData.trophies || 0);
+          const currentRankedPoints = freshData.currentRankedPoints || 0;
+          await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, freshData.trophies || 0, currentRankedPoints);
           linkedUser.playerName = freshData.name || linkedUser.playerName;
         } catch (_) {}
 
@@ -341,7 +352,7 @@ module.exports = {
           order: [['recordedAt', 'ASC']],
         });
 
-        // Query the most recent baseline snapshot before startDate to know starting trophies
+        // Query the most recent baseline snapshot before startDate to know starting trophies/ranked points
         const baselineLog = await BrawlStarsTrophyLog.findOne({
           where: {
             userId: targetUser.id,
@@ -354,18 +365,27 @@ module.exports = {
         if (baselineLog) {
           logs.unshift({
             trophies: baselineLog.trophies,
+            rankedPoints: baselineLog.rankedPoints || 0,
             recordedAt: startDate,
           });
         }
 
-        // Generate smoothed graph canvas
-        const graphBuffer = await brawlStarsService.generateTrophyGraph(
-          linkedUser.playerName || targetUser.username,
-          linkedUser.playerTag,
-          logs,
-          days,
-          accentColor
-        );
+        // Generate smoothed graph canvas (Trophies or Ranked)
+        const isRanked = graphType === 'ranked';
+        const graphBuffer = isRanked
+          ? await brawlStarsService.generateRankedGraph(
+              linkedUser.playerName || targetUser.username,
+              linkedUser.playerTag,
+              logs,
+              days
+            )
+          : await brawlStarsService.generateTrophyGraph(
+              linkedUser.playerName || targetUser.username,
+              linkedUser.playerTag,
+              logs,
+              days,
+              accentColor
+            );
 
         let periodDesc = `les **${days} derniers jours**`;
         if (logs.length > 0) {
@@ -376,15 +396,23 @@ module.exports = {
           }
         }
 
-        const attachment = new AttachmentBuilder(graphBuffer, { name: `trophy-evolution-${linkedUser.playerTag.replace('#', '')}.png` });
+        const filePrefix = isRanked ? 'ranked-evolution' : 'trophy-evolution';
+        const filename = `${filePrefix}-${linkedUser.playerTag.replace('#', '')}.png`;
+        const attachment = new AttachmentBuilder(graphBuffer, { name: filename });
+
+        const embedTitle = isRanked
+          ? `🎖️ Évolution des Points Ranked — ${linkedUser.playerName || targetUser.username}`
+          : `📈 Évolution des Trophées — ${linkedUser.playerName || targetUser.username}`;
+
+        const embedColor = isRanked ? '#A855F7' : accentColor;
 
         const embed = embeds.custom(
-          `📈 Évolution des Trophées — ${linkedUser.playerName || targetUser.username}`,
+          embedTitle,
           `Période : ${periodDesc} • Tag : \`${linkedUser.playerTag}\``,
-          accentColor,
+          embedColor,
           null,
           null,
-          `attachment://trophy-evolution-${linkedUser.playerTag.replace('#', '')}.png`
+          `attachment://${filename}`
         );
 
         return interaction.editReply({
