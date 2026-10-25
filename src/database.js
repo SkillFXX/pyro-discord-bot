@@ -425,6 +425,14 @@ const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  lastRankedPoints: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  highestRankedPoints: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
   weekKey: {
     type: DataTypes.STRING(32),
     defaultValue: '',
@@ -476,6 +484,11 @@ const BrawlStarsTrophyLog = sequelize.define('BrawlStarsTrophyLog', {
   },
   rankedRank: {
     type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  rankedPoints: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
     defaultValue: 0,
   },
   recordedAt: {
@@ -778,6 +791,12 @@ async function ensureBrawlStarsColumns() {
     const [userCols] = await sequelize.query('PRAGMA table_info(BrawlStarsUsers);');
     const userColNames = (userCols || []).map(c => c.name);
     if (userColNames.length > 0) {
+      if (!userColNames.includes('lastRankedPoints')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN lastRankedPoints INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('highestRankedPoints')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN highestRankedPoints INTEGER DEFAULT 0;');
+      }
       if (!userColNames.includes('weekKey')) {
         await sequelize.query("ALTER TABLE BrawlStarsUsers ADD COLUMN weekKey VARCHAR(32) DEFAULT '';");
       }
@@ -798,6 +817,9 @@ async function ensureBrawlStarsColumns() {
     const [logCols] = await sequelize.query('PRAGMA table_info(BrawlStarsTrophyLogs);');
     const logColNames = (logCols || []).map(c => c.name);
     if (logColNames.length > 0) {
+      if (!logColNames.includes('rankedPoints')) {
+        await sequelize.query('ALTER TABLE BrawlStarsTrophyLogs ADD COLUMN rankedPoints INTEGER DEFAULT 0;');
+      }
       if (!logColNames.includes('rankedRank')) {
         await sequelize.query('ALTER TABLE BrawlStarsTrophyLogs ADD COLUMN rankedRank INTEGER DEFAULT 0;');
       }

@@ -101,6 +101,84 @@ function drawTrophyIcon(ctx, x, y, size = 36) {
 }
 
 /**
+ * Draws a clean vector Ranked shield icon with purple glow and golden star.
+ * @param {object} ctx Canvas 2D context
+ * @param {number} x
+ * @param {number} y
+ * @param {number} size
+ */
+function drawRankedIcon(ctx, x, y, size = 36) {
+  ctx.save();
+  ctx.translate(x, y);
+  const s = size / 36;
+  ctx.scale(s, s);
+
+  // Background circular badge glow
+  ctx.fillStyle = 'rgba(168, 85, 247, 0.15)';
+  ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(18, 18, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Purple/Magenta Shield gradient
+  const shieldGrad = ctx.createLinearGradient(10, 8, 26, 28);
+  shieldGrad.addColorStop(0, '#C084FC');
+  shieldGrad.addColorStop(0.5, '#9333EA');
+  shieldGrad.addColorStop(1, '#6B21A8');
+
+  ctx.fillStyle = shieldGrad;
+  ctx.strokeStyle = '#E9D5FF';
+  ctx.lineWidth = 1.2;
+
+  // Hexagon/Diamond Shield
+  ctx.beginPath();
+  ctx.moveTo(18, 7);
+  ctx.lineTo(27, 12);
+  ctx.lineTo(25, 24);
+  ctx.lineTo(18, 29);
+  ctx.lineTo(11, 24);
+  ctx.lineTo(9, 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Golden star in center
+  ctx.fillStyle = '#FBBF24';
+  ctx.strokeStyle = '#D97706';
+  ctx.lineWidth = 0.8;
+
+  ctx.beginPath();
+  const cx = 18;
+  const cy = 18;
+  const spikes = 5;
+  const outerRadius = 5.5;
+  const innerRadius = 2.5;
+  let rot = (Math.PI / 2) * 3;
+  const step = Math.PI / spikes;
+
+  ctx.moveTo(cx, cy - outerRadius);
+  for (let i = 0; i < spikes; i++) {
+    let sx = cx + Math.cos(rot) * outerRadius;
+    let sy = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(sx, sy);
+    rot += step;
+
+    sx = cx + Math.cos(rot) * innerRadius;
+    sy = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(sx, sy);
+    rot += step;
+  }
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Normalizes a Brawl Stars player tag.
  * Replaces 'O' with '0', removes whitespace and ensures '#' prefix.
  * @param {string} tag
@@ -234,6 +312,7 @@ async function fetchPlayerData(playerTag) {
   data.highestRank = bestRank;
   data.highestRankedRank = bestRank;
   data.soloLeagueRank = bestRank;
+  data.currentRankedPoints = Number(data.rankedElo || data.highestAllTimeRankedElo || data.highestRankedElo || 0);
 
   return data;
 }
@@ -407,9 +486,9 @@ async function syncUserRoles(client, member, playerData = null) {
 }
 
 /**
- * Records a trophy snapshot for history tracking.
+ * Records a trophy & ranked snapshot for history tracking.
  */
-async function recordTrophySnapshot(userId, playerTag, trophies, rankedRank = 0) {
+async function recordTrophySnapshot(userId, playerTag, trophies, arg4 = 0, arg5 = 0) {
   try {
     const cleanTag = normalizePlayerTag(playerTag);
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
@@ -422,7 +501,25 @@ async function recordTrophySnapshot(userId, playerTag, trophies, rankedRank = 0)
       order: [['recordedAt', 'DESC']],
     });
 
-    if (recent && recent.trophies === trophies && (recent.rankedRank ?? 0) === (rankedRank || 0)) {
+    let rankedRank = 0;
+    let rankedPoints = 0;
+    if (typeof arg4 === 'object' && arg4 !== null) {
+      rankedRank = arg4.rankedRank || 0;
+      rankedPoints = arg4.rankedPoints || 0;
+    } else if (arg4 > 50) {
+      rankedPoints = arg4;
+      rankedRank = arg5 || 0;
+    } else {
+      rankedRank = arg4 || 0;
+      rankedPoints = arg5 || 0;
+    }
+
+    if (
+      recent &&
+      recent.trophies === trophies &&
+      (recent.rankedRank ?? 0) === (rankedRank || 0) &&
+      (recent.rankedPoints ?? 0) === (rankedPoints || 0)
+    ) {
       return;
     }
 
@@ -431,10 +528,11 @@ async function recordTrophySnapshot(userId, playerTag, trophies, rankedRank = 0)
       playerTag: cleanTag,
       trophies,
       rankedRank: rankedRank || 0,
+      rankedPoints: rankedPoints || 0,
       recordedAt: new Date(),
     });
   } catch (err) {
-    console.warn('[BrawlStarsService] Erreur snapshot trophées :', err.message);
+    console.warn('[BrawlStarsService] Erreur snapshot trophées/ranked :', err.message);
   }
 }
 
@@ -708,7 +806,10 @@ function getLocalDateKey(date) {
  * Handles gaps between days with carry-forward, collapses multiple intra-day snapshots
  * into daily end-of-day values, and supports intra-day mode when only one day of data exists.
  */
-async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accentColor = '#FF6B35') {
+async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accentColor = '#FF6B35', metric = 'trophies') {
+  if (metric === 'ranked') {
+    return generateRankedGraph(playerName, playerTag, logs, days, accentColor === '#FF6B35' ? '#A855F7' : accentColor);
+  }
   const width = 1100;
   const height = 580;
   const canvas = createCanvas(width, height);
@@ -976,6 +1077,288 @@ async function generateTrophyGraph(playerName, playerTag, logs, days = 30, accen
 }
 
 /**
+ * Generates a smooth, regular day-by-day bezier curve chart showing Ranked (Elo) points evolution.
+ */
+async function generateRankedGraph(playerName, playerTag, logs, days = 30, accentColor = '#A855F7') {
+  const width = 1100;
+  const height = 580;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, '#0F1219');
+  bgGrad.addColorStop(1, '#090B0F');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Top header box
+  ctx.fillStyle = '#151924';
+  ctx.strokeStyle = '#252B3C';
+  ctx.lineWidth = 1;
+  roundRect(ctx, 35, 25, width - 70, 95, 12, true, true);
+
+  // Ranked Icon in header
+  drawRankedIcon(ctx, 50, 42, 36);
+
+  // Header Title
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText(`Évolution Ranked — ${playerName}`, 100, 62);
+
+  // Handle case with no data
+  if (!logs || logs.length === 0) {
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Données insuffisantes pour tracer une courbe d\'évolution Ranked.', width / 2, height / 2);
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Le bot enregistre automatiquement vos points Ranked au fil du temps.', width / 2, height / 2 + 30);
+    return canvas.toBuffer('image/png');
+  }
+
+  // Sort logs chronologically ASC
+  const sorted = [...logs].sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+
+  // Group snapshots by calendar day to keep the latest snapshot of each day
+  const logsByDay = new Map();
+  for (const log of sorted) {
+    const dayKey = getLocalDateKey(log.recordedAt);
+    logsByDay.set(dayKey, log);
+  }
+
+  const uniqueDays = Array.from(logsByDay.keys());
+  let points = [];
+  let periodSubtitle = '';
+
+  // Chart bounds
+  const chartX = 85;
+  const chartY = 165;
+  const chartW = width - 130;
+  const chartH = height - 240;
+
+  if (uniqueDays.length < 2) {
+    if (sorted.length < 2) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Données insuffisantes pour tracer une courbe d\'évolution Ranked.', width / 2, height / 2);
+      ctx.font = '13px sans-serif';
+      ctx.fillText('Le bot enregistre automatiquement vos points Ranked au fil du temps.', width / 2, height / 2 + 30);
+      return canvas.toBuffer('image/png');
+    }
+
+    const minTime = new Date(sorted[0].recordedAt).getTime();
+    const maxTime = new Date(sorted[sorted.length - 1].recordedAt).getTime();
+    const timeRange = maxTime - minTime || 1;
+
+    periodSubtitle = `Aujourd'hui (${sorted.length} relevés)`;
+    points = sorted.map(l => {
+      const t = new Date(l.recordedAt).getTime();
+      return {
+        value: Number(l.rankedPoints || 0),
+        date: new Date(l.recordedAt),
+        tRel: (t - minTime) / timeRange,
+        label: new Date(l.recordedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      };
+    });
+  } else {
+    const firstLogDate = new Date(sorted[0].recordedAt);
+    firstLogDate.setHours(0, 0, 0, 0);
+
+    const lastLogDate = new Date(sorted[sorted.length - 1].recordedAt);
+    lastLogDate.setHours(0, 0, 0, 0);
+
+    const requestedStartDate = new Date(lastLogDate.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    const actualStartDate = new Date(Math.max(firstLogDate.getTime(), requestedStartDate.getTime()));
+
+    let currentVal = Number(sorted[0].rankedPoints || 0);
+    for (const l of sorted) {
+      if (new Date(l.recordedAt) <= actualStartDate) {
+        currentVal = Number(l.rankedPoints || 0);
+      }
+    }
+
+    const curr = new Date(actualStartDate);
+    const dailyPoints = [];
+
+    while (curr <= lastLogDate) {
+      const key = getLocalDateKey(curr);
+      if (logsByDay.has(key)) {
+        currentVal = Number(logsByDay.get(key).rankedPoints || 0);
+      }
+      dailyPoints.push({
+        date: new Date(curr),
+        value: currentVal,
+        label: new Date(curr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+      });
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    const totalDays = dailyPoints.length;
+    periodSubtitle = `${totalDays} derniers jours`;
+    points = dailyPoints.map((d, index) => ({
+      ...d,
+      tRel: totalDays > 1 ? index / (totalDays - 1) : 0,
+    }));
+  }
+
+  const values = points.map(p => p.value);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const startVal = points[0].value;
+  const endVal = points[points.length - 1].value;
+  const delta = endVal - startVal;
+
+  if (maxVal === 0 && minVal === 0) {
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Aucun point Ranked enregistré sur cette période.', width / 2, height / 2);
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Participez à des matchs du mode Ranked (Compétitif) Brawl Stars pour commencer le suivi.', width / 2, height / 2 + 30);
+    return canvas.toBuffer('image/png');
+  }
+
+  const currentTierId = convertEloToRankedTier(endVal);
+  const currentTierObj = RANKED_TIERS.find(t => t.id === currentTierId);
+  const currentTierName = currentTierObj ? currentTierObj.name : 'Non classé';
+
+  // Subtitle
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '14px monospace';
+  ctx.fillText(`${playerTag} • Période : ${periodSubtitle}`, 100, 90);
+
+  // Delta & metrics
+  const deltaText = delta > 0 ? `+${delta.toLocaleString('fr-FR')} pts` : (delta < 0 ? `${delta.toLocaleString('fr-FR')} pts` : '0 pt');
+  const deltaColor = delta > 0 ? '#10B981' : (delta < 0 ? '#EF4444' : '#94A3B8');
+
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = deltaColor;
+  ctx.fillText(deltaText, width - 55, 62);
+
+  ctx.font = '13px sans-serif';
+  ctx.fillStyle = currentTierObj ? currentTierObj.color : '#C084FC';
+  const tierText = `Rang : ${currentTierName} (${endVal.toLocaleString('fr-FR')} pts)`;
+  ctx.fillText(`${tierText} • Min: ${minVal.toLocaleString('fr-FR')} • Max: ${maxVal.toLocaleString('fr-FR')}`, width - 55, 90);
+  ctx.textAlign = 'left';
+
+  // Value bounds & Range
+  const valMargin = Math.max(50, Math.round((maxVal - minVal) * 0.15));
+  const chartMin = Math.max(0, minVal - valMargin);
+  const chartMax = maxVal + valMargin;
+  const valRange = chartMax - chartMin || 1;
+
+  // Grid Lines
+  const gridLines = 5;
+  ctx.strokeStyle = '#1F2535';
+  ctx.lineWidth = 1;
+  ctx.font = '12px monospace';
+  ctx.fillStyle = '#64748B';
+
+  for (let i = 0; i <= gridLines; i++) {
+    const gy = chartY + (chartH / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(chartX, gy);
+    ctx.lineTo(chartX + chartW, gy);
+    ctx.stroke();
+
+    const gVal = Math.round(chartMax - (valRange / gridLines) * i);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${gVal.toLocaleString('fr-FR')} pts`, chartX - 12, gy + 4);
+  }
+  ctx.textAlign = 'left';
+
+  // Compute pixel positions for all points
+  points.forEach(p => {
+    p.x = chartX + p.tRel * chartW;
+    p.y = chartY + chartH - ((p.value - chartMin) / valRange) * chartH;
+  });
+
+  // Curve
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+    let cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    let cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p1.y, p2.y);
+    cp1y = Math.max(minY, Math.min(maxY, cp1y));
+    cp2y = Math.max(minY, Math.min(maxY, cp2y));
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  // Gradient area fill under curve
+  ctx.lineTo(points[points.length - 1].x, chartY + chartH);
+  ctx.lineTo(points[0].x, chartY + chartH);
+  ctx.closePath();
+
+  const areaGrad = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
+  areaGrad.addColorStop(0, `${accentColor}55`);
+  areaGrad.addColorStop(1, `${accentColor}00`);
+  ctx.fillStyle = areaGrad;
+  ctx.fill();
+
+  // Points
+  points.forEach((p, idx) => {
+    const isSpecial = idx === 0 || idx === points.length - 1 || p.value === maxVal || p.value === minVal;
+    const prev = points[idx - 1];
+    const next = points[idx + 1];
+    const isChange = (prev && prev.value !== p.value) || (next && next.value !== p.value);
+
+    if (points.length <= 35 || isSpecial || isChange) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isSpecial ? 5.5 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = accentColor;
+      ctx.stroke();
+    }
+  });
+
+  // Date Labels along X Axis
+  ctx.fillStyle = '#64748B';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+
+  const maxIdx = points.length - 1;
+  const labelCount = Math.min(6, maxIdx);
+  const labelIndices = new Set();
+  for (let i = 0; i <= labelCount; i++) {
+    labelIndices.add(Math.round((i / labelCount) * maxIdx));
+  }
+
+  for (const idx of labelIndices) {
+    const p = points[idx];
+    ctx.fillText(p.label, p.x, chartY + chartH + 22);
+  }
+
+  // Footer
+  ctx.fillStyle = '#475569';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Pyro Bot • Suivi du Mode Ranked (Compétitif) Brawl Stars', width / 2, height - 20);
+
+  return canvas.toBuffer('image/png');
+}
+
+/**
  * Periodically synchronizes all linked Brawl Stars accounts in the background.
  * Fetches fresh player stats, records a trophy snapshot, and updates guild roles.
  */
@@ -995,15 +1378,18 @@ async function syncAllLinkedUsers(client) {
       try {
         const freshData = await fetchPlayerData(u.playerTag);
         if (freshData) {
+          const currentRankedPoints = freshData.currentRankedPoints || 0;
           const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
           await updateUserWeeklyStats(u, freshData.trophies || 0, peakRank);
-          await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank);
+          await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank, currentRankedPoints);
           await u.update({
             playerName: freshData.name || u.playerName,
             lastTrophies: freshData.trophies || 0,
             highestTrophies: freshData.highestTrophies || 0,
             lastRankedRank: peakRank,
             highestRankedRank: peakRank,
+            lastRankedPoints: currentRankedPoints,
+            highestRankedPoints: Math.max(u.highestRankedPoints || 0, currentRankedPoints),
             lastCheckedAt: new Date(),
           });
 
@@ -1062,6 +1448,8 @@ module.exports = {
   syncUserRoles,
   recordTrophySnapshot,
   generateTrophyGraph,
+  generateRankedGraph,
+  drawRankedIcon,
   getIsoWeekKey,
   getStartOfWeek,
   updateUserWeeklyStats,

@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder,
 const { ConfigHelper } = require('../../database');
 const embeds = require('../utils/embeds');
 const { logModerationAction } = require('../utils/moderationHelper');
+const { generateTicketChannelName } = require('../utils/ticketHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -38,6 +39,10 @@ module.exports = {
         .addStringOption(option =>
           option.setName('sujet')
             .setDescription('Sujet du ticket')
+            .setRequired(false))
+        .addStringOption(option =>
+          option.setName('nom')
+            .setDescription('Nom personnalisé pour le salon de ticket (optionnel)')
             .setRequired(false))),
 
   async execute(interaction, client) {
@@ -47,7 +52,12 @@ module.exports = {
     // For Add and Remove, verify we are inside a ticket channel
     if (subcommand === 'add' || subcommand === 'remove') {
       const channel = interaction.channel;
-      const isTicket = channel.name.startsWith('ticket-') && channel.type === ChannelType.GuildText;
+      const categoryId = await ConfigHelper.get('ticket_category_id');
+      const isTicket = channel.type === ChannelType.GuildText && (
+        channel.name.startsWith('ticket-') ||
+        (channel.topic && channel.topic.includes('Auteur ID:')) ||
+        (categoryId && channel.parentId === categoryId)
+      );
 
       if (!isTicket) {
         return interaction.reply({
@@ -199,7 +209,8 @@ module.exports = {
           });
         }
 
-        const channelName = `ticket-${target.username.substring(0, 15)}-${target.id.substring(target.id.length - 4)}`;
+        const customName = interaction.options.getString('nom');
+        const channelName = await generateTicketChannelName(target, subject, customName);
         const ticketChannel = await guild.channels.create({
           name: channelName,
           type: ChannelType.GuildText,
