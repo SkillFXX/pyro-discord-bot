@@ -92,7 +92,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('top')
-        .setDescription('Afficher les classements Brawl Stars (Trophées, Ranked et Évolutions de la semaine).')
+        .setDescription('Afficher les classements Brawl Stars (Trophées, Ranked et Évolution de trophées de la semaine).')
         .addStringOption(option =>
           option
             .setName('categorie')
@@ -103,7 +103,6 @@ module.exports = {
               { name: '🏆 Top Trophées', value: 'trophies' },
               { name: '🎖️ Top Ranked', value: 'ranked' },
               { name: '📈 Meilleure Évolution Trophées (Semaine)', value: 'gain_trophies' },
-              { name: '⚡ Meilleure Évolution Ranked (Semaine)', value: 'gain_ranked' },
             ))),
 
   async execute(interaction, client) {
@@ -477,7 +476,6 @@ module.exports = {
       try {
         const leaderboards = await brawlStarsService.getLeaderboards(interaction.guild);
         const trophyGrowthRoleId = await ConfigHelper.get('brawlstars_top_trophies_growth_role_id');
-        const rankedGrowthRoleId = await ConfigHelper.get('brawlstars_top_ranked_growth_role_id');
 
         if (!leaderboards || leaderboards.totalPlayers === 0) {
           const emptyEmbed = embeds.custom(
@@ -539,25 +537,6 @@ module.exports = {
               (roleMention ? `\n\n⭐ **Rôle Hebdomadaire attribué au n°1 :** ${roleMention}` : ''),
               '#10B981'
             );
-          } else if (category === 'gain_ranked') {
-            const list = leaderboards.topRankedGain.slice(0, 10);
-            const roleMention = rankedGrowthRoleId ? `<@&${rankedGrowthRoleId}>` : null;
-            const lines = list.map((p, idx) => {
-              const gainSign = p.weeklyRankedGain > 0 ? '+' : '';
-              const isWinner = idx === 0 && p.weeklyRankedGain > 0;
-              const crownBadge = isWinner && roleMention ? ` 👑 *Détient le rôle ${roleMention}*` : '';
-              const diffText = p.weeklyRankedGain !== 0 
-                ? `${gainSign}${p.weeklyRankedGain} division(s)`
-                : `Stable (0)`;
-              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) : **${diffText}**${crownBadge}\n┗ Début semaine : *${getRankLabel(p.weekStartRankedRank)}* ➔ Actuel : **${getRankLabel(p.rankedRank)}**`;
-            });
-            embed = embeds.custom(
-              '⚡ Meilleure Évolution Ranked (Semaine en cours)',
-              `Progression en Ranked enregistrée depuis lundi (${leaderboards.weekKey}) :\n\n` +
-              lines.join('\n\n') +
-              (roleMention ? `\n\n⭐ **Rôle Hebdomadaire attribué au n°1 :** ${roleMention}` : ''),
-              '#3B82F6'
-            );
           } else {
             // Overview (Global)
             const top3Trophies = leaderboards.topTrophies.slice(0, 3).map((p, idx) => 
@@ -574,20 +553,12 @@ module.exports = {
               return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${sign}${p.weeklyTrophyGain.toLocaleString('fr-FR')}** 🏆${crown}`;
             }).join('\n') || '*Aucune progression*';
 
-            const top3RankedGain = leaderboards.topRankedGain.slice(0, 3).map((p, idx) => {
-              const sign = p.weeklyRankedGain > 0 ? '+' : '';
-              const crown = idx === 0 && p.weeklyRankedGain > 0 && rankedGrowthRoleId ? ' 👑' : '';
-              const diffText = p.weeklyRankedGain !== 0 ? `${sign}${p.weeklyRankedGain} rang(s)` : 'Stable';
-              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${diffText}** (${getRankLabel(p.rankedRank)})${crown}`;
-            }).join('\n') || '*Aucune progression*';
-
             embed = embeds.custom(
               '🎮 Classements Brawl Stars — Vue d\'ensemble',
               `Statistiques globales et progressions de la semaine (**${leaderboards.weekKey}**) :\n\n` +
               `🏆 **Top 3 Trophées**\n${top3Trophies}\n\n` +
               `🎖️ **Top 3 Ranked**\n${top3Ranked}\n\n` +
-              `📈 **Top 3 Évolution Trophées (Semaine)**\n${top3TrophyGain}\n\n` +
-              `⚡ **Top 3 Évolution Ranked (Semaine)**\n${top3RankedGain}`,
+              `📈 **Top 3 Évolution Trophées (Semaine)**\n${top3TrophyGain}`,
               accentColor
             );
           }
@@ -620,11 +591,6 @@ module.exports = {
               .setLabel('Évol. Trophées')
               .setEmoji('📈')
               .setStyle(currentCat === 'gain_trophies' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('bs_top_gain_ranked')
-              .setLabel('Évol. Ranked')
-              .setEmoji('⚡')
-              .setStyle(currentCat === 'gain_ranked' ? ButtonStyle.Primary : ButtonStyle.Secondary),
           );
         };
 
@@ -646,7 +612,6 @@ module.exports = {
             bs_top_trophies: 'trophies',
             bs_top_ranked: 'ranked',
             bs_top_gain_trophies: 'gain_trophies',
-            bs_top_gain_ranked: 'gain_ranked',
           };
           const nextCategory = mapping[btnInt.customId];
           if (nextCategory) {

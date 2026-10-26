@@ -92,15 +92,13 @@
   let editRankedRoleId = '';
   let editRankedReplace = 'false';
 
-  // Weekly Growth Roles State
+  // Weekly Growth Role State
   let trophyGrowthRoleId = '';
-  let rankedGrowthRoleId = '';
   let savingWeeklyRoles = false;
   let weeklyRolesInitialized = false;
 
   $: if ($dashboardData.config && !weeklyRolesInitialized) {
     trophyGrowthRoleId = $dashboardData.config.brawlstars_top_trophies_growth_role_id || '';
-    rankedGrowthRoleId = $dashboardData.config.brawlstars_top_ranked_growth_role_id || '';
     weeklyRolesInitialized = true;
   }
 
@@ -108,13 +106,13 @@
     savingWeeklyRoles = true;
     const success = await saveConfig('gaming', {
       brawlstars_top_trophies_growth_role_id: trophyGrowthRoleId,
-      brawlstars_top_ranked_growth_role_id: rankedGrowthRoleId,
+      brawlstars_top_ranked_growth_role_id: '',
     });
     savingWeeklyRoles = false;
     if (success) {
-      showToast('Rôles d\'évolution hebdomadaire enregistrés avec succès !', 'success');
+      showToast('Rôle d\'évolution hebdomadaire enregistré avec succès !', 'success');
       $dashboardData.config.brawlstars_top_trophies_growth_role_id = trophyGrowthRoleId;
-      $dashboardData.config.brawlstars_top_ranked_growth_role_id = rankedGrowthRoleId;
+      $dashboardData.config.brawlstars_top_ranked_growth_role_id = '';
     }
   }
 
@@ -530,15 +528,15 @@
     </div>
   </Card>
 
-  <!-- 4. Weekly Growth Roles Section -->
+  <!-- 4. Weekly Growth Role Section -->
   <div id="brawlstars-weekly" class="section-anchor"></div>
-  <Card title="Rôles d'Évolution Hebdomadaire (Meilleure Progression)" icon={TrendingUp}>
+  <Card title="Rôle d'Évolution Hebdomadaire (Meilleure Progression Trophées)" icon={TrendingUp}>
     <p class="card-description">
-      Configurez des rôles exclusifs attribués automatiquement chaque semaine au joueur ayant la plus forte progression en trophées et au joueur ayant le plus progressé en Ranked. Dès qu'un nouveau joueur prend la tête, le rôle lui est transféré.
+      Configurez un rôle exclusif attribué automatiquement chaque semaine au joueur ayant la plus forte progression en trophées. Dès qu'un nouveau joueur prend la tête, le rôle lui est transféré.
     </p>
 
     <form on:submit|preventDefault={handleSaveWeeklyRoles}>
-      <div class="grid-2" style="margin-top: 1rem;">
+      <div style="margin-top: 1rem; max-width: 480px;">
         <div class="form-group">
           <label for="bs-trophy-growth-role">
             <Trophy size={15} style="color: #F59E0B; vertical-align: middle; margin-right: 4px;" />
@@ -551,23 +549,7 @@
             {/each}
           </select>
           <small class="form-help">
-            Attribué au n°1 ayant gagné le plus grand nombre de trophées cette semaine.
-          </small>
-        </div>
-
-        <div class="form-group">
-          <label for="bs-ranked-growth-role">
-            <Crown size={15} style="color: #A855F7; vertical-align: middle; margin-right: 4px;" />
-            Rôle Meilleure Évolution en Ranked
-          </label>
-          <select id="bs-ranked-growth-role" class="form-control" bind:value={rankedGrowthRoleId}>
-            <option value="">-- Aucun rôle (Désactivé) --</option>
-            {#each ($dashboardData.roles || []) as r}
-              <option value={r.id}>@{r.name}</option>
-            {/each}
-          </select>
-          <small class="form-help">
-            Attribué au n°1 ayant gravi le plus de divisions de Ranked cette semaine.
+            Attribué automatiquement au n°1 ayant gagné le plus grand nombre de trophées cette semaine.
           </small>
         </div>
       </div>
@@ -579,17 +561,17 @@
           disabled={savingWeeklyRoles}
         >
           <Save size={15} />
-          <span>{savingWeeklyRoles ? 'Enregistrement...' : 'Enregistrer les Rôles Hebdomadaires'}</span>
+          <span>{savingWeeklyRoles ? 'Enregistrement...' : 'Enregistrer le Rôle Hebdomadaire'}</span>
         </button>
 
         <button
           type="button"
           class="btn btn-secondary"
-          disabled={syncing}
-          on:click={handleSyncRoles}
+          disabled={syncingWeekly}
+          on:click={handleImmediateSync}
         >
-          <RefreshCw size={15} class={syncing ? 'spin' : ''} />
-          <span>{syncing ? 'Synchronisation...' : 'Synchroniser & Attribuer Maintenant'}</span>
+          <RefreshCw size={15} class={syncingWeekly ? 'spin' : ''} />
+          <span>{syncingWeekly ? 'Synchronisation...' : 'Synchroniser Maintenant'}</span>
         </button>
       </div>
     </form>

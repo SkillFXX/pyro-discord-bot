@@ -667,33 +667,24 @@ async function getLeaderboards(guild) {
     return b.trophies - a.trophies;
   });
   const topTrophyGain = [...guildUsers].sort((a, b) => b.weeklyTrophyGain - a.weeklyTrophyGain);
-  const topRankedGain = [...guildUsers].sort((a, b) => {
-    if (b.weeklyRankedGain !== a.weeklyRankedGain) return b.weeklyRankedGain - a.weeklyRankedGain;
-    return b.weeklyTrophyGain - a.weeklyTrophyGain;
-  });
 
   return {
     topTrophies,
     topRanked,
     topTrophyGain,
-    topRankedGain,
     totalPlayers: guildUsers.length,
     weekKey: currentWeek,
   };
 }
 
 /**
- * Automatically attributes weekly progression roles to the #1 in trophy growth and ranked growth.
+ * Automatically attributes weekly trophy progression role to the #1 in trophy growth.
  * Removes the role from any former holder.
  */
 async function syncWeeklyGrowthRoles(client) {
   try {
     const trophyGrowthRoleId = await ConfigHelper.get('brawlstars_top_trophies_growth_role_id');
-    const rankedGrowthRoleId = await ConfigHelper.get('brawlstars_top_ranked_growth_role_id');
-
-    if (!trophyGrowthRoleId && !rankedGrowthRoleId) {
-      return { skipped: true, reason: 'Aucun rôle d\'évolution configuré.' };
-    }
+    const formerRankedRoleId = await ConfigHelper.get('brawlstars_top_ranked_growth_role_id');
 
     const guildId = process.env.GUILD_ID;
     const guild = client?.guilds?.cache?.get(guildId) || client?.guilds?.cache?.first();
@@ -701,72 +692,56 @@ async function syncWeeklyGrowthRoles(client) {
       return { skipped: true, reason: 'Serveur Discord introuvable.' };
     }
 
+    // Clean up former ranked growth role if it was configured
+    if (formerRankedRoleId) {
+      const role = guild.roles.cache.get(formerRankedRoleId);
+      if (role) {
+        for (const [, member] of role.members) {
+          await member.roles.remove(role, 'Brawl Stars : Retrait du rôle Évolution Ranked (désactivé)').catch(() => {});
+        }
+      }
+      await ConfigHelper.set('brawlstars_top_ranked_growth_role_id', '');
+    }
+
+    if (!trophyGrowthRoleId) {
+      return { skipped: true, reason: 'Aucun rôle d\'évolution configuré.' };
+    }
+
     const leaderboards = await getLeaderboards(guild);
 
     let trophyWinner = null;
-    let rankedWinner = null;
     let trophyRoleName = null;
-    let rankedRoleName = null;
 
-    // 1. Trophy Growth Role
-    if (trophyGrowthRoleId) {
-      const role = guild.roles.cache.get(trophyGrowthRoleId);
-      if (role) {
-        trophyRoleName = role.name;
-        // Winner is index 0 with positive gain
-        const candidate = leaderboards.topTrophyGain[0];
-        if (candidate && candidate.weeklyTrophyGain > 0) {
-          trophyWinner = candidate;
-        }
+    // Trophy Growth Role
+    const role = guild.roles.cache.get(trophyGrowthRoleId);
+    if (role) {
+      trophyRoleName = role.name;
+      // Winner is index 0 with positive gain
+      const candidate = leaderboards.topTrophyGain[0];
+      if (candidate && candidate.weeklyTrophyGain > 0) {
+        trophyWinner = candidate;
+      }
 
-        // Remove from everyone who is not the winner
-        for (const [memberId, member] of role.members) {
-          if (!trophyWinner || memberId !== trophyWinner.userId) {
-            await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Trophées').catch(() => {});
-          }
-        }
-
-        // Add to winner
-        if (trophyWinner && trophyWinner.member && !trophyWinner.member.roles.cache.has(role.id)) {
-          await trophyWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Trophées de la Semaine').catch(() => {});
+      // Remove from everyone who is not the winner
+      for (const [memberId, member] of role.members) {
+        if (!trophyWinner || memberId !== trophyWinner.userId) {
+          await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Trophées').catch(() => {});
         }
       }
-    }
 
-    // 2. Ranked Growth Role
-    if (rankedGrowthRoleId) {
-      const role = guild.roles.cache.get(rankedGrowthRoleId);
-      if (role) {
-        rankedRoleName = role.name;
-        // Winner is index 0 with positive gain
-        const candidate = leaderboards.topRankedGain[0];
-        if (candidate && candidate.weeklyRankedGain > 0) {
-          rankedWinner = candidate;
-        }
-
-        // Remove from everyone who is not the winner
-        for (const [memberId, member] of role.members) {
-          if (!rankedWinner || memberId !== rankedWinner.userId) {
-            await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Ranked').catch(() => {});
-          }
-        }
-
-        // Add to winner
-        if (rankedWinner && rankedWinner.member && !rankedWinner.member.roles.cache.has(role.id)) {
-          await rankedWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Ranked de la Semaine').catch(() => {});
-        }
+      // Add to winner
+      if (trophyWinner && trophyWinner.member && !trophyWinner.member.roles.cache.has(role.id)) {
+        await trophyWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Trophées de la Semaine').catch(() => {});
       }
     }
 
     return {
       success: true,
       trophyWinner: trophyWinner ? { userId: trophyWinner.userId, name: trophyWinner.playerName, gain: trophyWinner.weeklyTrophyGain } : null,
-      rankedWinner: rankedWinner ? { userId: rankedWinner.userId, name: rankedWinner.playerName, gain: rankedWinner.weeklyRankedGain } : null,
       trophyRoleName,
-      rankedRoleName,
     };
   } catch (err) {
-    console.error('[BrawlStarsService] Erreur synchronisation rôles évolution hebdomadaire :', err);
+    console.error('[BrawlStarsService] Erreur synchronisation rôle progression hebdomadaire :', err);
     return { success: false, error: err.message };
   }
 }
