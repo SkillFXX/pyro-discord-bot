@@ -532,7 +532,7 @@
   <div id="brawlstars-weekly" class="section-anchor"></div>
   <Card title="Rôle d'Évolution Hebdomadaire (Meilleure Progression Trophées)" icon={TrendingUp}>
     <p class="card-description">
-      Configurez un rôle exclusif attribué automatiquement chaque semaine au joueur ayant la plus forte progression en trophées. Dès qu'un nouveau joueur prend la tête, le rôle lui est transféré.
+      Configurez un rôle exclusif attribué automatiquement au joueur ayant réalisé la plus forte progression en trophées de la semaine écoulée (du lundi au dimanche soir). Le vainqueur conserve ce rôle avec fierté durant toute la semaine suivante !
     </p>
 
     <form on:submit|preventDefault={handleSaveWeeklyRoles}>
@@ -549,7 +549,7 @@
             {/each}
           </select>
           <small class="form-help">
-            Attribué automatiquement au n°1 ayant gagné le plus grand nombre de trophées cette semaine.
+            Attribué chaque dimanche soir à 23h59 au n°1 de la semaine écoulée, et conservé durant toute la semaine suivante.
           </small>
         </div>
       </div>

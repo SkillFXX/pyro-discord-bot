@@ -476,6 +476,9 @@ module.exports = {
       try {
         const leaderboards = await brawlStarsService.getLeaderboards(interaction.guild);
         const trophyGrowthRoleId = await ConfigHelper.get('brawlstars_top_trophies_growth_role_id');
+        const activeWinnerId = await ConfigHelper.get('brawlstars_trophy_growth_winner_user_id');
+        const activeWinnerGain = parseInt(await ConfigHelper.get('brawlstars_trophy_growth_winner_gain', '0'), 10) || 0;
+        const activeWinnerWeek = await ConfigHelper.get('brawlstars_trophy_growth_winner_from_week');
 
         if (!leaderboards || leaderboards.totalPlayers === 0) {
           const emptyEmbed = embeds.custom(
@@ -523,18 +526,23 @@ module.exports = {
           } else if (category === 'gain_trophies') {
             const list = leaderboards.topTrophyGain.slice(0, 10);
             const roleMention = trophyGrowthRoleId ? `<@&${trophyGrowthRoleId}>` : null;
+            const winnerBadge = (activeWinnerId && roleMention)
+              ? `👑 **Détenteur du rôle cette semaine (${roleMention}) :** <@${activeWinnerId}> *(+${activeWinnerGain.toLocaleString('fr-FR')} 🏆 en semaine ${activeWinnerWeek || 'passée'})*\n\n`
+              : '';
+
             const lines = list.map((p, idx) => {
               const gainSign = p.weeklyTrophyGain > 0 ? '+' : '';
               const gainFormatted = `${gainSign}${p.weeklyTrophyGain.toLocaleString('fr-FR')} 🏆`;
-              const isWinner = idx === 0 && p.weeklyTrophyGain > 0;
-              const crownBadge = isWinner && roleMention ? ` 👑 *Détient le rôle ${roleMention}*` : '';
-              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) : **${gainFormatted}**${crownBadge}\n┗ Début semaine : *${p.weekStartTrophies.toLocaleString('fr-FR')}* ➔ Actuel : **${p.trophies.toLocaleString('fr-FR')}** 🏆`;
+              const isLeader = idx === 0 && p.weeklyTrophyGain > 0;
+              const leaderBadge = isLeader ? ' 🏃 *(Leader provisoire)*' : '';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) : **${gainFormatted}**${leaderBadge}\n┗ Début semaine : *${p.weekStartTrophies.toLocaleString('fr-FR')}* ➔ Actuel : **${p.trophies.toLocaleString('fr-FR')}** 🏆`;
             });
+
             embed = embeds.custom(
-              '📈 Meilleure Évolution Trophées (Semaine en cours)',
-              `Progression en trophées enregistrée depuis lundi (${leaderboards.weekKey}) :\n\n` +
-              lines.join('\n\n') +
-              (roleMention ? `\n\n⭐ **Rôle Hebdomadaire attribué au n°1 :** ${roleMention}` : ''),
+              '📈 Course à l\'Évolution Trophées (Semaine en cours)',
+              `${winnerBadge}**Course en cours (${leaderboards.weekKey}) :**\n` +
+              `*Le joueur à la 1ère place ce dimanche soir à 23h59 remportera le rôle ${roleMention || 'exclusif'} pour toute la semaine prochaine !*\n\n` +
+              lines.join('\n\n'),
               '#10B981'
             );
           } else {
@@ -549,16 +557,20 @@ module.exports = {
 
             const top3TrophyGain = leaderboards.topTrophyGain.slice(0, 3).map((p, idx) => {
               const sign = p.weeklyTrophyGain > 0 ? '+' : '';
-              const crown = idx === 0 && p.weeklyTrophyGain > 0 && trophyGrowthRoleId ? ' 👑' : '';
-              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${sign}${p.weeklyTrophyGain.toLocaleString('fr-FR')}** 🏆${crown}`;
+              const leaderMark = idx === 0 && p.weeklyTrophyGain > 0 ? ' 🏃 *(Leader)*' : '';
+              return `${formatRankNum(idx)} <@${p.userId}> (**${p.playerName}**) — **${sign}${p.weeklyTrophyGain.toLocaleString('fr-FR')}** 🏆${leaderMark}`;
             }).join('\n') || '*Aucune progression*';
+
+            const winnerSummary = (activeWinnerId && trophyGrowthRoleId)
+              ? `\n👑 Rôle détenu cette semaine par <@${activeWinnerId}>`
+              : '';
 
             embed = embeds.custom(
               '🎮 Classements Brawl Stars — Vue d\'ensemble',
               `Statistiques globales et progressions de la semaine (**${leaderboards.weekKey}**) :\n\n` +
               `🏆 **Top 3 Trophées**\n${top3Trophies}\n\n` +
               `🎖️ **Top 3 Ranked**\n${top3Ranked}\n\n` +
-              `📈 **Top 3 Évolution Trophées (Semaine)**\n${top3TrophyGain}`,
+              `📈 **Course Évolution Trophées (Semaine)**${winnerSummary}\n${top3TrophyGain}`,
               accentColor
             );
           }

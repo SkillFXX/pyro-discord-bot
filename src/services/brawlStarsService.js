@@ -549,6 +549,14 @@ function getIsoWeekKey(d = new Date()) {
 }
 
 /**
+ * Returns ISO week key string of the previous week, e.g. "2026-W43".
+ */
+function getPreviousIsoWeekKey(d = new Date()) {
+  const prevDate = new Date(d.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return getIsoWeekKey(prevDate);
+}
+
+/**
  * Returns Monday 00:00:00.000 for the week of the given date.
  */
 function getStartOfWeek(d = new Date()) {
@@ -570,6 +578,12 @@ async function updateUserWeeklyStats(user, currentTrophies, currentRankedRank) {
     const cleanRank = typeof currentRankedRank === 'number' ? currentRankedRank : (user.lastRankedRank || 0);
 
     if (user.weekKey !== currentWeek || user.weekStartTrophies === null || user.weekStartTrophies === undefined) {
+      // Archive previous week final gain before starting a new week
+      if (user.weekKey && user.weekKey !== currentWeek) {
+        user.previousWeekGain = user.weeklyTrophyGain || 0;
+        user.previousWeekKey = user.weekKey;
+      }
+
       const startOfWeek = getStartOfWeek();
       let baseline = await BrawlStarsTrophyLog.findOne({
         where: {
@@ -707,38 +721,84 @@ async function syncWeeklyGrowthRoles(client) {
       return { skipped: true, reason: 'Aucun rôle d\'évolution configuré.' };
     }
 
-    const leaderboards = await getLeaderboards(guild);
-
-    let trophyWinner = null;
-    let trophyRoleName = null;
-
-    // Trophy Growth Role
     const role = guild.roles.cache.get(trophyGrowthRoleId);
-    if (role) {
-      trophyRoleName = role.name;
-      // Winner is index 0 with positive gain
-      const candidate = leaderboards.topTrophyGain[0];
-      if (candidate && candidate.weeklyTrophyGain > 0) {
-        trophyWinner = candidate;
-      }
+    if (!role) {
+      return { skipped: true, reason: 'Rôle Discord introuvable.' };
+    }
 
-      // Remove from everyone who is not the winner
-      for (const [memberId, member] of role.members) {
-        if (!trophyWinner || memberId !== trophyWinner.userId) {
-          await member.roles.remove(role, 'Brawl Stars : Perte du titre Meilleure Évolution Trophées').catch(() => {});
+    const currentWeek = getIsoWeekKey();
+    const previousWeek = getPreviousIsoWeekKey();
+    let activeWeek = await ConfigHelper.get('brawlstars_trophy_growth_active_week');
+    let winnerUserId = await ConfigHelper.get('brawlstars_trophy_growth_winner_user_id');
+    let winnerName = await ConfigHelper.get('brawlstars_trophy_growth_winner_name');
+    let winnerGain = parseInt(await ConfigHelper.get('brawlstars_trophy_growth_winner_gain', '0'), 10) || 0;
+
+    // Check if we need to crown a new champion (transition from previousWeek to currentWeek)
+    if (activeWeek !== currentWeek) {
+      const linkedUsers = await BrawlStarsUser.findAll();
+      const candidates = [];
+
+      for (const u of linkedUsers) {
+        let gain = 0;
+        if (u.previousWeekKey === previousWeek) {
+          gain = u.previousWeekGain || 0;
+        } else if (u.weekKey === previousWeek) {
+          // If the user has not updated to currentWeek yet, their gain is from previousWeek
+          gain = u.weeklyTrophyGain || 0;
+        }
+
+        if (gain > 0) {
+          candidates.push({
+            userId: u.userId,
+            playerName: u.playerName,
+            gain,
+          });
         }
       }
 
-      // Add to winner
-      if (trophyWinner && trophyWinner.member && !trophyWinner.member.roles.cache.has(role.id)) {
-        await trophyWinner.member.roles.add(role, 'Brawl Stars : Nouveau n°1 Évolution Trophées de la Semaine').catch(() => {});
+      candidates.sort((a, b) => b.gain - a.gain);
+      const crowned = candidates[0] || null;
+
+      if (crowned) {
+        winnerUserId = crowned.userId;
+        winnerName = crowned.playerName;
+        winnerGain = crowned.gain;
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_user_id', winnerUserId);
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_name', winnerName);
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_gain', String(winnerGain));
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_from_week', previousWeek);
+      } else {
+        winnerUserId = null;
+        winnerName = null;
+        winnerGain = 0;
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_user_id', '');
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_name', '');
+        await ConfigHelper.set('brawlstars_trophy_growth_winner_gain', '0');
+      }
+
+      await ConfigHelper.set('brawlstars_trophy_growth_active_week', currentWeek);
+      activeWeek = currentWeek;
+    }
+
+    // Enforce role assignment on Discord: ONLY the crowned winner holds the role during activeWeek
+    for (const [memberId, member] of role.members) {
+      if (!winnerUserId || memberId !== winnerUserId) {
+        await member.roles.remove(role, 'Brawl Stars : Fin de règne Meilleure Évolution Trophées').catch(() => {});
+      }
+    }
+
+    if (winnerUserId) {
+      const winnerMember = guild.members.cache.get(winnerUserId) || await guild.members.fetch(winnerUserId).catch(() => null);
+      if (winnerMember && !winnerMember.roles.cache.has(role.id)) {
+        await winnerMember.roles.add(role, `Brawl Stars : Vainqueur de la Semaine ${previousWeek} (+${winnerGain} trophées)`).catch(() => {});
       }
     }
 
     return {
       success: true,
-      trophyWinner: trophyWinner ? { userId: trophyWinner.userId, name: trophyWinner.playerName, gain: trophyWinner.weeklyTrophyGain } : null,
-      trophyRoleName,
+      activeWeek,
+      winner: winnerUserId ? { userId: winnerUserId, name: winnerName, gain: winnerGain, fromWeek: previousWeek } : null,
+      trophyRoleName: role.name,
     };
   } catch (err) {
     console.error('[BrawlStarsService] Erreur synchronisation rôle progression hebdomadaire :', err);
@@ -1426,6 +1486,7 @@ module.exports = {
   generateRankedGraph,
   drawRankedIcon,
   getIsoWeekKey,
+  getPreviousIsoWeekKey,
   getStartOfWeek,
   updateUserWeeklyStats,
   getLeaderboards,

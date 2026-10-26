@@ -453,6 +453,14 @@ const BrawlStarsUser = sequelize.define('BrawlStarsUser', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  previousWeekGain: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  previousWeekKey: {
+    type: DataTypes.STRING(32),
+    defaultValue: '',
+  },
   lastCheckedAt: {
     type: DataTypes.DATE,
     allowNull: true,
@@ -811,6 +819,12 @@ async function ensureBrawlStarsColumns() {
       }
       if (!userColNames.includes('weeklyRankedGain')) {
         await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN weeklyRankedGain INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('previousWeekGain')) {
+        await sequelize.query('ALTER TABLE BrawlStarsUsers ADD COLUMN previousWeekGain INTEGER DEFAULT 0;');
+      }
+      if (!userColNames.includes('previousWeekKey')) {
+        await sequelize.query("ALTER TABLE BrawlStarsUsers ADD COLUMN previousWeekKey VARCHAR(32) DEFAULT '';");
       }
     }
 
