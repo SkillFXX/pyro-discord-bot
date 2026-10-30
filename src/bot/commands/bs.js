@@ -191,7 +191,7 @@ module.exports = {
         }
 
         const existingUser = await BrawlStarsUser.findByPk(targetUser.id);
-        const bestRank = playerData?.highestRankedRank ?? existingUser?.highestRankedRank ?? 0;
+        const bestRank = brawlStarsService.resolvePeakRank(playerData, existingUser);
 
         if (playerData) {
           playerData.highestRankedRank = bestRank;
@@ -237,8 +237,7 @@ module.exports = {
             }
           }
 
-          const rankTierObj = brawlStarsService.RANKED_TIERS.find(t => t.id === bestRank);
-          const rankLabel = rankTierObj ? rankTierObj.name : (bestRank > 0 ? `Rang ${bestRank}` : 'Non classé');
+          const rankLabel = brawlStarsService.getRankedTierLabel(bestRank);
 
           const linkEmbed = embeds.custom(
             '🎮 Compte Brawl Stars Lié !',
@@ -373,7 +372,7 @@ module.exports = {
         try {
           const freshData = await brawlStarsService.fetchPlayerData(linkedUser.playerTag);
           const currentRankedPoints = freshData.currentRankedPoints || 0;
-          const freshRank = freshData.highestRankedRank ?? linkedUser.highestRankedRank ?? 0;
+          const freshRank = brawlStarsService.resolvePeakRank(freshData, linkedUser);
           await brawlStarsService.recordTrophySnapshot(targetUser.id, linkedUser.playerTag, freshData.trophies || 0, freshRank, currentRankedPoints);
           await brawlStarsService.updateUserWeeklyStats(linkedUser, freshData.trophies || 0, freshRank);
           linkedUser.playerName = freshData.name || linkedUser.playerName;
@@ -492,10 +491,7 @@ module.exports = {
 
         const medals = ['🥇', '🥈', '🥉'];
         const formatRankNum = (idx) => medals[idx] || `**#${idx + 1}**`;
-        const getRankLabel = (tierId) => {
-          const tier = brawlStarsService.RANKED_TIERS.find(t => t.id === tierId);
-          return tier ? tier.name : (tierId > 0 ? `Rang ${tierId}` : 'Non classé');
-        };
+        const getRankLabel = brawlStarsService.getRankedTierLabel;
 
         const renderEmbed = (category) => {
           let embed;

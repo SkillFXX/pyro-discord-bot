@@ -203,42 +203,36 @@ async function getApiKey() {
 }
 
 /**
- * Converts Ranked Elo points (or tier ID) into the corresponding Ranked Tier index (1..22).
- * Supports both Ranked 2.0 (standard progression points) and direct tier indices.
- * @param {number} elo
+ * Single source of truth for Ranked tiers. The official API returns the tier index (1..22)
+ * itself (rankedRank / highestAllTimeRankedRank): never derive a tier from Elo points.
+ * @param {object} apiPlayer Raw player object from the Brawl Stars API
+ * @returns {{ currentTier: number, peakTier: number }}
+ */
+function resolveRankedTiers(apiPlayer) {
+  const asTier = (v) => (Number.isInteger(v) && v >= 1 && v <= RANKED_TIERS.length ? v : 0);
+  const currentTier = asTier(apiPlayer?.rankedRank);
+  const peakTier = Math.max(asTier(apiPlayer?.highestAllTimeRankedRank), currentTier);
+  return { currentTier, peakTier };
+}
+
+/**
+ * Peak Ranked tier to store/display: fresh API data first, stored value as fallback.
+ * @param {object} [freshData] Result of fetchPlayerData
+ * @param {object} [dbUser] BrawlStarsUser row
  * @returns {number}
  */
-function convertEloToRankedTier(elo) {
-  if (typeof elo !== 'number' || isNaN(elo) || elo <= 0) return 0;
+function resolvePeakRank(freshData, dbUser) {
+  return freshData?.highestRankedRank || dbUser?.highestRankedRank || 0;
+}
 
-  // If already a rank tier ID (1 to 22)
-  if (Number.isInteger(elo) && elo >= 1 && elo <= 22) return elo;
-
-  // Ranked points thresholds (Ranked 2.0 / Elo)
-  if (elo >= 11250) return 22; // Pro (11250+)
-  if (elo >= 11000) return 21; // Maître III (Master III) (11000+)
-  if (elo >= 10000) return 20; // Maître II (Master II) (10000+)
-  if (elo >= 9000) return 19;  // Maître I (Master I) (9000+)
-  if (elo >= 7500) return 18;  // Légendaire III (7500 - 8999)
-  if (elo >= 6750) return 17;  // Légendaire II (6750 - 7499)
-  if (elo >= 6000) return 16;  // Légendaire I (6000 - 6749)
-  if (elo >= 5500) return 15;  // Mythique III (5500 - 5999)
-  if (elo >= 5000) return 14;  // Mythique II (5000 - 5499)
-  if (elo >= 4500) return 13;  // Mythique I (4500 - 4999)
-  if (elo >= 4000) return 12;  // Diamant III (4000 - 4499)
-  if (elo >= 3500) return 11;  // Diamant II (3500 - 3999)
-  if (elo >= 3000) return 10;  // Diamant I (3000 - 3499)
-  if (elo >= 2500) return 9;   // Or III (2500 - 2999)
-  if (elo >= 2000) return 8;   // Or II (2000 - 2499)
-  if (elo >= 1500) return 7;   // Or I (1500 - 1999)
-  if (elo >= 1250) return 6;   // Argent III (1250 - 1499)
-  if (elo >= 1000) return 5;   // Argent II (1000 - 1249)
-  if (elo >= 750) return 4;    // Argent I (750 - 999)
-  if (elo >= 500) return 3;    // Bronze III (500 - 749)
-  if (elo >= 250) return 2;    // Bronze II (250 - 499)
-  if (elo > 0) return 1;       // Bronze I (1 - 249)
-
-  return 0;
+/**
+ * Display name of a Ranked tier index.
+ * @param {number} tierId
+ * @returns {string}
+ */
+function getRankedTierLabel(tierId) {
+  const tier = RANKED_TIERS.find(t => t.id === tierId);
+  return tier ? tier.name : (tierId > 0 ? `Rang ${tierId}` : 'Non classé');
 }
 
 /**
@@ -286,33 +280,15 @@ async function fetchPlayerData(playerTag) {
 
   const data = await response.json();
 
-  // Extract Peak Ranked Elo & Tier from official player object
-  const candidates = [
-    data.highestAllTimeRankedElo,
-    data.highestRankedElo,
-    data.rankedElo,
-    data.highestRank,
-    data.soloLeagueRank,
-    data.highestSoloLeagueRank,
-  ].filter(v => typeof v === 'number' && !isNaN(v) && v > 0);
+  const { currentTier, peakTier } = resolveRankedTiers(data);
 
-  let bestRank = 0;
-  for (const val of candidates) {
-    const tier = convertEloToRankedTier(val);
-    if (tier > bestRank) {
-      bestRank = tier;
-    }
-  }
-
-  const rawElo = data.highestAllTimeRankedElo || data.highestRankedElo || data.rankedElo || bestRank;
-
-  data.rankedElo = rawElo;
-  data.highestAllTimeRankedElo = data.highestAllTimeRankedElo || rawElo;
-  data.rankedRank = bestRank;
-  data.highestRank = bestRank;
-  data.highestRankedRank = bestRank;
-  data.soloLeagueRank = bestRank;
-  data.currentRankedPoints = Number(data.rankedElo || data.highestAllTimeRankedElo || data.highestRankedElo || 0);
+  data.rankedElo = data.rankedElo || 0;
+  data.highestAllTimeRankedElo = data.highestAllTimeRankedElo || data.rankedElo;
+  data.rankedRank = currentTier;
+  data.highestRank = peakTier;
+  data.highestRankedRank = peakTier;
+  data.soloLeagueRank = peakTier;
+  data.currentRankedPoints = Number(data.rankedElo);
 
   return data;
 }
@@ -1255,10 +1231,6 @@ async function generateRankedGraph(playerName, playerTag, logs, days = 30, accen
     return canvas.toBuffer('image/png');
   }
 
-  const currentTierId = convertEloToRankedTier(endVal);
-  const currentTierObj = RANKED_TIERS.find(t => t.id === currentTierId);
-  const currentTierName = currentTierObj ? currentTierObj.name : 'Non classé';
-
   // Subtitle
   ctx.fillStyle = '#94A3B8';
   ctx.font = '14px monospace';
@@ -1274,8 +1246,8 @@ async function generateRankedGraph(playerName, playerTag, logs, days = 30, accen
   ctx.fillText(deltaText, width - 55, 62);
 
   ctx.font = '13px sans-serif';
-  ctx.fillStyle = currentTierObj ? currentTierObj.color : '#C084FC';
-  const tierText = `Rang : ${currentTierName} (${endVal.toLocaleString('fr-FR')} pts)`;
+  ctx.fillStyle = '#C084FC';
+  const tierText = `Points : ${endVal.toLocaleString('fr-FR')} pts`;
   ctx.fillText(`${tierText} • Min: ${minVal.toLocaleString('fr-FR')} • Max: ${maxVal.toLocaleString('fr-FR')}`, width - 55, 90);
   ctx.textAlign = 'left';
 
@@ -1414,7 +1386,7 @@ async function syncAllLinkedUsers(client) {
         const freshData = await fetchPlayerData(u.playerTag);
         if (freshData) {
           const currentRankedPoints = freshData.currentRankedPoints || 0;
-          const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
+          const peakRank = resolvePeakRank(freshData, u);
           await updateUserWeeklyStats(u, freshData.trophies || 0, peakRank);
           await recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank, currentRankedPoints);
           await u.update({
@@ -1476,7 +1448,9 @@ module.exports = {
   normalizePlayerTag,
   getApiKey,
   fetchPlayerData,
-  convertEloToRankedTier,
+  resolveRankedTiers,
+  resolvePeakRank,
+  getRankedTierLabel,
   fetchSpotlightCard,
   validatePlayerTagViaSpotlight,
   getExpectedRoleIds,

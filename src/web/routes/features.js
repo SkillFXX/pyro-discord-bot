@@ -527,7 +527,7 @@ function createFeaturesRouter(client) {
           if (member) {
             const freshData = await brawlStarsService.fetchPlayerData(u.playerTag);
             const currentRankedPoints = freshData.currentRankedPoints || 0;
-            const peakRank = freshData.highestRankedRank ?? u.highestRankedRank ?? 0;
+            const peakRank = brawlStarsService.resolvePeakRank(freshData, u);
             await brawlStarsService.updateUserWeeklyStats(u, freshData.trophies || 0, peakRank);
             await brawlStarsService.recordTrophySnapshot(u.userId, u.playerTag, freshData.trophies || 0, peakRank, currentRankedPoints);
             await brawlStarsService.syncUserRoles(client, member, freshData);

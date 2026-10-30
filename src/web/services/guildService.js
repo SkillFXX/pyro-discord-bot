@@ -9,7 +9,7 @@ const {
   UserSnapshot,
   BrawlStarsRoleReward,
 } = require('../../database');
-const { RANKED_TIERS } = require('../../services/brawlStarsService');
+const { getRankedTierLabel } = require('../../services/brawlStarsService');
 
 let cachedGuildContext = null;
 let cachedGuildContextTime = 0;
@@ -210,8 +210,7 @@ async function fetchBrawlStarsRewards(guild) {
   return dbRewards.map(r => {
     let thresholdLabel = `${Number(r.threshold).toLocaleString('fr-FR')} Trophées`;
     if (r.type === 'ranked') {
-      const tier = RANKED_TIERS.find(t => t.id === r.threshold);
-      thresholdLabel = tier ? tier.name : `Rang ${r.threshold}`;
+      thresholdLabel = getRankedTierLabel(r.threshold);
     }
     return {
       id: r.id,
