@@ -95,6 +95,7 @@
   // Weekly Growth Role State
   let trophyGrowthRoleId = '';
   let savingWeeklyRoles = false;
+  let syncingWeekly = false;
   let weeklyRolesInitialized = false;
 
   $: if ($dashboardData.config && !weeklyRolesInitialized) {
@@ -153,6 +154,12 @@
     syncing = true;
     await syncBrawlStarsRoles();
     syncing = false;
+  }
+
+  async function handleImmediateSync() {
+    syncingWeekly = true;
+    await syncBrawlStarsRoles();
+    syncingWeekly = false;
   }
 
   // --- Trophy Rewards Handlers ---
