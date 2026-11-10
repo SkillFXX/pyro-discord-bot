@@ -46,6 +46,9 @@ module.exports = {
     const voiceXpService = require('../../services/voiceXpService');
     voiceXpService.start(client);
 
+    // Initialize Scheduled Polls Service
+    require('../../services/pollSchedulerService').start(client);
+
     // Initialize Invite Tracking Service
     const inviteService = require('../../services/inviteService');
     await inviteService.init(client);

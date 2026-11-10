@@ -763,3 +763,47 @@ export async function testSendCard(type, channelId, config) {
 
 
 
+
+// Scheduled Polls API Helpers
+export async function fetchScheduledPolls() {
+  try {
+    const res = await fetch('/api/polls', { headers: getHeaders() });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Erreur chargement sondages :', e);
+  }
+  return { polls: [], timezone: '', limits: {} };
+}
+
+async function pollRequest(url, method, payload, successMessage) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: getHeaders(),
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      showToast(successMessage(data), 'success');
+      return data;
+    }
+    showToast(data.error || 'Erreur lors de la requête', 'error');
+  } catch (e) {
+    showToast('Erreur réseau', 'error');
+  }
+  return null;
+}
+
+export const createScheduledPoll = (payload) =>
+  pollRequest('/api/polls', 'POST', payload, () => 'Sondage programmé avec succès !');
+
+export const updateScheduledPoll = (id, payload) =>
+  pollRequest(`/api/polls/${id}`, 'PUT', payload, () => 'Sondage mis à jour !');
+
+export const deleteScheduledPoll = (id) =>
+  pollRequest(`/api/polls/${id}`, 'DELETE', null, () => 'Sondage supprimé !');
+
+export const sendScheduledPollNow = (id) =>
+  pollRequest(`/api/polls/${id}/send`, 'POST', null, (d) => `Sondage envoyé dans #${d.channelName || 'salon'} !`);

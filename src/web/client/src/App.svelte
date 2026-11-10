@@ -22,6 +22,7 @@
   import LogsTab from './tabs/LogsTab.svelte';
   import AnalyticsTab from './tabs/AnalyticsTab.svelte';
   import MusicTab from './tabs/MusicTab.svelte';
+  import PollsTab from './tabs/PollsTab.svelte';
 
   let currentTab = 'general';
   let currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
@@ -80,6 +81,8 @@
           <CustomizationTab />
         {:else if currentTab === 'messages' && $auth.permissions?.isAdmin}
           <MessagesTab />
+        {:else if currentTab === 'polls' && $auth.permissions?.isAdmin}
+          <PollsTab />
         {:else if currentTab === 'moderation' && $auth.permissions?.isAdmin}
           <ModerationTab />
         {:else if currentTab === 'automod' && $auth.permissions?.isAdmin}

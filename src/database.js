@@ -560,6 +560,58 @@ const CustomMessage = sequelize.define('CustomMessage', {
   },
 });
 
+// 19. ScheduledPoll: Discord polls posted automatically on a daily/weekly schedule
+const ScheduledPoll = sequelize.define('ScheduledPoll', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  channelId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  question: {
+    type: DataTypes.STRING(300),
+    allowNull: false,
+  },
+  answers: {
+    type: DataTypes.JSON, // [{ text: string, emoji?: string }] (2 to 10 entries)
+    allowNull: false,
+    defaultValue: [],
+  },
+  allowMultiselect: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  durationHours: {
+    type: DataTypes.INTEGER, // Poll lifetime on Discord (1 to 768 hours)
+    defaultValue: 24,
+  },
+  time: {
+    type: DataTypes.STRING, // 'HH:MM' in POLL_TIMEZONE
+    allowNull: false,
+    defaultValue: '12:00',
+  },
+  days: {
+    type: DataTypes.JSON, // Days of the week to post on (0 = Sunday ... 6 = Saturday)
+    allowNull: false,
+    defaultValue: [0, 1, 2, 3, 4, 5, 6],
+  },
+  mentionRoleId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  enabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+  lastRunDate: {
+    type: DataTypes.STRING, // 'YYYY-MM-DD' of the last post, prevents duplicates
+    allowNull: true,
+  },
+});
+
 // 19. FormSubmission: User submissions from Discord modal forms
 const FormSubmission = sequelize.define('FormSubmission', {
   id: {
@@ -921,6 +973,7 @@ module.exports = {
   BrawlStarsUser,
   BrawlStarsTrophyLog,
   CustomMessage,
+  ScheduledPoll,
   FormSubmission,
   UserInvite,
   MemberInvite,
