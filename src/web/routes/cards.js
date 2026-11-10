@@ -9,7 +9,7 @@ function createCardsRouter(client) {
   const router = express.Router();
   router.use(apiLimiter);
 
-  const VALID_TYPES = ['welcome', 'leave', 'levelup'];
+  const VALID_TYPES = ['welcome', 'leave', 'levelup', 'niveau'];
 
   /**
    * GET /api/cards/:type
@@ -69,6 +69,10 @@ function createCardsRouter(client) {
         level: mockContext.level || 5,
         oldLevel: (mockContext.level || 5) - 1,
         xp: mockContext.xp || 1250,
+        xpInLevel: mockContext.xpInLevel ?? 180,
+        xpNeeded: mockContext.xpNeeded ?? 400,
+        progress: mockContext.progress ?? 0.45,
+        rank: mockContext.rank ?? 3,
         inviter: mockContext.inviter || 'InviteurAmi',
         inviterUsername: mockContext.inviterUsername || 'InviteurAmi',
         invitesCount: mockContext.invitesCount || 3,
@@ -136,6 +140,10 @@ function createCardsRouter(client) {
         level: 10,
         oldLevel: 9,
         xp: 3200,
+        xpInLevel: 200,
+        xpNeeded: 480,
+        progress: 200 / 480,
+        rank: 3,
         inviter: 'StaffPyro',
         inviterUsername: 'StaffPyro',
         invitesCount: 5,
@@ -152,6 +160,7 @@ function createCardsRouter(client) {
         welcome: '👋 Test de Carte de Bienvenue',
         leave: '📤 Test de Carte d\'Au revoir',
         levelup: '⭐ Test de Carte de Montée de Niveau',
+        niveau: '📊 Test de Carte /niveau',
       };
 
       await channel.send({

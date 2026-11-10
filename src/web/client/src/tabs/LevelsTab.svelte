@@ -269,6 +269,14 @@
         />
       </div>
 
+      <div style="margin-top: 1.25rem;">
+        <CardEditor 
+          type="niveau" 
+          title="Carte Graphique de la Commande /niveau" 
+          subtitle="Image affichée par /niveau avec le niveau, le rang et la barre de progression d'XP" 
+        />
+      </div>
+
       <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
         <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: #FFFFFF; display: flex; align-items: center; gap: 0.5rem;">
           <Award size={18} style="color: var(--primary);" /> Classement Public en Ligne

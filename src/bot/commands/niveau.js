@@ -1,7 +1,9 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags, AttachmentBuilder } = require('discord.js');
+const { Op } = require('sequelize');
 const { UserXP } = require('../../database');
 const embeds = require('../utils/embeds');
 const { getXPNeededForLevel, makeProgressBar } = require('../utils/xpHelper');
+const cardGeneratorService = require('../../services/cardGeneratorService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,6 +39,35 @@ module.exports = {
       const xpNeededForThisLevel = xpForNextLevel - xpForCurrentLevel;
 
       const progress = makeProgressBar(xpInThisLevel, xpNeededForThisLevel);
+
+      if (await cardGeneratorService.isEnabled('niveau')) {
+        const cardConfig = await cardGeneratorService.getConfig('niveau');
+        const rank = (await UserXP.count({ where: { xp: { [Op.gt]: currentXP } } })) + 1;
+        const cardBuffer = await cardGeneratorService.generateCard('niveau', {
+          username: target.username,
+          userMention: `${target}`,
+          userTag: target.tag || target.username,
+          serverName: interaction.guild?.name,
+          memberCount: interaction.guild?.memberCount,
+          level: currentLevel,
+          xp: currentXP,
+          xpInLevel: xpInThisLevel,
+          xpNeeded: xpNeededForThisLevel,
+          progress: xpNeededForThisLevel > 0 ? xpInThisLevel / xpNeededForThisLevel : 0,
+          rank,
+          avatarUrl: target.displayAvatarURL({ extension: 'png', size: 256 }),
+        });
+
+        if (cardBuffer) {
+          const file = new AttachmentBuilder(cardBuffer, { name: 'niveau-card.png' });
+          if (cardConfig.sendMode === 'embed') {
+            const cardEmbed = embeds.custom(`⭐ Niveau de ${target.username}`, null, embeds.COLORS.PRIMARY);
+            cardEmbed.setImage('attachment://niveau-card.png');
+            return await interaction.editReply({ embeds: [cardEmbed], files: [file] });
+          }
+          return await interaction.editReply({ files: [file] });
+        }
+      }
 
       const fields = [
         { name: '⭐ Niveau', value: `\`Niveau ${currentLevel}\``, inline: true },

@@ -23,7 +23,7 @@
   import { showToast } from '../stores/toast';
 
   // Props
-  export let type = 'welcome'; // 'welcome' | 'leave' | 'levelup'
+  export let type = 'welcome'; // 'welcome' | 'leave' | 'levelup' | 'niveau'
   export let title = 'Carte Graphique Personnalisée';
   export let subtitle = 'Générez et envoyez une image personnalisée sur Discord';
 
@@ -32,7 +32,7 @@
   let showTestModal = false;
   let selectedTestChannelId = '';
   let isExpanded = false;
-  let activeTab = 'presets'; // 'presets' | 'background' | 'avatar' | 'texts'
+  let activeTab = 'presets'; // 'presets' | 'background' | 'avatar' | 'progress' | 'texts'
 
   // Local card configuration state
   let config = null;
@@ -49,6 +49,10 @@
     level: 12,
     oldLevel: 11,
     xp: 4850,
+    xpInLevel: 180,
+    xpNeeded: 400,
+    progress: 0.45,
+    rank: 3,
     inviter: 'CaptainPyro',
     inviterUsername: 'CaptainPyro',
     invitesCount: 6,
@@ -104,7 +108,19 @@
   ];
 
   // Available dynamic variables per card type
-  $: availableVariables = type === 'levelup' 
+  $: availableVariables = type === 'niveau'
+    ? [
+        { tag: '{username}', desc: 'Pseudo' },
+        { tag: '{user}', desc: 'Mention' },
+        { tag: '{level}', desc: 'Niveau actuel' },
+        { tag: '{xp}', desc: 'XP totale' },
+        { tag: '{xpInLevel}', desc: 'XP dans le niveau' },
+        { tag: '{xpNeeded}', desc: 'XP pour le niveau suivant' },
+        { tag: '{progress}', desc: 'Progression (%)' },
+        { tag: '{rank}', desc: 'Classement' },
+        { tag: '{server}', desc: 'Serveur' }
+      ]
+    : type === 'levelup' 
     ? [
         { tag: '{username}', desc: 'Pseudo' },
         { tag: '{user}', desc: 'Mention' },
@@ -189,6 +205,10 @@
       .replace(/{level}/g, mockContext.level.toString())
       .replace(/{oldLevel}/g, mockContext.oldLevel.toString())
       .replace(/{xp}/g, mockContext.xp.toLocaleString('fr-FR'))
+      .replace(/{xpInLevel}/g, mockContext.xpInLevel.toLocaleString('fr-FR'))
+      .replace(/{xpNeeded}/g, mockContext.xpNeeded.toLocaleString('fr-FR'))
+      .replace(/{progress}/g, Math.round(mockContext.progress * 100).toString())
+      .replace(/{rank}/g, mockContext.rank.toString())
       .replace(/{inviter}/g, mockContext.inviter)
       .replace(/{inviterUsername}/g, mockContext.inviterUsername)
       .replace(/{inviterTag}/g, mockContext.inviter)
@@ -321,6 +341,38 @@
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
       ctx.drawImage(cachedAvatarImg, avX - avRadius, avY - avRadius, avSize, avSize);
+      ctx.restore();
+    }
+
+    // 3b. XP Progress Bar
+    const pb = config.progressBar || {};
+    if (pb.enabled) {
+      const pbX = pb.x ?? 260;
+      const pbY = pb.y ?? 285;
+      const pbW = pb.width ?? 580;
+      const pbH = pb.height ?? 28;
+      const ratio = Math.max(0, Math.min(1, mockContext.progress));
+      const pill = (w) => {
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(pbX, pbY, w, pbH, pbH / 2);
+        } else {
+          ctx.rect(pbX, pbY, w, pbH);
+        }
+      };
+
+      ctx.save();
+      ctx.fillStyle = pb.trackColor || 'rgba(255, 255, 255, 0.12)';
+      pill(pbW);
+      ctx.fill();
+      if (ratio > 0) {
+        const barGradient = ctx.createLinearGradient(pbX, 0, pbX + pbW, 0);
+        barGradient.addColorStop(0, pb.fillColor || '#ef490b');
+        barGradient.addColorStop(1, pb.fillColorEnd || pb.fillColor || '#f1c40f');
+        ctx.fillStyle = barGradient;
+        pill(Math.max(pbH, pbW * ratio));
+        ctx.fill();
+      }
       ctx.restore();
     }
 
@@ -697,6 +749,15 @@
             >
               <User size={14} /> Avatar
             </button>
+            {#if type === 'niveau' && config.progressBar}
+              <button 
+                type="button" 
+                class="flat-nav-btn {activeTab === 'progress' ? 'active' : ''}" 
+                on:click={() => (activeTab = 'progress')}
+              >
+                <Type size={14} /> Barre XP
+              </button>
+            {/if}
             <button 
               type="button" 
               class="flat-nav-btn {activeTab === 'texts' ? 'active' : ''}" 
@@ -976,6 +1037,55 @@
                       bind:checked={config.avatar.glow}
                       on:change={renderClientCanvas}
                     />
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- TAB: XP PROGRESS BAR (niveau card only) -->
+          {#if activeTab === 'progress' && config.progressBar}
+            <div class="tab-pane">
+              <Toggle 
+                id={`pb_enabled_${type}`} 
+                label="Afficher la barre de progression d'XP" 
+                bind:checked={config.progressBar.enabled}
+                on:change={renderClientCanvas}
+              />
+
+              {#if config.progressBar.enabled}
+                <div class="section-divider"></div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for={`pb_x_${type}`}>Position X ({config.progressBar.x}px)</label>
+                    <input type="range" id={`pb_x_${type}`} min="0" max="800" step="5" bind:value={config.progressBar.x} on:input={renderClientCanvas} />
+                  </div>
+                  <div class="form-group">
+                    <label for={`pb_y_${type}`}>Position Y ({config.progressBar.y}px)</label>
+                    <input type="range" id={`pb_y_${type}`} min="0" max="380" step="5" bind:value={config.progressBar.y} on:input={renderClientCanvas} />
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for={`pb_w_${type}`}>Largeur ({config.progressBar.width}px)</label>
+                    <input type="range" id={`pb_w_${type}`} min="100" max="860" step="10" bind:value={config.progressBar.width} on:input={renderClientCanvas} />
+                  </div>
+                  <div class="form-group">
+                    <label for={`pb_h_${type}`}>Épaisseur ({config.progressBar.height}px)</label>
+                    <input type="range" id={`pb_h_${type}`} min="10" max="60" step="2" bind:value={config.progressBar.height} on:input={renderClientCanvas} />
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for={`pb_c1_${type}`}>Couleur de début</label>
+                    <input type="color" id={`pb_c1_${type}`} class="color-picker-square" bind:value={config.progressBar.fillColor} on:input={renderClientCanvas} />
+                  </div>
+                  <div class="form-group">
+                    <label for={`pb_c2_${type}`}>Couleur de fin</label>
+                    <input type="color" id={`pb_c2_${type}`} class="color-picker-square" bind:value={config.progressBar.fillColorEnd} on:input={renderClientCanvas} />
                   </div>
                 </div>
               {/if}

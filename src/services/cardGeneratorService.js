@@ -275,6 +275,63 @@ const DEFAULT_CARD_CONFIGS = {
       },
     ],
   },
+
+  niveau: {
+    enabled: false,
+    sendMode: 'standalone',
+    width: 900,
+    height: 400,
+    borderRadius: 24,
+    background: {
+      type: 'gradient',
+      color: '#12131a',
+      gradient: {
+        type: 'linear',
+        angle: 135,
+        colors: ['#0d0c1d', '#1f1538', '#110c22'],
+      },
+      imageUrl: '',
+      overlayColor: '#000000',
+      overlayOpacity: 0.45,
+    },
+    border: {
+      enabled: true,
+      color: '#ef490b',
+      width: 2,
+      glow: true,
+      glowColor: 'rgba(239, 73, 11, 0.35)',
+      glowBlur: 14,
+    },
+    avatar: {
+      enabled: true,
+      x: 140,
+      y: 190,
+      size: 150,
+      shape: 'circle',
+      borderRadius: 24,
+      borderWidth: 4,
+      borderColor: '#ef490b',
+      glow: true,
+      glowColor: 'rgba(239, 73, 11, 0.45)',
+      glowBlur: 16,
+    },
+    progressBar: {
+      enabled: true,
+      x: 260,
+      y: 285,
+      width: 580,
+      height: 28,
+      trackColor: 'rgba(255, 255, 255, 0.12)',
+      fillColor: '#ef490b',
+      fillColorEnd: '#f1c40f',
+    },
+    texts: [
+      { id: 'username', text: '{username}', x: 260, y: 130, align: 'left', fontSize: 40, fontFamily: 'Figtree', fontWeight: 'bold', color: '#ffffff', shadow: true, shadowColor: 'rgba(0, 0, 0, 0.8)', shadowBlur: 8 },
+      { id: 'level', text: 'NIVEAU {level}', x: 260, y: 180, align: 'left', fontSize: 26, fontFamily: 'Syne', fontWeight: 'bold', color: '#ef490b', shadow: true, shadowColor: 'rgba(0, 0, 0, 0.8)', shadowBlur: 8 },
+      { id: 'rank', text: 'Rang #{rank} • {xp} XP au total', x: 260, y: 225, align: 'left', fontSize: 18, fontFamily: 'Figtree', fontWeight: 'bold', color: '#cbd5e1', shadow: false, shadowColor: 'rgba(0, 0, 0, 0.5)', shadowBlur: 4 },
+      { id: 'progress', text: '{xpInLevel} / {xpNeeded} XP ({progress}%)', x: 840, y: 270, align: 'right', fontSize: 16, fontFamily: 'Figtree', fontWeight: 'bold', color: '#ffffff', shadow: false, shadowColor: 'rgba(0, 0, 0, 0.5)', shadowBlur: 4 },
+    ],
+  },
 };
 
 /**
@@ -299,6 +356,10 @@ function formatVariables(text, context = {}) {
     .replace(/{level}/g, (context.level ?? 0).toString())
     .replace(/{oldLevel}/g, (context.oldLevel ?? 0).toString())
     .replace(/{xp}/g, (context.xp ?? 0).toLocaleString('fr-FR'))
+    .replace(/{xpInLevel}/g, (context.xpInLevel ?? 0).toLocaleString('fr-FR'))
+    .replace(/{xpNeeded}/g, (context.xpNeeded ?? 0).toLocaleString('fr-FR'))
+    .replace(/{progress}/g, Math.round((context.progress ?? 0) * 100).toString())
+    .replace(/{rank}/g, (context.rank ?? 0).toString())
     .replace(/{inviter}/g, context.inviter || 'Inconnu')
     .replace(/{inviterUsername}/g, context.inviterUsername || context.inviter || 'Inconnu')
     .replace(/{inviterTag}/g, context.inviterTag || context.inviter || 'Inconnu')
@@ -523,7 +584,40 @@ async function renderCardCanvas(rawConfig, context = {}) {
     }
   }
 
-  // 5. Render Text Layers
+  // 5. Render Progress Bar (XP progression)
+  const pb = config.progressBar || {};
+  if (pb.enabled) {
+    const pbX = pb.x ?? 260;
+    const pbY = pb.y ?? 285;
+    const pbW = Math.max(40, Math.min(width, pb.width ?? 580));
+    const pbH = Math.max(8, Math.min(80, pb.height ?? 28));
+    const ratio = Math.max(0, Math.min(1, Number(context.progress) || 0));
+    const pill = (w) => {
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(pbX, pbY, w, pbH, pbH / 2);
+      } else {
+        ctx.rect(pbX, pbY, w, pbH);
+      }
+    };
+
+    ctx.save();
+    ctx.fillStyle = pb.trackColor || 'rgba(255, 255, 255, 0.12)';
+    pill(pbW);
+    ctx.fill();
+
+    if (ratio > 0) {
+      const gradient = ctx.createLinearGradient(pbX, 0, pbX + pbW, 0);
+      gradient.addColorStop(0, pb.fillColor || '#ef490b');
+      gradient.addColorStop(1, pb.fillColorEnd || pb.fillColor || '#f1c40f');
+      ctx.fillStyle = gradient;
+      pill(Math.max(pbH, pbW * ratio));
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 6. Render Text Layers
   const texts = Array.isArray(config.texts) ? config.texts : [];
   for (const item of texts) {
     if (!item.text) continue;

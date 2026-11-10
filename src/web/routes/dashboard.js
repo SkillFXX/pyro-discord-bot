@@ -63,6 +63,7 @@ function createDashboardRouter(client, distDir) {
         welcome: await cardGeneratorService.getConfig('welcome'),
         leave: await cardGeneratorService.getConfig('leave'),
         levelup: await cardGeneratorService.getConfig('levelup'),
+        niveau: await cardGeneratorService.getConfig('niveau'),
       } : null;
 
       res.json({
