@@ -48,6 +48,7 @@ async function getLogChannel(client) {
  * @param {string} [options.thumbnail]
  * @param {string} [options.image]
  * @param {{text: string, iconURL?: string}} [options.footer]
+ * @param {Array<import('discord.js').AttachmentBuilder>} [options.files] Fichiers joints au log (ex: médias supprimés)
  * @returns {Promise<boolean>} True si le log a été envoyé
  */
 async function log(client, eventKey, {
@@ -59,6 +60,7 @@ async function log(client, eventKey, {
   thumbnail = null,
   image = null,
   footer = null,
+  files = [],
 }) {
   try {
     // 1. Check if event is enabled
@@ -108,7 +110,7 @@ async function log(client, eventKey, {
       });
     }
 
-    await channel.send({ embeds: [embed] });
+    await channel.send({ embeds: [embed], files });
     return true;
   } catch (error) {
     console.error(`[LoggerService] Erreur lors de l'envoi du log (${eventKey}):`, error.message);

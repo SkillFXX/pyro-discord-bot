@@ -29,6 +29,13 @@ module.exports = {
       console.error('[Bot ready] Erreur lors de l\'enregistrement des commandes slash :', error);
     }
 
+    // Load every member into the cache so member update logs compare against the real previous state
+    try {
+      await guild.members.fetch();
+    } catch (error) {
+      console.warn('[Bot ready] Impossible de charger tous les membres en cache :', error.message);
+    }
+
     // Set Bot Status from config
     await updateBotStatus(client);
 

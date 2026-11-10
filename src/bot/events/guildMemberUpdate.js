@@ -6,6 +6,10 @@ module.exports = {
     // Ignore bots
     if (newMember.user.bot) return;
 
+    // With Partials.GuildMember, an update for an uncached member gives an empty "old" member
+    // (no nickname, no roles, no timeout): comparing against it logs fake changes.
+    if (oldMember.partial) return;
+
     // 1. Changement de pseudo / surnom
     if (oldMember.nickname !== newMember.nickname) {
       const oldNick = oldMember.nickname || oldMember.user.username;
