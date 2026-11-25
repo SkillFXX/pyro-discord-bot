@@ -807,3 +807,15 @@ export const deleteScheduledPoll = (id) =>
 
 export const sendScheduledPollNow = (id) =>
   pollRequest(`/api/polls/${id}/send`, 'POST', null, (d) => `Sondage envoyé dans #${d.channelName || 'salon'} !`);
+
+export async function fetchPollStats() {
+  try {
+    const res = await fetch('/api/polls/stats', { headers: getHeaders() });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Erreur chargement stats sondages :', e);
+  }
+  return { summary: { pollsCount: 0, finishedCount: 0, totalVotes: 0, averageVotes: 0 }, results: [] };
+}

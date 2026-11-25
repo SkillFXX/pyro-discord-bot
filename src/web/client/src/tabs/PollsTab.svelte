@@ -12,6 +12,7 @@
     updateScheduledPoll,
     deleteScheduledPoll,
     sendScheduledPollNow,
+    fetchPollStats,
   } from '../stores/data';
 
   const DAY_LABELS = [
@@ -25,6 +26,7 @@
   ];
 
   let polls = [];
+  let stats = { summary: { pollsCount: 0, finishedCount: 0, totalVotes: 0, averageVotes: 0 }, results: [] };
   let timezone = '';
   let limits = { question: 300, answerText: 55, minAnswers: 2, maxAnswers: 10, maxDurationHours: 768 };
 
@@ -50,6 +52,19 @@
     polls = data.polls || [];
     timezone = data.timezone || '';
     limits = { ...limits, ...(data.limits || {}) };
+    stats = await fetchPollStats();
+  }
+
+  function percent(votes, result) {
+    return result.totalVotes > 0 ? Math.round((votes / result.totalVotes) * 100) : 0;
+  }
+
+  function topVotes(result) {
+    return Math.max(...result.answers.map((a) => a.votes));
+  }
+
+  function formatDate(value) {
+    return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   onMount(load);
@@ -206,6 +221,53 @@
         </td>
       </tr>
     </DataTable>
+  </Card>
+
+  <Card
+    id="polls-stats"
+    icon={ChartBar}
+    title="Statistiques des Sondages"
+    subtitle="Résultats des sondages envoyés automatiquement (mis à jour toutes les 5 minutes)"
+  >
+    <div class="grid-2" style="margin-bottom: 1.25rem;">
+      <div class="form-group">
+        <span class="form-label">Sondages envoyés</span>
+        <strong style="font-size: 1.5rem;">{stats.summary.pollsCount}</strong>
+        <small style="color: var(--text-muted);">{stats.summary.finishedCount} terminé(s)</small>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Votes</span>
+        <strong style="font-size: 1.5rem;">{stats.summary.totalVotes}</strong>
+        <small style="color: var(--text-muted);">≈ {stats.summary.averageVotes} par sondage</small>
+      </div>
+    </div>
+
+    {#each stats.results as result (result.id)}
+      <div style="padding: 1rem 0; border-top: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
+          <strong>{result.question}</strong>
+          <span style="color: var(--text-muted); font-size: 0.8rem;">
+            {formatDate(result.createdAt)} • {result.totalVotes} vote(s) •
+            {result.status === 'finalized' ? 'Terminé' : 'En cours'}
+          </span>
+        </div>
+        {#each result.answers as answer}
+          <div style="margin-bottom: 0.45rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px;">
+              <span>{answer.text}{result.totalVotes > 0 && answer.votes === topVotes(result) ? ' 🏆' : ''}</span>
+              <span>{answer.votes} ({percent(answer.votes, result)}%)</span>
+            </div>
+            <div style="height: 8px; border-radius: 4px; background: var(--border); overflow: hidden;">
+              <div style="height: 100%; width: {percent(answer.votes, result)}%; background: var(--primary);"></div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p style="color: var(--text-muted); margin: 0;">
+        Aucun résultat pour le moment. Les sondages envoyés à partir de maintenant seront suivis automatiquement.
+      </p>
+    {/each}
   </Card>
 
   <Modal bind:open={showModal} title={editingId ? 'Modifier le Sondage' : 'Nouveau Sondage Programmé'}>

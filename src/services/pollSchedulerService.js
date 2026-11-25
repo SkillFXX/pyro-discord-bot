@@ -1,8 +1,9 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { ScheduledPoll } = require('../database');
+const { ScheduledPoll, PollResult } = require('../database');
 
 const POLL_TIMEZONE = process.env.POLL_TIMEZONE || 'Europe/Paris';
 const CHECK_INTERVAL_MS = 30 * 1000;
+const RESULTS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 // A poll missed because the bot was offline is still posted if the bot comes back within this window.
 const CATCH_UP_WINDOW_MINUTES = 120;
 
@@ -82,7 +83,8 @@ function validatePollPayload(body = {}) {
 }
 
 /**
- * Posts a poll to its channel.
+ * Posts a poll to its channel and records it so its votes can be tracked.
+ * @returns {Promise<import('discord.js').Channel>} the channel the poll was posted in
  * @throws {Error} with a user-readable message when the poll cannot be posted
  */
 async function sendPoll(client, poll) {
@@ -96,7 +98,7 @@ async function sendPoll(client, poll) {
     throw new Error(`Le bot n'a pas la permission « Envoyer des sondages » dans #${channel.name}.`);
   }
 
-  await channel.send({
+  const message = await channel.send({
     content: poll.mentionRoleId ? `<@&${poll.mentionRoleId}>` : undefined,
     allowedMentions: poll.mentionRoleId ? { roles: [poll.mentionRoleId] } : { parse: [] },
     poll: {
@@ -106,7 +108,51 @@ async function sendPoll(client, poll) {
       allowMultiselect: Boolean(poll.allowMultiselect),
     },
   });
+
+  await PollResult.create({
+    scheduledPollId: poll.id,
+    messageId: message.id,
+    channelId: channel.id,
+    question: poll.question,
+    answers: poll.answers.map(a => ({ text: a.text, votes: 0 })),
+    expiresAt: new Date(Date.now() + poll.durationHours * 60 * 60 * 1000),
+  }).catch(err => console.error('[PollScheduler] Résultat non enregistré :', err.message));
+
   return channel;
+}
+
+/**
+ * Refreshes the vote counts of every poll that is still open.
+ * Discord keeps the results after a poll ends, so polls that ended while the bot was offline are still caught.
+ */
+async function syncPollResults(client) {
+  const guild = client.guilds.cache.get(process.env.GUILD_ID);
+  if (!guild) return;
+
+  const openResults = await PollResult.findAll({ where: { status: 'open' } });
+  for (const result of openResults) {
+    try {
+      const channel = await guild.channels.fetch(result.channelId).catch(() => null);
+      const message = channel ? await channel.messages.fetch(result.messageId).catch(err => (err.code === 10008 ? null : undefined)) : null;
+
+      // undefined = temporary failure (network, permissions): retry on the next pass
+      if (message === undefined) continue;
+
+      if (!message || !message.poll) {
+        await result.update({ status: 'deleted' });
+        continue;
+      }
+
+      const answers = [...message.poll.answers.values()].map(a => ({ text: a.text, votes: a.voteCount ?? 0 }));
+      await result.update({
+        answers,
+        totalVotes: answers.reduce((sum, a) => sum + a.votes, 0),
+        status: message.poll.resultsFinalized ? 'finalized' : 'open',
+      });
+    } catch (err) {
+      console.error(`[PollScheduler] Suivi du sondage ${result.messageId} impossible :`, err.message);
+    }
+  }
 }
 
 async function runDuePolls(client) {
@@ -136,7 +182,11 @@ function start(client) {
   const tick = () => runDuePolls(client).catch(err => console.error('[PollScheduler] Erreur :', err));
   setTimeout(tick, 10 * 1000).unref();
   setInterval(tick, CHECK_INTERVAL_MS).unref();
+
+  const syncResults = () => syncPollResults(client).catch(err => console.error('[PollScheduler] Erreur suivi résultats :', err));
+  setTimeout(syncResults, 30 * 1000).unref();
+  setInterval(syncResults, RESULTS_SYNC_INTERVAL_MS).unref();
   console.log(`[PollScheduler] Planificateur de sondages démarré (fuseau ${POLL_TIMEZONE}).`);
 }
 
-module.exports = { start, runDuePolls, sendPoll, validatePollPayload, getLocalParts, POLL_TIMEZONE, LIMITS };
+module.exports = { start, runDuePolls, syncPollResults, sendPoll, validatePollPayload, getLocalParts, POLL_TIMEZONE, LIMITS };

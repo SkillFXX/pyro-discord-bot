@@ -612,6 +612,52 @@ const ScheduledPoll = sequelize.define('ScheduledPoll', {
   },
 });
 
+// 20. PollResult: one row per poll posted by the scheduler, tracks the votes for statistics
+const PollResult = sequelize.define('PollResult', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  scheduledPollId: {
+    type: DataTypes.INTEGER, // Not a foreign key: results are kept when the schedule is deleted
+    allowNull: true,
+  },
+  messageId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  channelId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  question: {
+    type: DataTypes.STRING(300),
+    allowNull: false,
+  },
+  answers: {
+    type: DataTypes.JSON, // [{ text: string, votes: number }]
+    allowNull: false,
+    defaultValue: [],
+  },
+  totalVotes: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  expiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  status: {
+    type: DataTypes.STRING, // 'open' | 'finalized' | 'deleted'
+    allowNull: false,
+    defaultValue: 'open',
+  },
+}, {
+  indexes: [{ fields: ['status'] }, { fields: ['scheduledPollId'] }],
+});
+
 // 19. FormSubmission: User submissions from Discord modal forms
 const FormSubmission = sequelize.define('FormSubmission', {
   id: {
@@ -974,6 +1020,7 @@ module.exports = {
   BrawlStarsTrophyLog,
   CustomMessage,
   ScheduledPoll,
+  PollResult,
   FormSubmission,
   UserInvite,
   MemberInvite,
