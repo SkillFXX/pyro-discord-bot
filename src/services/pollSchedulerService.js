@@ -1,5 +1,6 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { ScheduledPoll, PollResult } = require('../database');
+const { Op } = require('sequelize');
+const { sequelize, ScheduledPoll, PollResult, PollVote } = require('../database');
 
 const POLL_TIMEZONE = process.env.POLL_TIMEZONE || 'Europe/Paris';
 const CHECK_INTERVAL_MS = 30 * 1000;
@@ -122,15 +123,47 @@ async function sendPoll(client, poll) {
 }
 
 /**
- * Refreshes the vote counts of every poll that is still open.
+ * Fetches every voter of every answer of a poll (Discord returns at most 100 per call).
+ * @returns {Promise<Array<{ userId: string, answerIndex: number, answerText: string }>>}
+ */
+async function fetchPollVotes(poll) {
+  const votes = [];
+  let answerIndex = 0;
+  for (const answer of poll.answers.values()) {
+    let after;
+    for (;;) {
+      const voters = await answer.voters.fetch({ after, limit: 100 });
+      for (const userId of voters.keys()) {
+        votes.push({ userId, answerIndex, answerText: String(answer.text).substring(0, 100) });
+      }
+      if (voters.size < 100) break;
+      after = voters.lastKey();
+    }
+    answerIndex++;
+  }
+  return votes;
+}
+
+async function storeVotes(result, votes) {
+  await sequelize.transaction(async (transaction) => {
+    await PollVote.destroy({ where: { pollResultId: result.id }, transaction });
+    await PollVote.bulkCreate(votes.map(v => ({ ...v, pollResultId: result.id })), { transaction });
+  });
+}
+
+/**
+ * Refreshes the votes of every poll that is still open, and stores the voters of ended polls.
  * Discord keeps the results after a poll ends, so polls that ended while the bot was offline are still caught.
  */
 async function syncPollResults(client) {
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   if (!guild) return;
 
-  const openResults = await PollResult.findAll({ where: { status: 'open' } });
-  for (const result of openResults) {
+  const pending = await PollResult.findAll({
+    where: { [Op.or]: [{ status: 'open' }, { status: 'finalized', votersSynced: false }] },
+  });
+
+  for (const result of pending) {
     try {
       const channel = await guild.channels.fetch(result.channelId).catch(() => null);
       const message = channel ? await channel.messages.fetch(result.messageId).catch(err => (err.code === 10008 ? null : undefined)) : null;
@@ -139,20 +172,124 @@ async function syncPollResults(client) {
       if (message === undefined) continue;
 
       if (!message || !message.poll) {
-        await result.update({ status: 'deleted' });
+        // An ended poll whose message is gone keeps what was stored; an open one is dropped from the stats.
+        await result.update(result.status === 'finalized' ? { votersSynced: true } : { status: 'deleted' });
         continue;
       }
 
       const answers = [...message.poll.answers.values()].map(a => ({ text: a.text, votes: a.voteCount ?? 0 }));
+      const status = message.poll.resultsFinalized ? 'finalized' : 'open';
+      const changed = JSON.stringify(answers) !== JSON.stringify(result.answers);
+      const needsVoters = changed || (status === 'finalized' && !result.votersSynced);
+
+      if (needsVoters) {
+        await storeVotes(result, await fetchPollVotes(message.poll));
+      }
+
       await result.update({
         answers,
         totalVotes: answers.reduce((sum, a) => sum + a.votes, 0),
-        status: message.poll.resultsFinalized ? 'finalized' : 'open',
+        status,
+        votersSynced: status === 'finalized' ? true : result.votersSynced,
       });
     } catch (err) {
       console.error(`[PollScheduler] Suivi du sondage ${result.messageId} impossible :`, err.message);
     }
   }
+}
+
+/**
+ * Statistics of one recurring poll. Occurrences of a recurring poll are merged together
+ * (answers are grouped by their text), different recurring polls are never mixed.
+ * @param {object} filters
+ * @param {number|string} [filters.pollId] ScheduledPoll id (defaults to the most recently posted one)
+ * @param {string} [filters.from] 'YYYY-MM-DD' (inclusive)
+ * @param {string} [filters.to] 'YYYY-MM-DD' (inclusive)
+ * @param {string} [filters.userId] restrict the votes to one member
+ */
+async function getPollStats({ pollId, from, to, userId } = {}) {
+  const all = await PollResult.findAll({
+    where: { status: ['open', 'finalized'] },
+    order: [['createdAt', 'DESC']],
+  });
+
+  const groups = new Map();
+  for (const r of all) {
+    if (!groups.has(r.scheduledPollId)) groups.set(r.scheduledPollId, r);
+  }
+  const schedules = await ScheduledPoll.findAll({ where: { id: [...groups.keys()].filter(id => id !== null) } });
+  const polls = [...groups.entries()].map(([id, latest]) => ({
+    id,
+    question: schedules.find(sp => sp.id === id)?.question || latest.question,
+    deleted: !schedules.some(sp => sp.id === id),
+  }));
+
+  const selectedId = pollId !== undefined && pollId !== '' ? Number(pollId) : polls[0]?.id;
+  const selectedPoll = polls.find(p => p.id === selectedId);
+  if (!selectedPoll) return { polls, selected: null };
+
+  const fromDate = from ? new Date(`${from}T00:00:00`) : null;
+  const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
+  const results = all
+    .filter(r => r.scheduledPollId === selectedId)
+    .filter(r => (!fromDate || r.createdAt >= fromDate) && (!toDate || r.createdAt <= toDate))
+    .reverse(); // chronological
+
+  const answerTotals = new Map();
+  for (const r of results) {
+    const best = Math.max(0, ...r.answers.map(a => a.votes));
+    for (const a of r.answers) {
+      const entry = answerTotals.get(a.text) || { text: a.text, votes: 0, wins: 0 };
+      entry.votes += a.votes;
+      if (best > 0 && a.votes === best) entry.wins++;
+      answerTotals.set(a.text, entry);
+    }
+  }
+  const totalVotes = results.reduce((sum, r) => sum + r.totalVotes, 0);
+  const percentOf = (votes, total) => (total > 0 ? Math.round((votes / total) * 1000) / 10 : 0);
+
+  const resultIds = results.map(r => r.id);
+  const votes = resultIds.length
+    ? await PollVote.findAll({ where: { pollResultId: resultIds }, attributes: ['pollResultId', 'userId', 'answerText'] })
+    : [];
+
+  let member = null;
+  if (userId) {
+    const memberVotes = votes.filter(v => v.userId === userId);
+    const byAnswer = new Map();
+    for (const v of memberVotes) byAnswer.set(v.answerText, (byAnswer.get(v.answerText) || 0) + 1);
+    member = {
+      userId,
+      participated: new Set(memberVotes.map(v => v.pollResultId)).size,
+      occurrences: results.length,
+      answers: [...byAnswer.entries()]
+        .map(([text, count]) => ({ text, count, percent: percentOf(count, memberVotes.length) }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }
+
+  return {
+    polls,
+    selected: {
+      id: selectedPoll.id,
+      question: selectedPoll.question,
+      occurrences: results.length,
+      totalVotes,
+      averageVotes: results.length ? Math.round((totalVotes / results.length) * 10) / 10 : 0,
+      answers: [...answerTotals.values()]
+        .map(a => ({ ...a, percent: percentOf(a.votes, totalVotes) }))
+        .sort((a, b) => b.votes - a.votes),
+      timeline: results.map(r => ({
+        id: r.id,
+        date: r.createdAt,
+        status: r.status,
+        totalVotes: r.totalVotes,
+        answers: r.answers,
+      })),
+      voters: [...new Set(votes.map(v => v.userId))],
+      member,
+    },
+  };
 }
 
 async function runDuePolls(client) {
@@ -189,4 +326,4 @@ function start(client) {
   console.log(`[PollScheduler] Planificateur de sondages démarré (fuseau ${POLL_TIMEZONE}).`);
 }
 
-module.exports = { start, runDuePolls, syncPollResults, sendPoll, validatePollPayload, getLocalParts, POLL_TIMEZONE, LIMITS };
+module.exports = { start, runDuePolls, syncPollResults, getPollStats, sendPoll, validatePollPayload, getLocalParts, POLL_TIMEZONE, LIMITS };

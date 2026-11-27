@@ -808,14 +808,20 @@ export const deleteScheduledPoll = (id) =>
 export const sendScheduledPollNow = (id) =>
   pollRequest(`/api/polls/${id}/send`, 'POST', null, (d) => `Sondage envoyé dans #${d.channelName || 'salon'} !`);
 
-export async function fetchPollStats() {
+export async function fetchPollStats({ pollId, from, to, userId } = {}) {
+  const params = new URLSearchParams();
+  if (pollId !== undefined && pollId !== null && pollId !== '') params.set('pollId', pollId);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (userId) params.set('userId', userId);
+
   try {
-    const res = await fetch('/api/polls/stats', { headers: getHeaders() });
+    const res = await fetch(`/api/polls/stats?${params}`, { headers: getHeaders() });
     if (res.ok) {
       return await res.json();
     }
   } catch (e) {
     console.error('Erreur chargement stats sondages :', e);
   }
-  return { summary: { pollsCount: 0, finishedCount: 0, totalVotes: 0, averageVotes: 0 }, results: [] };
+  return { polls: [], selected: null };
 }

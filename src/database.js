@@ -654,8 +654,39 @@ const PollResult = sequelize.define('PollResult', {
     allowNull: false,
     defaultValue: 'open',
   },
+  votersSynced: {
+    type: DataTypes.BOOLEAN, // true once the voters of a finalized poll have been stored
+    defaultValue: false,
+  },
 }, {
   indexes: [{ fields: ['status'] }, { fields: ['scheduledPollId'] }],
+});
+
+// 21. PollVote: who voted for which answer of a posted poll (polls are not anonymous on Discord)
+const PollVote = sequelize.define('PollVote', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  pollResultId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  answerIndex: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  answerText: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+  },
+}, {
+  indexes: [{ fields: ['pollResultId'] }, { fields: ['userId'] }],
 });
 
 // 19. FormSubmission: User submissions from Discord modal forms
@@ -1021,6 +1052,7 @@ module.exports = {
   CustomMessage,
   ScheduledPoll,
   PollResult,
+  PollVote,
   FormSubmission,
   UserInvite,
   MemberInvite,

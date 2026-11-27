@@ -26,7 +26,12 @@
   ];
 
   let polls = [];
-  let stats = { summary: { pollsCount: 0, finishedCount: 0, totalVotes: 0, averageVotes: 0 }, results: [] };
+  let stats = { polls: [], selected: null };
+  let statsPollId = '';
+  let statsPeriod = '30';
+  let statsFrom = '';
+  let statsTo = '';
+  let statsUserId = '';
   let timezone = '';
   let limits = { question: 300, answerText: 55, minAnswers: 2, maxAnswers: 10, maxDurationHours: 768 };
 
@@ -52,15 +57,43 @@
     polls = data.polls || [];
     timezone = data.timezone || '';
     limits = { ...limits, ...(data.limits || {}) };
-    stats = await fetchPollStats();
+    await loadStats();
   }
 
-  function percent(votes, result) {
-    return result.totalVotes > 0 ? Math.round((votes / result.totalVotes) * 100) : 0;
+  function dayString(daysAgo) {
+    const d = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  function topVotes(result) {
-    return Math.max(...result.answers.map((a) => a.votes));
+  async function loadStats() {
+    const custom = statsPeriod === 'custom';
+    const from = custom ? statsFrom : statsPeriod === 'all' ? '' : dayString(Number(statsPeriod));
+    const to = custom ? statsTo : '';
+    stats = await fetchPollStats({ pollId: statsPollId, from, to, userId: statsUserId });
+    // Keep the selection in sync with what the server resolved (default = most recent recurring poll)
+    if (stats.selected) statsPollId = String(stats.selected.id);
+  }
+
+  async function selectStatsPoll() {
+    statsUserId = '';
+    await loadStats();
+  }
+
+  function memberName(id) {
+    return ($dashboardData.members || []).find((m) => m.id === id)?.name || id;
+  }
+
+  $: statsVoters = (stats.selected?.voters || [])
+    .map((id) => ({ id, name: memberName(id) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function percent(votes, total) {
+    return total > 0 ? Math.round((votes / total) * 100) : 0;
+  }
+
+  function winner(entry) {
+    const best = Math.max(0, ...entry.answers.map((a) => a.votes));
+    return best > 0 ? entry.answers.filter((a) => a.votes === best).map((a) => a.text).join(' / ') : '—';
   }
 
   function formatDate(value) {
@@ -226,48 +259,123 @@
   <Card
     id="polls-stats"
     icon={ChartBar}
-    title="Statistiques des Sondages"
-    subtitle="Résultats des sondages envoyés automatiquement (mis à jour toutes les 5 minutes)"
+    title="Statistiques par Sondage"
+    subtitle="Chaque sondage récurrent a ses propres statistiques, regroupées sur la période choisie (mises à jour toutes les 5 minutes)"
   >
-    <div class="grid-2" style="margin-bottom: 1.25rem;">
-      <div class="form-group">
-        <span class="form-label">Sondages envoyés</span>
-        <strong style="font-size: 1.5rem;">{stats.summary.pollsCount}</strong>
-        <small style="color: var(--text-muted);">{stats.summary.finishedCount} terminé(s)</small>
-      </div>
-      <div class="form-group">
-        <span class="form-label">Votes</span>
-        <strong style="font-size: 1.5rem;">{stats.summary.totalVotes}</strong>
-        <small style="color: var(--text-muted);">≈ {stats.summary.averageVotes} par sondage</small>
-      </div>
-    </div>
-
-    {#each stats.results as result (result.id)}
-      <div style="padding: 1rem 0; border-top: 1px solid var(--border);">
-        <div style="display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
-          <strong>{result.question}</strong>
-          <span style="color: var(--text-muted); font-size: 0.8rem;">
-            {formatDate(result.createdAt)} • {result.totalVotes} vote(s) •
-            {result.status === 'finalized' ? 'Terminé' : 'En cours'}
-          </span>
-        </div>
-        {#each result.answers as answer}
-          <div style="margin-bottom: 0.45rem;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px;">
-              <span>{answer.text}{result.totalVotes > 0 && answer.votes === topVotes(result) ? ' 🏆' : ''}</span>
-              <span>{answer.votes} ({percent(answer.votes, result)}%)</span>
-            </div>
-            <div style="height: 8px; border-radius: 4px; background: var(--border); overflow: hidden;">
-              <div style="height: 100%; width: {percent(answer.votes, result)}%; background: var(--primary);"></div>
-            </div>
-          </div>
-        {/each}
-      </div>
-    {:else}
+    {#if stats.polls.length === 0}
       <p style="color: var(--text-muted); margin: 0;">
         Aucun résultat pour le moment. Les sondages envoyés à partir de maintenant seront suivis automatiquement.
       </p>
-    {/each}
+    {:else}
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="stats_poll">Sondage récurrent</label>
+          <select id="stats_poll" bind:value={statsPollId} on:change={selectStatsPoll}>
+            {#each stats.polls as p}
+              <option value={String(p.id)}>{p.question}{p.deleted ? ' (supprimé)' : ''}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="stats_period">Période</label>
+          <select id="stats_period" bind:value={statsPeriod} on:change={loadStats}>
+            <option value="7">7 derniers jours</option>
+            <option value="30">30 derniers jours</option>
+            <option value="90">90 derniers jours</option>
+            <option value="all">Depuis le début</option>
+            <option value="custom">Dates personnalisées</option>
+          </select>
+        </div>
+      </div>
+
+      {#if statsPeriod === 'custom'}
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="stats_from">Du</label>
+            <input id="stats_from" type="date" bind:value={statsFrom} on:change={loadStats} />
+          </div>
+          <div class="form-group">
+            <label for="stats_to">Au</label>
+            <input id="stats_to" type="date" bind:value={statsTo} on:change={loadStats} />
+          </div>
+        </div>
+      {/if}
+
+      <div class="form-group">
+        <label for="stats_member">Membre</label>
+        <select id="stats_member" bind:value={statsUserId} on:change={loadStats}>
+          <option value="">Tous les membres (vue d'ensemble)</option>
+          {#each statsVoters as v}
+            <option value={v.id}>{v.name}</option>
+          {/each}
+        </select>
+      </div>
+
+      {#if stats.selected}
+        {@const sel = stats.selected}
+        <div class="grid-2" style="margin: 1rem 0;">
+          <div class="form-group">
+            <span class="form-label">Sondages envoyés sur la période</span>
+            <strong style="font-size: 1.5rem;">{sel.occurrences}</strong>
+          </div>
+          <div class="form-group">
+            <span class="form-label">Votes</span>
+            <strong style="font-size: 1.5rem;">{sel.totalVotes}</strong>
+            <small style="color: var(--text-muted);">≈ {sel.averageVotes} par sondage</small>
+          </div>
+        </div>
+
+        {#if sel.member}
+          <div style="padding: 1rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem;">
+            <strong>Votes de {memberName(sel.member.userId)}</strong>
+            <div style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0.75rem;">
+              A participé à {sel.member.participated} sondage(s) sur {sel.member.occurrences}
+              ({percent(sel.member.participated, sel.member.occurrences)}%)
+            </div>
+            {#each sel.member.answers as answer}
+              <div style="margin-bottom: 0.45rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px;">
+                  <span>{answer.text}</span>
+                  <span>{answer.count} fois ({answer.percent}%)</span>
+                </div>
+                <div style="height: 8px; border-radius: 4px; background: var(--border); overflow: hidden;">
+                  <div style="height: 100%; width: {answer.percent}%; background: var(--primary);"></div>
+                </div>
+              </div>
+            {:else}
+              <p style="color: var(--text-muted); margin: 0;">Aucun vote de ce membre sur la période.</p>
+            {/each}
+          </div>
+        {/if}
+
+        <h4 style="font-size: 0.95rem; margin: 1rem 0 0.6rem;">Ce que votent les gens en moyenne</h4>
+        {#each sel.answers as answer}
+          <div style="margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px;">
+              <span>{answer.text}</span>
+              <span>{answer.votes} votes ({answer.percent}%) • gagne {answer.wins} fois</span>
+            </div>
+            <div style="height: 8px; border-radius: 4px; background: var(--border); overflow: hidden;">
+              <div style="height: 100%; width: {answer.percent}%; background: var(--primary);"></div>
+            </div>
+          </div>
+        {:else}
+          <p style="color: var(--text-muted); margin: 0;">Aucun sondage sur cette période.</p>
+        {/each}
+
+        {#if sel.timeline.length > 0}
+          <h4 style="font-size: 0.95rem; margin: 1.25rem 0 0.6rem;">Historique</h4>
+          <DataTable headers={['Date', 'Votes', 'Réponse gagnante', 'Statut']} items={[...sel.timeline].reverse()}>
+            <tr slot="row" let:item>
+              <td>{formatDate(item.date)}</td>
+              <td>{item.totalVotes}</td>
+              <td>{winner(item)}</td>
+              <td>{item.status === 'finalized' ? 'Terminé' : 'En cours'}</td>
+            </tr>
+          </DataTable>
+        {/if}
+      {/if}
+    {/if}
   </Card>
 
   <Modal bind:open={showModal} title={editingId ? 'Modifier le Sondage' : 'Nouveau Sondage Programmé'}>

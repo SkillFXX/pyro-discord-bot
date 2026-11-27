@@ -1,5 +1,5 @@
 const express = require('express');
-const { ScheduledPoll, PollResult } = require('../../database');
+const { ScheduledPoll } = require('../../database');
 const { requireAdmin } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const pollScheduler = require('../../services/pollSchedulerService');
@@ -20,24 +20,12 @@ function createPollsRouter(client) {
 
   router.get('/api/polls/stats', requireAdmin, async (req, res) => {
     try {
-      const results = await PollResult.findAll({
-        where: { status: ['open', 'finalized'] },
-        order: [['createdAt', 'DESC']],
-        limit: 100,
-      });
-
-      const finished = results.filter(r => r.status === 'finalized');
-      const totalVotes = results.reduce((sum, r) => sum + r.totalVotes, 0);
-
-      return res.json({
-        summary: {
-          pollsCount: results.length,
-          finishedCount: finished.length,
-          totalVotes,
-          averageVotes: results.length ? Math.round((totalVotes / results.length) * 10) / 10 : 0,
-        },
-        results,
-      });
+      const { pollId, from, to, userId } = req.query;
+      const isDay = (v) => v === undefined || v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v);
+      if (!isDay(from) || !isDay(to)) {
+        return res.status(400).json({ error: 'Les dates doivent être au format AAAA-MM-JJ.' });
+      }
+      return res.json(await pollScheduler.getPollStats({ pollId, from, to, userId: userId || undefined }));
     } catch (err) {
       console.error('[Polls] Erreur stats :', err);
       return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques.' });
